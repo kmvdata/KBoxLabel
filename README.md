@@ -33,10 +33,9 @@ cd KBoxLabel
 
 2. 创建虚拟环境（推荐）：
 ```bash
-python -m venv venv
-source venv/bin/activate  # Linux/macOS
-# 或
-venv\Scripts\activate     # Windows
+# 使用conda创建虚拟环境
+conda create -n kboxlabel python=3.10
+conda activate kboxlabel
 ```
 
 3. 安装依赖：
