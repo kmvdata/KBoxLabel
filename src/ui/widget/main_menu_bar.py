@@ -41,9 +41,6 @@ class MainMenuBar(QMenuBar):
         self.yolo_action = QAction("Yolo格式", self)
         self.coco_action = QAction("Coco格式", self)
 
-        # 编辑菜单动作
-        self.edit_action = QAction("编辑功能", self)
-
         self.create_menus()
         self.connect_signals()
 
@@ -68,10 +65,6 @@ class MainMenuBar(QMenuBar):
         file_menu.addSeparator()
         file_menu.addAction(self.close_action)
 
-        # 编辑菜单
-        edit_menu = self.addMenu("编辑")
-        edit_menu.addAction(self.edit_action)
-
     def connect_signals(self):
         """连接动作的信号到槽函数"""
         self.new_action.triggered.connect(self.handle_new_project)
@@ -80,7 +73,6 @@ class MainMenuBar(QMenuBar):
         self.yolo_action.triggered.connect(self.exportToYoloRequested.emit)  # type: ignore
         self.coco_action.triggered.connect(self.exportToCocoRequested.emit)  # type: ignore
         self.close_action.triggered.connect(self.closeRequested.emit)  # type: ignore
-        self.edit_action.triggered.connect(self.editActionRequested.emit)  # type: ignore
 
     def handle_new_project(self):
         """处理新建项目的目录选择"""
