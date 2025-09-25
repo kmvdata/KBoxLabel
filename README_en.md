@@ -14,7 +14,7 @@ KBoxLabel is a PyQt5-based image annotation tool designed for object detection t
 
 ## Interface Preview
 
-![Interface Preview](docs/images/interface.png)
+![Interface Preview](docs/images/main_window.png)
 
 ## Installation Guide
 

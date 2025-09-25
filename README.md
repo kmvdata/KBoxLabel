@@ -14,7 +14,7 @@ KBoxLabel 是一个基于 PyQt5 开发的图像标注工具，支持目标检测
 
 ## 界面预览
 
-![界面预览](docs/images/interface.png)
+![界面预览](docs/images/main_window.png)
 
 ## 安装指南
 

@@ -220,8 +220,8 @@ class MainMenuBar(QMenuBar):
         """处理图片导入功能"""
         main_window = self.parent()
         # 使用getattr安全获取project_path属性，如果不存在则返回None
-        project_path_ref = getattr(main_window, 'project_path', None)
-        project_path = project_path_ref.path
+        project_info = getattr(main_window, 'project_info', None)
+        project_path = project_info.path
         # 检查project_path是否存在且是Path类型
         if project_path is None or not isinstance(project_path, Path):
             QMessageBox.warning(self, "错误", "获取工程路径异常")
@@ -270,18 +270,33 @@ class MainMenuBar(QMenuBar):
 
     def get_image_files(self, import_type):
         """根据选择的类型获取图片文件列表"""
+        # 获取上次打开的目录
+        from src.core.ksettings import KSettings
+        settings = KSettings()
+        last_directory = settings.get_last_opened_directory()
+        
         if import_type == "files":
             # 选择多个图片文件 [3](@ref)
             file_paths, _ = QFileDialog.getOpenFileNames(
                 self,
                 "选择图片文件",
-                "",
+                last_directory,
                 "图片文件 (*.jpg *.jpeg *.png *.bmp *.gif *.tif *.tiff);;所有文件 (*.*)"
             )
+            
+            # 保存当前选择的目录
+            if file_paths:
+                settings.set_last_opened_directory(str(Path(file_paths[0]).parent))
+                
             return file_paths
         else:
             # 选择文件夹并获取所有图片文件
-            folder_path = QFileDialog.getExistingDirectory(self, "选择图片文件夹")
+            folder_path = QFileDialog.getExistingDirectory(self, "选择图片文件夹", last_directory)
+            
+            # 保存当前选择的目录
+            if folder_path:
+                settings.set_last_opened_directory(folder_path)
+                
             if not folder_path:
                 return []
 
