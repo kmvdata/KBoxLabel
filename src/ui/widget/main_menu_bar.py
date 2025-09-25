@@ -76,15 +76,22 @@ class MainMenuBar(QMenuBar):
 
     def handle_new_project(self):
         """处理新建项目的目录选择"""
+        # 获取上次打开的目录
+        from src.core.ksettings import KSettings
+        settings = KSettings()
+        last_directory = settings.get_last_opened_directory()
+        
         selected_dir = QFileDialog.getExistingDirectory(
             self,
             "选择或创建项目目录",
-            "",  # 从当前目录开始
+            last_directory,  # 使用上次打开的目录作为默认路径
             options=QFileDialog.ShowDirsOnly | QFileDialog.DontUseNativeDialog
         )
 
         if selected_dir:
             self.create_new_project(selected_dir)
+            # 保存当前选择的目录
+            settings.set_last_opened_directory(selected_dir)
 
     def create_new_project(self, project_path: str):
         """创建或打开项目目录"""
