@@ -14,7 +14,7 @@ KBoxLabel 是一个基于 PyQt5 开发的图像标注工具，支持目标检测
 
 ## 界面预览
 
-![界面预览](docs/images/interface.png)
+![界面预览](docs/images/main_window.png)
 
 ## 安装指南
 
@@ -33,10 +33,9 @@ cd KBoxLabel
 
 2. 创建虚拟环境（推荐）：
 ```bash
-python -m venv venv
-source venv/bin/activate  # Linux/macOS
-# 或
-venv\Scripts\activate     # Windows
+# 使用conda创建虚拟环境
+conda create -n kboxlabel python=3.10
+conda activate kboxlabel
 ```
 
 3. 安装依赖：
@@ -158,4 +157,4 @@ KBoxLabel/
 如有问题或建议，请通过以下方式联系：
 
 - 提交 Issue
-- 发送邮件至：[your-email@example.com]
+- 发送邮件至：[kermit.mei@gmail.com]

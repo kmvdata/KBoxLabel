@@ -743,12 +743,20 @@ class ImageCanvas(QGraphicsView):
 
     def select_yolo_model(self):
         """选择YOLO模型的pt文件，并复制到项目目录"""
-        # 打开文件选择对话框
+        # 获取上次打开的目录
+        from src.core.ksettings import KSettings
+        settings = KSettings()
+        last_directory = settings.get_last_opened_directory()
+        
+        # 打开文件选择对话框，使用上次打开的目录作为默认目录
         file_path, _ = QFileDialog.getOpenFileName(
-            self, "Select YOLO Model", str(self.project_info), "YOLO Model Files (*.pt)"
+            self, "Select YOLO Model", last_directory, "YOLO Model Files (*.pt)"
         )
 
         if file_path:
+            # 保存当前选择的目录
+            settings.set_last_opened_directory(str(Path(file_path).parent))
+            
             src_path = Path(file_path)  # 源文件路径
             dest_path = self.project_info.path / src_path.name  # 目标路径：项目目录/文件名.pt
             replace_file = False

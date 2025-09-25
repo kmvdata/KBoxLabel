@@ -41,9 +41,6 @@ class MainMenuBar(QMenuBar):
         self.yolo_action = QAction("Yolo格式", self)
         self.coco_action = QAction("Coco格式", self)
 
-        # 编辑菜单动作
-        self.edit_action = QAction("编辑功能", self)
-
         self.create_menus()
         self.connect_signals()
 
@@ -68,10 +65,6 @@ class MainMenuBar(QMenuBar):
         file_menu.addSeparator()
         file_menu.addAction(self.close_action)
 
-        # 编辑菜单
-        edit_menu = self.addMenu("编辑")
-        edit_menu.addAction(self.edit_action)
-
     def connect_signals(self):
         """连接动作的信号到槽函数"""
         self.new_action.triggered.connect(self.handle_new_project)
@@ -80,19 +73,25 @@ class MainMenuBar(QMenuBar):
         self.yolo_action.triggered.connect(self.exportToYoloRequested.emit)  # type: ignore
         self.coco_action.triggered.connect(self.exportToCocoRequested.emit)  # type: ignore
         self.close_action.triggered.connect(self.closeRequested.emit)  # type: ignore
-        self.edit_action.triggered.connect(self.editActionRequested.emit)  # type: ignore
 
     def handle_new_project(self):
         """处理新建项目的目录选择"""
+        # 获取上次打开的目录
+        from src.core.ksettings import KSettings
+        settings = KSettings()
+        last_directory = settings.get_last_opened_directory()
+        
         selected_dir = QFileDialog.getExistingDirectory(
             self,
             "选择或创建项目目录",
-            "",  # 从当前目录开始
+            last_directory,  # 使用上次打开的目录作为默认路径
             options=QFileDialog.ShowDirsOnly | QFileDialog.DontUseNativeDialog
         )
 
         if selected_dir:
             self.create_new_project(selected_dir)
+            # 保存当前选择的目录
+            settings.set_last_opened_directory(selected_dir)
 
     def create_new_project(self, project_path: str):
         """创建或打开项目目录"""
@@ -221,8 +220,8 @@ class MainMenuBar(QMenuBar):
         """处理图片导入功能"""
         main_window = self.parent()
         # 使用getattr安全获取project_path属性，如果不存在则返回None
-        project_path_ref = getattr(main_window, 'project_path', None)
-        project_path = project_path_ref.path
+        project_info = getattr(main_window, 'project_info', None)
+        project_path = project_info.path
         # 检查project_path是否存在且是Path类型
         if project_path is None or not isinstance(project_path, Path):
             QMessageBox.warning(self, "错误", "获取工程路径异常")
@@ -271,18 +270,33 @@ class MainMenuBar(QMenuBar):
 
     def get_image_files(self, import_type):
         """根据选择的类型获取图片文件列表"""
+        # 获取上次打开的目录
+        from src.core.ksettings import KSettings
+        settings = KSettings()
+        last_directory = settings.get_last_opened_directory()
+        
         if import_type == "files":
             # 选择多个图片文件 [3](@ref)
             file_paths, _ = QFileDialog.getOpenFileNames(
                 self,
                 "选择图片文件",
-                "",
+                last_directory,
                 "图片文件 (*.jpg *.jpeg *.png *.bmp *.gif *.tif *.tiff);;所有文件 (*.*)"
             )
+            
+            # 保存当前选择的目录
+            if file_paths:
+                settings.set_last_opened_directory(str(Path(file_paths[0]).parent))
+                
             return file_paths
         else:
             # 选择文件夹并获取所有图片文件
-            folder_path = QFileDialog.getExistingDirectory(self, "选择图片文件夹")
+            folder_path = QFileDialog.getExistingDirectory(self, "选择图片文件夹", last_directory)
+            
+            # 保存当前选择的目录
+            if folder_path:
+                settings.set_last_opened_directory(folder_path)
+                
             if not folder_path:
                 return []
 
