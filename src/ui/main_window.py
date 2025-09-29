@@ -49,6 +49,7 @@ class MainWindow(QMainWindow):
         self.image_list = ImageListView(self.project_info)
         left_layout.addWidget(self.image_list)
         # 连接选中项变化信号
+        self.image_list.sig_selection_changed.connect(self.on_image_list_selection_changed)  # type: ignore
         self.image_list.selectionModel().selectionChanged.connect(self.on_image_selection_changed)  # type: ignore
 
         # ===== 中间图片编辑区域 =====
@@ -731,6 +732,14 @@ class MainWindow(QMainWindow):
     def set_left_status(self, text: str):
         if self.left_status:
             self.left_status.setText(text)
+
+    def on_image_list_selection_changed(self, total_count, current_index):
+        """处理图片列表选择变化，更新状态栏"""
+        if current_index > 0:
+            status_text = f"共加载 {total_count} 张图片，当前选中第 {current_index} 张"
+        else:
+            status_text = f"共加载 {total_count} 张图片，未选中任何图片"
+        self.statusBar().showMessage(status_text)
 
     def handle_import_images(self):
         """处理图片导入功能"""

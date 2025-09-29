@@ -292,6 +292,7 @@ class YoloWorker(QThread):
 class ImageListView(QListView):
     sig_image_clicked = pyqtSignal(str)
     sig_canvas_needs_reload = pyqtSignal()  # 发送canvas需要reload的信号
+    sig_selection_changed = pyqtSignal(int, int)  # 发送图片总数和当前选中索引信号
 
     def __init__(self, project_info: RefProjectInfo):
         super().__init__()
@@ -309,6 +310,7 @@ class ImageListView(QListView):
 
         # 连接信号
         self.doubleClicked.connect(self.handle_item_clicked)  # type: ignore
+        self.selectionModel().selectionChanged.connect(self.on_selection_changed)  # type: ignore
 
     def set_row_height(self, height):
         """统一设置行高（更新模型和委托）"""
@@ -322,6 +324,18 @@ class ImageListView(QListView):
     def load_images_from_path(self, project_path: Path):
         """从项目路径加载图片"""
         self.model.load_images_from_path(project_path)
+
+    def on_selection_changed(self, selected, deselected):
+        """处理选择变化事件"""
+        # 获取当前选中索引
+        indexes = selected.indexes()
+        current_index = indexes[0].row() + 1 if indexes else 0
+        
+        # 获取总图片数
+        total_count = self.model.rowCount()
+        
+        # 发送信号
+        self.sig_selection_changed.emit(total_count, current_index)
 
     def handle_item_clicked(self, index):
         """处理项点击事件"""
