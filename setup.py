@@ -7,14 +7,14 @@ with open("app/requirements.txt", "r", encoding="utf-8") as fh:
     requirements = [line.strip() for line in fh if line.strip() and not line.startswith("#")]
 
 setup(
-    name="KBoxLabel",
+    name="kboxlabel",
     version="1.0.0",
     author="Your Name",
     author_email="your.email@example.com",
     description="A image annotation tool for object detection tasks",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/your-username/KBoxLabel",
+    url="https://github.com/kmvdata/KBoxLabel",
     packages=find_packages(where="src"),
     package_dir={"": "src"},
     classifiers=[
@@ -35,7 +35,7 @@ setup(
     install_requires=requirements,
     entry_points={
         "console_scripts": [
-            "KBoxLabel=main:main",
+            "kboxlabel=main:main",
         ],
     },
     include_package_data=True,
