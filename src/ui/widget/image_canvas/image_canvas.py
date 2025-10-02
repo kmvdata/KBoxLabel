@@ -742,7 +742,7 @@ class ImageCanvas(QGraphicsView):
             self.config_menu.exec_(self.config_button.mapToGlobal(self.config_button.rect().bottomLeft()))
 
     def select_yolo_model(self):
-        """选择YOLO模型的pt文件，并复制到项目目录"""
+        """选择YOLO模型的pt文件，直接引用原位置文件"""
         # 获取上次打开的目录
         from src.core.ksettings import KSettings
         settings = KSettings()
@@ -757,48 +757,30 @@ class ImageCanvas(QGraphicsView):
             # 保存当前选择的目录
             settings.set_last_opened_directory(str(Path(file_path).parent))
             
-            src_path = Path(file_path)  # 源文件路径
-            dest_path = self.project_info.path / src_path.name  # 目标路径：项目目录/文件名.pt
-            replace_file = False
+            model_path = Path(file_path)  # 模型文件路径
+            
+            try:
+                # 直接引用原位置的模型文件
+                self.project_info.yolo_model_path = str(model_path)
+                # 加载模型到project_info的yolo_executor
+                self.project_info.load_yolo(model_path)
+                # 保存配置+启用Run按钮
+                self.save_model_config()
+                if self.run_tool_button:
+                    self.run_tool_button.setEnabled(True)
 
-            # 1. 检查目标路径是否已存在同名文件
-            if dest_path.exists():
-                reply = QMessageBox.question(
-                    self, "File Exists",
-                    f"Model '{dest_path.name}' already exists in project.\nDo you want to replace it?",
-                    QMessageBox.Yes | QMessageBox.No,
-                    QMessageBox.No  # 默认不替换
+                QMessageBox.information(
+                    self, "Success",
+                    f"Model '{model_path.name}' selected successfully!\nPath: {model_path}"
                 )
-                replace_file = (reply == QMessageBox.Yes)
+            except Exception as e:
+                # 捕获加载异常
+                QMessageBox.warning(
+                    self, "Load Failed",
+                    f"Failed to load model:\n{str(e)}"
+                )
             else:
-                replace_file = True  # 不存在则直接复制
-
-            # 2. 执行文件复制
-            if replace_file:
-                try:
-                    # 复制文件（保留元数据，如修改时间）
-                    shutil.copy2(src_path, dest_path)
-                    # 更新模型路径到project_info（替代原self.yolo_model_path）
-                    self.project_info.yolo_model_path = str(dest_path)
-                    # 加载模型到project_info的yolo_executor
-                    self.project_info.load_yolo(dest_path)
-                    # 保存配置+启用Run按钮
-                    self.save_model_config()
-                    if self.run_tool_button:
-                        self.run_tool_button.setEnabled(True)
-
-                    QMessageBox.information(
-                        self, "Success",
-                        f"Model '{dest_path.name}' copied to project successfully!\nPath: {dest_path}"
-                    )
-                except Exception as e:
-                    # 捕获复制异常（如权限不足、文件占用）
-                    QMessageBox.warning(
-                        self, "Copy Failed",
-                        f"Failed to copy model:\n{str(e)}"
-                    )
-            else:
-                QMessageBox.information(self, "Cancelled", "Model selection cancelled (no file copied).")
+                QMessageBox.information(self, "Cancelled", "Model selection cancelled.")
 
     def delete_yolo_model(self):
         """删除已选择的YOLO模型配置"""

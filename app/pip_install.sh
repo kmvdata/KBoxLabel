@@ -11,6 +11,7 @@ core_packages=(
     ultralytics
     pyqtgraph
     pyqt5
+    "numpy<2"
 )
 
 # 使用国内镜像源加速安装
