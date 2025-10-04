@@ -11,6 +11,7 @@ core_packages=(
     ultralytics
     pyqtgraph
     pyqt5
+    sqlalchemy
     "numpy<2"
 )
 
