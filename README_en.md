@@ -20,7 +20,7 @@ KBoxLabel is a PyQt5-based image annotation tool designed for object detection t
 
 ### System Requirements
 
-- Python 3.10 or higher
+- Python 3.11 or higher
 - Supported systems: Windows, macOS, Linux
 
 ### Installation Steps
@@ -41,7 +41,7 @@ conda activate kboxlabel
 3. Install dependencies:
 ```bash
 # Linux/macOS
-./app/pip_install.sh
+bash ./app/pip_install.sh
 
 # Windows
 pip install -r app/requirements.txt
