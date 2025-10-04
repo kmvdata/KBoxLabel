@@ -219,6 +219,7 @@ class ImageListItemDelegate(QStyledItemDelegate):
         thumbnail = index.data(Qt.DecorationRole)
         thumbnail.paint(painter, thumbnail_rect, Qt.AlignCenter)
 
+
         # 设置文本位置（缩略图右侧）
         text_rect = option.rect.adjusted(
             self.thumbnail_size.width() + 6,
@@ -365,6 +366,10 @@ class ImageListView(QListView):
         # 添加新增的Run和Run All菜单项
         run_action = menu.addAction("Run")
         run_all_action = menu.addAction("Run All")
+        
+        # 添加新的菜单项
+        jump_to_action = menu.addAction("跳转至...")
+        smart_jump_action = menu.addAction("智能跳转")
 
         # 检查模型是否已加载，控制Run相关菜单项的可用性
         model_loaded = self.project_info.is_model_loaded
@@ -375,6 +380,10 @@ class ImageListView(QListView):
         rename_action.setEnabled(is_item_clicked)
         delete_action.setEnabled(is_item_clicked)
         open_action.setEnabled(is_item_clicked)
+        
+        # 设置新菜单项的可用性
+        jump_to_action.setEnabled(True)
+        smart_jump_action.setEnabled(self.model.rowCount() > 0)
 
         # 连接菜单项信号
         rename_action.triggered.connect(lambda: self.rename_selected(index))  # type: ignore
@@ -382,6 +391,10 @@ class ImageListView(QListView):
         open_action.triggered.connect(lambda: self.open_in_explorer(index))  # type: ignore
         run_action.triggered.connect(lambda: self.on_run_clicked(index))  # type: ignore
         run_all_action.triggered.connect(self.on_run_all_clicked)  # type: ignore
+        
+        # 连接新菜单项的信号
+        jump_to_action.triggered.connect(self.on_jump_to_clicked)  # type: ignore
+        smart_jump_action.triggered.connect(self.on_smart_jump_clicked)  # type: ignore
 
         # 显示菜单
         menu.exec_(self.mapToGlobal(event.pos()))
@@ -803,4 +816,49 @@ class ImageListView(QListView):
         # 显示进度对话框
         progress_dialog.exec_()
 
+    def on_jump_to_clicked(self):
+        """跳转至...菜单项点击事件"""
+        if self.model.rowCount() == 0:
+            return
+            
+        # 弹出输入对话框让用户输入要跳转到的图片序号
+        max_index = self.model.rowCount()
+        jump_to, ok = QInputDialog.getInt(
+            self,
+            "跳转至...",
+            f"请输入图片序号 (1-{max_index}):",
+            1, 1, max_index, 1
+        )
+        
+        if ok:
+            # 跳转到指定图片（索引从0开始，所以需要减1）
+            index = self.model.index(jump_to - 1, 0)
+            if index.isValid():
+                self.setCurrentIndex(index)
+                # 模拟点击事件以加载图片
+                self.handle_item_clicked(index)
 
+    def on_smart_jump_clicked(self):
+        """智能跳转菜单项点击事件：跳转到第一个没有对应.kolo文件的图片"""
+        if self.model.rowCount() == 0:
+            return
+            
+        # 遍历所有图片，查找第一个没有对应.kolo文件的图片
+        for i in range(self.model.rowCount()):
+            file_path = self.model.image_paths[i]
+            # 获取图片文件名（不含扩展名）
+            file_name = os.path.splitext(os.path.basename(file_path))[0]
+            # 构造对应的.kolo文件路径
+            kolo_file_path = os.path.join(os.path.dirname(file_path), file_name + '.kolo')
+            
+            # 如果.kolo文件不存在，则跳转到该图片
+            if not os.path.exists(kolo_file_path):
+                index = self.model.index(i, 0)
+                if index.isValid():
+                    self.setCurrentIndex(index)
+                    # 模拟点击事件以加载图片
+                    self.handle_item_clicked(index)
+                return
+                
+        # 如果所有图片都有对应的.kolo文件，显示提示信息
+        QMessageBox.information(self, "智能跳转", "所有图片都已标注完成，没有找到未标注的图片。")
