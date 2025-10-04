@@ -129,6 +129,10 @@ class ImageCanvas(QGraphicsView):
         if self.annotation_list:
             self.annotation_list.annotation_selected.connect(self.on_list_annotation_selected)
 
+        # 添加上下文菜单策略
+        self.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.customContextMenuRequested.connect(self.show_context_menu)
+
     def clear_canvas(self):
         """清空画布，只保留背景"""
         self.scene.clear()
@@ -1189,6 +1193,46 @@ class ImageCanvas(QGraphicsView):
             self.update_delete_button_state()
         finally:
             self.scene.blockSignals(False)
+
+    def show_context_menu(self, position):
+        """显示上下文菜单"""
+        context_menu = QMenu(self)
+        
+        # 添加"全部清空"选项
+        clear_all_action = QAction("全部清空", self)
+        clear_all_action.triggered.connect(self.clear_all_annotations)
+        context_menu.addAction(clear_all_action)
+        
+        # 在鼠标位置显示菜单
+        context_menu.exec_(self.mapToGlobal(position))
+
+    def clear_all_annotations(self):
+        """清空所有标注并删除对应的.kolo文件"""
+        if not self.current_image_path or self.image_item is None:
+            return
+            
+        # 确认操作
+        reply = QMessageBox.question(
+            self, "确认清空", "确定要清空所有标注并删除标注文件吗？",
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No
+        )
+        
+        if reply == QMessageBox.Yes:
+            # 清空画布上的所有标注
+            self.clear_annotation_views()
+            
+            # 删除对应的.kolo文件
+            kolo_path = self.current_image_path.with_suffix('.kolo')
+            if kolo_path.exists():
+                try:
+                    kolo_path.unlink()
+                    print(f"已删除标注文件: {kolo_path}")
+                except Exception as e:
+                    print(f"删除标注文件时出错: {e}")
+                    QMessageBox.warning(self, "错误", f"删除标注文件时出错:\n{str(e)}")
+            
+            # 保存状态更新
+            self.set_needs_save_annotations = False
 
     def reload_image(self):
         """重新加载当前显示的图片（如果存在）"""
