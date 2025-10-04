@@ -52,6 +52,12 @@ class RefProjectInfo:
     def is_model_loaded(self):
         return self.yolo_executor.is_model_loaded()
 
+    @property
+    def sqlite_path(self) -> Optional[Path]:
+        if self.path is None:
+            return None
+        return self.path / '__sql_config__.sql'
+
     def load_yolo(self, model_path: Path) -> bool:
         """加载YOLO模型并在成功后缓存路径"""
         try:

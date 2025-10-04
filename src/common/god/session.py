@@ -7,10 +7,10 @@ import traceback
 
 from sqlalchemy.orm import scoped_session
 
-from kanata.common.common.exception.business_exception import BusinessException
-from kanata.common.common.exception.common_error import CommonError
-from kanata.common.common.god import cosmos
-from kanata.common.common.tool.logger import logger
+from src.common.god import cosmos
+from src.common.god.business_exception import BusinessException
+from src.common.god.common_error import CommonError
+from src.common.god.logger import logger
 
 
 class DB(object):

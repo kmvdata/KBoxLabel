@@ -12,8 +12,8 @@ class CommonError(object):
     CODE = 0
     SUCCESS = [0, "success", 'success']
     UNKNOWN_ERROR = [CODE + 10000, '未知错误', '']
-    PARAMETER_ERROR = [CODE + 10002, i18n.t('kanata.PARAMETER_ERROR'), '参数错误']
-    NOT_FOUND_ERROR = [CODE + 10003, i18n.t('kanata.NOT_FOUNT_ERROR'), '资源不存在']
+    PARAMETER_ERROR = [CODE + 10002, 'PARAMETER_ERROR', '参数错误']
+    NOT_FOUND_ERROR = [CODE + 10003, 'kanata.NOT_FOUNT_ERROR', '资源不存在']
 
     CORE_ERROR = [CODE + 20000, 'core错误', '']
     ADMIN_ERROR = [CODE + 20001, 'admin错误', '']
