@@ -1,11 +1,14 @@
-from sqlalchemy import Column, INTEGER, String, DateTime, text, Numeric, func
+from sqlalchemy import Column, INTEGER, String, DateTime, text, Numeric, func, Index
 
 from src.common.god.korm_base import KOrmBase
 
 
 class KoloItem(KOrmBase):
     __tablename__ = 'kolo_item'
-    __table_args__ = {'comment': 'Kolo项目表'}
+    __table_args__ = (
+        Index('idx_image_name', 'image_name'),
+        {'comment': 'Kolo项目表'}
+    )
 
     id = Column(INTEGER, primary_key=True, comment='自增id')
     kid = Column(INTEGER, nullable=False, unique=True, comment='唯一kid')

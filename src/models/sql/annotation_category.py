@@ -1,11 +1,15 @@
-from sqlalchemy import Column, INTEGER, String, DateTime, text, func  # 导入func
+from sqlalchemy import Column, INTEGER, String, DateTime, text, func, Index  # 导入func
 
 from src.common.god.korm_base import KOrmBase
 
 
 class AnnotationCategory(KOrmBase):
     __tablename__ = 'annotation_category'
-    __table_args__ = {'comment': '标注类别表'}
+    __table_args__ = (
+        Index('idx_class_id', 'class_id'),
+        Index('idx_class_name', 'class_name'),
+        {'comment': '标注类别表'}
+    )
 
     id = Column(INTEGER, primary_key=True, comment='自增id')
     class_id = Column(INTEGER, nullable=False, unique=False, comment='类别ID')
