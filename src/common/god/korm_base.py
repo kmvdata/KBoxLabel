@@ -19,6 +19,8 @@ metadata = MetaData()
 
 @as_declarative(metadata=metadata)
 class KOrmBase(object):
+    id = None
+    kid = None
     __tablename__ = None
 
     def __init__(self):
@@ -58,14 +60,14 @@ class KOrmBase(object):
         return cls(**args)
 
     @classmethod
-    def get(cls, id, with_for_update: bool = False):
+    def get(cls, _id, with_for_update: bool = False):
         session = DB.thread_session()
-        if id is None:
+        if _id is None:
             return None
-        if isinstance(id, tuple):
-            id, = id
-        return session.query(cls).filter_by(id=id).first() if not with_for_update else session.query(
-            cls).with_for_update().filter_by(id=id).first()
+        if isinstance(_id, tuple):
+            _id, = _id
+        return session.query(cls).filter_by(id=_id).first() if not with_for_update else session.query(
+            cls).with_for_update().filter_by(id=_id).first()
 
     @classmethod
     def get_by_kid(cls, kid, with_for_update: bool = False, use_cache=False):
@@ -137,7 +139,6 @@ class KOrmBase(object):
         _order_by = text(order_by) if order_by else text('id desc')
         return session.query(cls).filter(cls.kid.in_(kids)).order_by(_order_by).all()
 
-    # 使用方法见 https://www.jianshu.com/p/a4de47d668e3 和 https://stackoverflow.com/questions/29885879/sqlalchemy-dynamic-filter-by
     @classmethod
     def gets_by_filters(cls, filters: tuple, page: int, size: int, order_by: str = None) -> (list, int):
         session = DB.thread_session()
@@ -156,7 +157,8 @@ class KOrmBase(object):
         return session.query(*[func.sum(x) for x in fields]).filter(*filters).all()
 
     @classmethod
-    def delete_by_kid(cls, kid: Annotated[str, '唯一kid'], with_commit: Annotated[bool, '是否提交事务'] = True) -> None:
+    def delete_by_kid(cls, kid: Annotated[str | int, '唯一kid'],
+                      with_commit: Annotated[bool, '是否提交事务'] = True) -> None:
         if not kid:
             raise BusinessException(error=CommonError.PARAMETER_ERROR)
         instance = cls.get_by_kid(kid=kid)
