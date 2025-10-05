@@ -1,16 +1,15 @@
 # annotation_list.py
 import json
-from pathlib import Path
 from typing import Tuple
 
 from PyQt5.QtCore import pyqtSignal, Qt, QSize, QRect, QItemSelectionModel, QMimeData, \
     QSortFilterProxyModel
-from PyQt5.QtGui import QStandardItemModel, QStandardItem, QPen, QDrag, QColor
+from PyQt5.QtGui import QStandardItemModel, QStandardItem, QPen, QDrag
 from PyQt5.QtWidgets import QLineEdit, QSpinBox, QListView, QStyledItemDelegate, QAbstractItemView, \
     QStyle, QToolBar, QWidget, QHBoxLayout, QMenu, QAction
 
-from src.models.annotation_category import AnnotationCategory
-from src.models.ref_project_info import RefProjectInfo
+from src.models.dto.annotation_category import AnnotationCategory
+from src.models.dto.ref_project_info import RefProjectInfo
 
 
 class AnnotationDelegate(QStyledItemDelegate):

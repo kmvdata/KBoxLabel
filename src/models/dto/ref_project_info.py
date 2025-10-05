@@ -4,7 +4,7 @@ from typing import Optional
 
 from src.core.ksettings import KSettings
 from src.core.yolo_executor import YOLOExecutor
-from src.models.annotation_category import AnnotationCategory
+from src.models.dto.annotation_category import AnnotationCategory
 
 
 class RefProjectInfo:

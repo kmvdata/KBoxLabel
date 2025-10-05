@@ -10,7 +10,7 @@ from PyQt5.QtWidgets import (QMainWindow, QWidget, QHBoxLayout, QVBoxLayout,
                              QPushButton, QInputDialog, QFileDialog, QDialogButtonBox,
                              )  # 新增导入
 
-from src.models.ref_project_info import RefProjectInfo
+from src.models.dto.ref_project_info import RefProjectInfo
 from src.ui.widget.image_canvas.image_canvas import ImageCanvas
 from src.ui.widget.image_list import ImageListView
 from src.ui.widget.main_menu_bar import MainMenuBar
@@ -334,7 +334,6 @@ class MainWindow(QMainWindow):
         """
         from PyQt5.QtWidgets import QProgressDialog, QMessageBox
         from PyQt5.QtCore import Qt
-        import glob
 
         # 检查项目路径是否存在
         if not self.project_info.path.exists():
@@ -440,7 +439,6 @@ class MainWindow(QMainWindow):
         """
         from PyQt5.QtWidgets import QProgressDialog, QMessageBox, QFileDialog
         from PyQt5.QtCore import Qt
-        import glob
         import json
         from datetime import datetime
 

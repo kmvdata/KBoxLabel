@@ -10,7 +10,7 @@ from PyQt5.QtWidgets import (QListView, QStyledItemDelegate, QStyle,
                              QMenu, QInputDialog, QMessageBox, QDialog, QVBoxLayout,
                              QLabel, QPushButton, QProgressBar)
 
-from src.models.ref_project_info import RefProjectInfo
+from src.models.dto.ref_project_info import RefProjectInfo
 
 
 class ThumbnailLoaderSignals(QObject):

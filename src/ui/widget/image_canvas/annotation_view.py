@@ -8,7 +8,7 @@ from PyQt5.QtGui import QPen, QPainter, QBrush, QColor
 from PyQt5.QtWidgets import QGraphicsRectItem, QGraphicsItem, QStyle
 
 from src.core.utils.string_util import StringUtil
-from src.models.annotation_category import AnnotationCategory
+from src.models.dto.annotation_category import AnnotationCategory
 
 
 class AnnotationView(QGraphicsRectItem):
@@ -438,7 +438,7 @@ class AnnotationView(QGraphicsRectItem):
             category_data = json.loads(json_data)
 
             # 创建AnnotationCategory对象
-            from src.models.annotation_category import AnnotationCategory
+            from src.models.dto.annotation_category import AnnotationCategory
             dropped_category = AnnotationCategory(
                 class_id=category_data['class_id'],
                 class_name=category_data['class_name']

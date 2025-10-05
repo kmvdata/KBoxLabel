@@ -1,6 +1,5 @@
 # image_canvas.py
 import json
-import shutil
 import sys
 from pathlib import Path
 from typing import Optional
@@ -11,8 +10,8 @@ from PyQt5.QtWidgets import (QGraphicsView, QGraphicsScene, QGraphicsPixmapItem,
                              QToolBar, QSizePolicy, QMenu, QFileDialog, QMessageBox, QToolButton)
 
 from src.core.utils.string_util import StringUtil
-from src.models.annotation_category import AnnotationCategory
-from src.models.ref_project_info import RefProjectInfo
+from src.models.dto.annotation_category import AnnotationCategory
+from src.models.dto.ref_project_info import RefProjectInfo
 from src.ui.widget.image_canvas.annotation_list import AnnotationList
 from src.ui.widget.image_canvas.annotation_view import AnnotationView
 
