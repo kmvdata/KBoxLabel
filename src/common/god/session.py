@@ -6,20 +6,30 @@ import threading
 import traceback
 from pathlib import Path
 
-from sqlalchemy.orm import scoped_session
+from sqlalchemy import engine_from_config
+from sqlalchemy.orm import scoped_session, sessionmaker
 
-from src.common.god import cosmos
 from src.common.god.business_exception import BusinessException
 from src.common.god.common_error import CommonError
 from src.common.god.logger import logger
 
 
-class DB(object):
+class SqliteDB(object):
 
-    def load_sqlite3_db(self, db_path: Path):
+    def __init__(self, db_path: Path):
+        self.db_path = None
+        self.db_engine = None
+        self.db_session = None
+        self.sessions = dict()
+        self._load_db(db_path)
+
+    def _load_db(self, db_path: Path):
         try:
-            from sqlalchemy import engine_from_config
-            from sqlalchemy.orm import scoped_session, sessionmaker
+            self.db_path = db_path
+            if not self.db_path.exists():
+                self.db_path.touch()
+                logger.info(f'创建数据库文件: {db_path}')
+
             # SQLAlchemy
             # 多线程网络模型中session生命周期 https://docs.sqlalchemy.org/en/14/orm/contextual.html#thread-local-scope
             # commit后会清空session所有的绑定对象, 如果需要继续使用model, 需要session.refresh(user)或者配置expire_on_commit=False
@@ -28,16 +38,17 @@ class DB(object):
                 "sqlalchemy.echo": False,
                 "sqlalchemy.pool_pre_ping": True,
             }
-            db_engine = engine_from_config(db_config, prefix="sqlalchemy.")
+            self.db_engine = engine_from_config(db_config, prefix="sqlalchemy.")
             # 创建 Session 类
-            cosmos.db_session = scoped_session(sessionmaker(bind=db_engine, expire_on_commit=False))
+            self.db_session = scoped_session(sessionmaker(bind=self.db_engine, expire_on_commit=False))
         except (NameError, ModuleNotFoundError) as e:
             logger.error(e)
+            # 数据库加载失败，继续上抛异常
+            raise
 
-    @staticmethod
-    def thread_session() -> scoped_session | None:
+    def thread_session(self) -> scoped_session | None:
         # threading.local()每次都会重新生成新的变量
-        session = cosmos.sessions.get(threading.get_ident())
+        session = self.sessions.get(threading.get_ident())
         if session is None:
             logger.error('没有合适的线程安全session')
             logger.error(''.join(traceback.format_stack(limit=10)))
@@ -45,7 +56,7 @@ class DB(object):
         return session
 
     @staticmethod
-    def close():
-        session = cosmos.sessions.get(threading.get_ident())
+    def close_session(self):
+        session = self.sessions.get(threading.get_ident())
         session.close()
         pass
