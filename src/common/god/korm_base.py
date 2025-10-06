@@ -96,10 +96,10 @@ class KOrmBase(object):
                       with_commit: Annotated[bool, '是否提交事务'] = True) -> None:
         DB.delete_by_kid(cls, kid, with_commit)
 
-    def save(self, with_commit: Annotated[bool, '是否提交事务'] = True, use_cache: bool = True) -> None:
+    def save(self, with_commit: Annotated[bool, '是否提交事务'] = True) -> None:
         DB.save(self, with_commit)
 
-    def add(self, with_commit: Annotated[bool, '是否提交事务'] = True, use_cache: bool = True) -> None:
+    def add(self, with_commit: Annotated[bool, '是否提交事务'] = True) -> None:
         DB.add(self, with_commit)
 
     def delete(self, with_commit: Annotated[bool, '是否提交事务'] = True) -> None:

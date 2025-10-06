@@ -4,11 +4,6 @@
 """
 import threading
 import traceback
-import hashlib
-import json
-import time
-from datetime import datetime, date
-from decimal import Decimal
 from pathlib import Path
 from typing import Annotated
 
@@ -154,17 +149,7 @@ class SqliteDB(object):
             if with_commit:
                 # 事务提交
                 session.commit()
-                # TODO: 这里需要确认cosmos.redis的访问方式
-                # if use_cache:
-                #     # 节约redis的内存占用
-                #     if hasattr(cosmos, 'redis') and obj.kid:
-                #         cosmos.redis.hset(name=obj.__tablename__, key=obj.kid,
-                #                           value=json.dumps(obj.to_serializable_dict()))
             else:
-                # 执行外部事务(外部提交)，需要放弃redis的缓存对应的数据，否则有可能因为外部事务的失败，造成数据库和缓存不一致
-                # 部分表kid未使用，永远是null
-                # if hasattr(cosmos, 'redis') and obj.kid:
-                #     cosmos.redis.hdel(obj.__tablename__, obj.kid)
                 pass
         except Exception as e:
             logger.error(e)
@@ -178,14 +163,7 @@ class SqliteDB(object):
             session.add(obj)
             if with_commit:
                 session.commit()
-                # TODO: 这里需要确认cosmos.redis的访问方式
-                # if use_cache and hasattr(cosmos, 'redis'):
-                #     if hasattr(obj, 'kid') and obj.kid is not None:
-                #         cosmos.redis.hset(name=obj.__tablename__, key=obj.kid,
-                #                           value=json.dumps(obj.to_serializable_dict()))
             else:
-                # if hasattr(cosmos, 'redis') and obj.kid:
-                #     cosmos.redis.hdel(obj.__tablename__, obj.kid)
                 pass
         except Exception as e:
             logger.error(e)
@@ -199,21 +177,9 @@ class SqliteDB(object):
             session.delete(obj)
             if with_commit:
                 session.commit()
-                # TODO: 这里需要确认cosmos.redis的访问方式
-                # if hasattr(cosmos, 'redis') and hasattr(obj, 'kid') and obj.kid:
-                #     cosmos.redis.hdel(obj.__tablename__, obj.kid)
             else:
-                # if hasattr(cosmos, 'redis') and hasattr(obj, 'kid') and obj.kid:
-                #     cosmos.redis.hdel(obj.__tablename__, obj.kid)
                 pass
         except Exception as e:
             logger.error(e)
             session.rollback()
             raise e
-
-    @staticmethod
-    def generate_kid() -> str:
-        """
-        more生成kid算法(完全随机)
-        """
-        return hashlib.md5(time.time().__str__().encode()).hexdigest().lower()[:16]
