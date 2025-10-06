@@ -848,7 +848,7 @@ class ImageCanvas(QGraphicsView):
                 with open(config_path, 'r') as f:
                     config = json.load(f)
                     # 加载模型路径到project_info（替代原self.yolo_model_path）
-                    self.project_info.yolo_model_path = config.get("model_path")
+                    self.project_info.yolo_model_path = config.get_by_id("model_path")
                     print(f"Loaded YOLO model from {self.project_info.yolo_model_path}")
                     # 如果有模型，启用Run按钮
                     if self.run_tool_button and self.project_info.yolo_model_path:

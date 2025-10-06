@@ -26,4 +26,5 @@ class KoloItem(KOrmBase):
     update_time = Column(DateTime,
                          default=func.current_timestamp(),  # 插入时默认当前时间
                          onupdate=func.current_timestamp(),  # 更新时自动更新为当前时间
-                         comment='更新时间')
+                         comment='更新时间'
+
