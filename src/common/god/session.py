@@ -4,6 +4,7 @@
 """
 import threading
 import traceback
+from pathlib import Path
 
 from sqlalchemy.orm import scoped_session
 
@@ -14,6 +15,24 @@ from src.common.god.logger import logger
 
 
 class DB(object):
+
+    def load_sqlite3_db(self, db_path: Path):
+        try:
+            from sqlalchemy import engine_from_config
+            from sqlalchemy.orm import scoped_session, sessionmaker
+            # SQLAlchemy
+            # 多线程网络模型中session生命周期 https://docs.sqlalchemy.org/en/14/orm/contextual.html#thread-local-scope
+            # commit后会清空session所有的绑定对象, 如果需要继续使用model, 需要session.refresh(user)或者配置expire_on_commit=False
+            db_config = {
+                "sqlalchemy.url": f"sqlite:///{str(db_path)}",
+                "sqlalchemy.echo": False,
+                "sqlalchemy.pool_pre_ping": True,
+            }
+            db_engine = engine_from_config(db_config, prefix="sqlalchemy.")
+            # 创建 Session 类
+            cosmos.db_session = scoped_session(sessionmaker(bind=db_engine, expire_on_commit=False))
+        except (NameError, ModuleNotFoundError) as e:
+            logger.error(e)
 
     @staticmethod
     def thread_session() -> scoped_session | None:

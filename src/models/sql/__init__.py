@@ -39,6 +39,14 @@ class DBUtil:
         # 创建表和索引
         table_class.metadata.create_all(engine)  # type: ignore
 
+    def save(self, orm_obj: KOrmBase):
+        # todo: 以kid为key保存对象，如果存在，就覆盖，如果不存在，就add
+        pass
+
+    def delete(self, orm_obj: KOrmBase, key: str):
+        # todo: 如果id不为None，就以id为key删除对象；如果id为None，就以kid为key删除对象
+        pass
+
 
 if __name__ == '__main__':
     DBUtil.gen_sql_tables(AnnotationCategory, Path('../data/annotation_category.db'))
