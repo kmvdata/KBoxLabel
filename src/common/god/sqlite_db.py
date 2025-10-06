@@ -75,12 +75,10 @@ class SqliteDB(object):
             _id, = _id
         return session.query(cls).filter_by(id=_id).first()
 
-    def get_by_kid(self, cls, kid, with_for_update: bool = False, use_cache=False):
+    def get_by_kid(self, cls, kid):
         """
         :param cls: 继承自KOrmBase的类
         :param kid:
-        :param with_for_update: 加互斥锁，并发读并修改后解除锁
-        :param use_cache:
         :return:
         """
         if kid is None:
@@ -88,25 +86,7 @@ class SqliteDB(object):
         if isinstance(kid, tuple):
             kid, = kid
         session = self.thread_session()
-        # TODO: 这里需要确认cosmos.redis的访问方式
-        # if use_cache and hasattr(cosmos, 'redis'):
-        #     _obj = cosmos.redis.hget(name=cls.__tablename__, key=kid)
-        #     obj = cls.unserializable_from_dict(json.loads(_obj)) if _obj else None
-        #     # 缓存未命中, 从数据库中获取
-        #     if obj is None:
-        #         obj = session.query(cls).filter_by(kid=kid).first() if not with_for_update else \
-        #             session.query(cls).with_for_update().filter_by(kid=kid).first()
-        #         # 补充到缓存中
-        #         if obj:
-        #             cosmos.redis.hset(name=cls.__tablename__, key=kid, value=json.dumps(obj.to_serializable_dict()))
-        # else:
-        #     obj = session.query(cls).filter_by(kid=kid).first() if not with_for_update else session.query(
-        #         cls).with_for_update().filter_by(kid=kid).first()
-        #     # 补充到缓存中
-        #     if obj and hasattr(cosmos, 'redis'):
-        #         cosmos.redis.hset(name=cls.__tablename__, key=kid, value=json.dumps(obj.to_serializable_dict()))
-        obj = session.query(cls).filter_by(kid=kid).first() if not with_for_update else session.query(
-            cls).with_for_update().filter_by(kid=kid).first()
+        obj = session.query(cls).filter_by(kid=kid).first()
         return obj
 
     def get_by_condition(self, cls, with_for_update: bool = False, order_by: str = None, **condition):

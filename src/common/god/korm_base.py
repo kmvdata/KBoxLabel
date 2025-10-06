@@ -64,8 +64,8 @@ class KOrmBase(object):
         return DB.get_by_id(cls, _id, with_for_update)
 
     @classmethod
-    def get_by_kid(cls, kid, with_for_update: bool = False, use_cache=False):
-        return DB.get_by_kid(cls, kid, with_for_update, use_cache)
+    def get_by_kid(cls, kid):
+        return DB.get_by_kid(cls, kid)
 
     @classmethod
     def get_by_condition(cls, with_for_update: bool = False, order_by: str = None, **condition):
