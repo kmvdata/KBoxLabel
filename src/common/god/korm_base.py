@@ -1,18 +1,8 @@
-import hashlib
-import json
-import time
 from datetime import datetime, date
 from decimal import Decimal
-from typing import Annotated
 
-from sqlalchemy import text, func, MetaData
+from sqlalchemy import MetaData
 from sqlalchemy.orm import as_declarative
-
-from src.common.god import cosmos
-from src.common.god.business_exception import BusinessException
-from src.common.god.common_error import CommonError
-from src.common.god.logger import logger
-from src.common.god.sqlite_db import DB
 
 metadata = MetaData()
 
@@ -58,68 +48,3 @@ class KOrmBase(object):
                 args[key] = value
 
         return cls(**args)
-
-    @classmethod
-    def get(cls, _id, with_for_update: bool = False):
-        return DB.get_by_id(cls, _id, with_for_update)
-
-    @classmethod
-    def get_by_kid(cls, kid):
-        return DB.get_by_kid(cls, kid)
-
-    @classmethod
-    def get_by_condition(cls, with_for_update: bool = False, order_by: str = None, **condition):
-        return DB.get_by_condition(cls, with_for_update, order_by, **condition)
-
-    @classmethod
-    def gets_by_condition(cls, page: int, size: int, order_by: str = None, **condition) -> (list, int):
-        return DB.gets_by_condition(cls, page, size, order_by, **condition)
-
-    @classmethod
-    def gets_in_ids(cls, ids: list, order_by: str = None) -> list | None:
-        return DB.gets_in_ids(cls, ids, order_by)
-
-    @classmethod
-    def gets_in_kids(cls, kids: list, order_by: str = None) -> list | None:
-        return DB.gets_in_kids(cls, kids, order_by)
-
-    @classmethod
-    def gets_by_filters(cls, filters: tuple, page: int, size: int, order_by: str = None) -> (list, int):
-        return DB.gets_by_filters(cls, filters, page, size, order_by)
-
-    @classmethod
-    def get_sums(cls, fields: list, filters: tuple) -> list | None:
-        return DB.get_sums(cls, fields, filters)
-
-    @classmethod
-    def delete_by_kid(cls, kid: Annotated[str | int, '唯一kid'],
-                      with_commit: Annotated[bool, '是否提交事务'] = True) -> None:
-        DB.delete_by_kid(cls, kid, with_commit)
-
-    def save(self, with_commit: Annotated[bool, '是否提交事务'] = True) -> None:
-        DB.save(self, with_commit)
-
-    def add(self, with_commit: Annotated[bool, '是否提交事务'] = True) -> None:
-        DB.add(self, with_commit)
-
-    def delete(self, with_commit: Annotated[bool, '是否提交事务'] = True) -> None:
-        DB.delete(self, with_commit)
-
-    @staticmethod
-    def generate_kid() -> str:
-        """
-        more生成kid算法(完全随机)
-        """
-        return hashlib.md5(time.time().__str__().encode()).hexdigest().lower()[:16]
-
-    def remove_kid_if_none(self):
-        """
-        为了兼容没有kid的库
-        :return:
-        """
-        try:
-            if self.kid is None:
-                del self.kid
-        except AttributeError:
-            pass
-        return self
