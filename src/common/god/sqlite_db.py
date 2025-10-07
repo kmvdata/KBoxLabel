@@ -183,3 +183,21 @@ class SqliteDB(object):
             logger.error(e)
             session.rollback()
             raise e
+
+    def execute_in_transaction(self, transaction_func, *args, **kwargs):
+        """
+        在事务中执行函数
+        :param transaction_func: 要执行的函数，接收session作为第一个参数
+        :param args: 传递给函数的位置参数
+        :param kwargs: 传递给函数的关键字参数
+        :return: 函数的返回值
+        """
+        session = self.thread_session()
+        try:
+            result = transaction_func(session, *args, **kwargs)
+            session.commit()
+            return result
+        except Exception as e:
+            session.rollback()
+            logger.error(e)
+            raise e
