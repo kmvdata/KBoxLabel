@@ -42,6 +42,9 @@ class ImageCanvas(QGraphicsView):
         # 添加标志防止递归调用
         self._updating_delete_state = False
 
+        # 连接模型加载完成的信号
+        self._connect_model_signals()
+
         # 加载已保存的模型配置
         self.load_model_config()
 
@@ -765,8 +768,31 @@ class ImageCanvas(QGraphicsView):
             try:
                 # 直接引用原位置的模型文件
                 self.project_info.yolo_model_path = str(model_path)
-                # 加载模型到project_info的yolo_executor
-                self.project_info.load_yolo(model_path)
+                # 异步加载模型到project_info的yolo_executor
+                self._load_yolo_model_async(model_path)
+                
+            except Exception as e:
+                # 捕获加载异常
+                QMessageBox.warning(
+                    self, "Load Failed",
+                    f"Failed to load model:\n{str(e)}"
+                )
+        else:
+            QMessageBox.information(self, "Cancelled", "Model selection cancelled.")
+
+    def _load_yolo_model_async(self, model_path: Path):
+        """异步加载YOLO模型"""
+        # 显示加载提示
+        loading_msg = QMessageBox()
+        loading_msg.setWindowTitle("Loading Model")
+        loading_msg.setText("Loading YOLO model, please wait...")
+        loading_msg.setStandardButtons(QMessageBox.NoButton)
+        loading_msg.show()
+        
+        # 连接加载完成的回调
+        def on_model_loaded(success: bool, error_message: str):
+            loading_msg.close()
+            if success:
                 # 保存配置+启用Run按钮
                 self.save_model_config()
                 if self.run_tool_button:
@@ -776,14 +802,20 @@ class ImageCanvas(QGraphicsView):
                     self, "Success",
                     f"Model '{model_path.name}' selected successfully!\nPath: {model_path}"
                 )
-            except Exception as e:
-                # 捕获加载异常
+            else:
+                # 加载失败，显示错误信息
                 QMessageBox.warning(
                     self, "Load Failed",
-                    f"Failed to load model:\n{str(e)}"
+                    f"Failed to load model:\n{error_message}"
                 )
-            else:
-                QMessageBox.information(self, "Cancelled", "Model selection cancelled.")
+        
+        # 开始异步加载
+        model_thread = self.project_info.load_yolo_async(model_path)
+        if model_thread:
+            model_thread.model_loaded.connect(on_model_loaded)
+        else:
+            loading_msg.close()
+            QMessageBox.warning(self, "Warning", "Model is already loading.")
 
     def delete_yolo_model(self):
         """删除已选择的YOLO模型配置"""
@@ -848,11 +880,21 @@ class ImageCanvas(QGraphicsView):
                 with open(config_path, 'r') as f:
                     config = json.load(f)
                     # 加载模型路径到project_info（替代原self.yolo_model_path）
-                    self.project_info.yolo_model_path = config.get_by_id("model_path")
+                    self.project_info.yolo_model_path = config.get("model_path")
                     print(f"Loaded YOLO model from {self.project_info.yolo_model_path}")
                     # 如果有模型，启用Run按钮
                     if self.run_tool_button and self.project_info.yolo_model_path:
-                        self.run_tool_button.setEnabled(True)
+                        # 检查模型是否已经加载或者正在加载
+                        if self.project_info.is_model_loaded:
+                            self.run_tool_button.setEnabled(True)
+                        elif self.project_info.is_model_loading:
+                            # 模型正在加载，稍后会通过信号启用按钮
+                            pass
+                        else:
+                            # 模型未加载也未在加载，尝试加载
+                            model_path = Path(self.project_info.yolo_model_path)
+                            if model_path.exists():
+                                self._load_yolo_model_async(model_path)
         except Exception as e:
             print(f"Error loading YOLO model configuration: {e}")
 
@@ -862,6 +904,11 @@ class ImageCanvas(QGraphicsView):
         import logging
         # 移除函数内重复导入，统一放在模块顶部
 
+        # 检查模型是否正在加载
+        if self.project_info.is_model_loading:
+            QMessageBox.warning(self, "Warning", "Model is still loading, please wait.")
+            return
+            
         # 检查模型是否加载
         if not self.project_info.is_model_loaded:
             QMessageBox.warning(self, "Warning", "No YOLO model selected! Please configure a model first.")
@@ -1239,3 +1286,18 @@ class ImageCanvas(QGraphicsView):
         if self.current_image_path is not None:
             # 调用已有的load_image方法重新加载当前图片
             self.load_image(self.current_image_path)
+
+    def _connect_model_signals(self):
+        """连接模型加载相关的信号"""
+        # 为了确保能接收到模型加载完成的信号，我们需要在project_info中添加信号连接
+        pass  # 实际的信号连接在RefProjectInfo中处理
+
+    def _on_model_load_finished(self, success: bool, error_message: str):
+        """缓存模型加载完成的回调"""
+        if success:
+            # 模型加载成功，启用Run按钮
+            if self.run_tool_button:
+                self.run_tool_button.setEnabled(True)
+            print("缓存的YOLO模型加载成功")
+        else:
+            print(f"缓存的YOLO模型加载失败: {error_message}")

@@ -627,6 +627,10 @@ class ImageListView(QListView):
 
     def on_run_all_clicked(self):
         """Run All菜单项点击事件：处理所有文件"""
+        if self.project_info.is_model_loading:
+            QMessageBox.warning(self, "Warning", "YOLO model is still loading. Please wait until loading is complete.")
+            return
+            
         if not self.project_info.is_model_loaded:
             QMessageBox.warning(self, "Warning", "YOLO model not loaded. Please load a model first.")
             return
