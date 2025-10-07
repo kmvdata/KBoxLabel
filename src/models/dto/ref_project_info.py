@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 from typing import Optional
 
+from src.common.god.sqlite_db import SqliteDB
 from src.core.ksettings import KSettings
 from src.core.yolo_executor import YOLOExecutor
 from src.models.dto.annotation_category import AnnotationCategory
@@ -14,6 +15,7 @@ class RefProjectInfo:
         self.path = path  # 可变属性
         self.yolo_executor = YOLOExecutor()
         self.categories: list[AnnotationCategory] = []
+        self.sqlite_db: Optional[SqliteDB] = None
 
         # 初始化时检查是否有缓存的模型路径并尝试加载
         self._load_cached_yolo_model()
