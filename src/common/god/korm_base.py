@@ -4,16 +4,19 @@ from decimal import Decimal
 from sqlalchemy import MetaData
 from sqlalchemy.orm import as_declarative
 
+from src.common.god.ksnowflake import KSnowflake
+
 metadata = MetaData()
 
 
 @as_declarative(metadata=metadata)
 class KOrmBase(object):
-    id = None
-    kid = None
     __tablename__ = None
 
+    snowflake = KSnowflake()
+
     def __init__(self):
+        self.id = None
         self.kid = None
         self.__table__ = None
 
@@ -48,3 +51,7 @@ class KOrmBase(object):
                 args[key] = value
 
         return cls(**args)
+
+    @classmethod
+    def gen_kid(cls) -> int:
+        return cls.snowflake.gen_kid()

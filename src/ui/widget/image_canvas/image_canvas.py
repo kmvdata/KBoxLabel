@@ -9,9 +9,11 @@ from PyQt5.QtGui import QPixmap, QPen, QColor, QPainter, QBrush, QKeySequence, Q
 from PyQt5.QtWidgets import (QGraphicsView, QGraphicsScene, QGraphicsPixmapItem, QAction,
                              QToolBar, QSizePolicy, QMenu, QFileDialog, QMessageBox, QToolButton)
 
+from src.common.god.korm_base import KOrmBase
 from src.core.utils.string_util import StringUtil
 from src.models.dto.annotation_category import AnnotationCategory
 from src.models.dto.ref_project_info import RefProjectInfo
+from src.models.sql import KoloItem
 from src.ui.widget.image_canvas.annotation_list import AnnotationList
 from src.ui.widget.image_canvas.annotation_view import AnnotationView
 
@@ -559,6 +561,9 @@ class ImageCanvas(QGraphicsView):
             # 按class_id排序
             annotations.sort(key=lambda _item: _item.category.class_name)
 
+            # 创建kolo_item_list用于存储KoloItem对象
+            kolo_item_list = []
+            
             with open(txt_path, 'w') as f:
                 for item in annotations:
                     # 获取当前在场景中的绝对位置和大小（修复：使用sceneBoundingRect获取最新位置）
@@ -579,6 +584,31 @@ class ImageCanvas(QGraphicsView):
 
                     # 写入文件，保留9位小数
                     f.write(f"{class_name_b64} {x_center:.9f} {y_center:.9f} {norm_width:.9f} {norm_height:.9f}\n")
+                    
+                    # 创建KoloItem对象并添加到列表中
+                    # 从当前图片路径获取图片名称
+                    image_name = self.current_image_path.name
+                    kolo_item_list.append(KoloItem(
+                        kid=KOrmBase.snowflake.gen_kid(),
+                        image_name=image_name,
+                        class_name=item.category.class_name,
+                        x_center=x_center,
+                        y_center=y_center,
+                        width=norm_width,
+                        height=norm_height
+                    ))
+
+            # 在事务中删除所有image_name的kolo_item, 然后插入新的kolo_item_list中的对象
+            def transaction_func(session):
+                # 删除所有与当前图片相关的旧记录
+                session.query(KoloItem).filter(KoloItem.image_name == self.current_image_path.name).delete()
+                
+                # 插入新的KoloItem对象
+                for kolo_item in kolo_item_list:
+                    session.add(kolo_item)
+            
+            # 执行事务
+            self.project_info.sqlite_db.execute_in_transaction(transaction_func)
 
             print(f"保存标注文件成功: {txt_path}")
             return True

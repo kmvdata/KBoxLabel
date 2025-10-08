@@ -51,6 +51,8 @@ class SqliteDB(object):
         # threading.local()每次都会重新生成新的变量
         session = self.sessions.get(threading.get_ident())
         if session is None:
+            self.sessions[threading.get_ident()] = self.db_session()
+            session = self.sessions.get(threading.get_ident())
             logger.error('没有合适的线程安全session')
             logger.error(''.join(traceback.format_stack(limit=10)))
             raise BusinessException(CommonError.SESSION_ERROR)
@@ -192,7 +194,7 @@ class SqliteDB(object):
         :param kwargs: 传递给函数的关键字参数
         :return: 函数的返回值
         """
-        session = self.thread_session()
+        session = self.db_session()
         try:
             result = transaction_func(session, *args, **kwargs)
             session.commit()
@@ -201,3 +203,5 @@ class SqliteDB(object):
             session.rollback()
             logger.error(e)
             raise e
+        finally:
+            session.close()
