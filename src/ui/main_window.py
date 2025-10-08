@@ -273,7 +273,6 @@ class MainWindow(QMainWindow):
 
             # todo: 判断self.project_info.sqlite_path位置是否存在，如果不存在，创建这个sqlite文件
 
-
             # 更新UI
             self.setWindowTitle(self.window_title)
             self.statusBar().showMessage(f"已打开项目: {project_path}", 5000)
@@ -288,7 +287,7 @@ class MainWindow(QMainWindow):
                 f"无法打开项目: {str(e)}"
             )
             # 确保项目路径为无效状态
-            self.project_info = RefProjectInfo(Path(""))
+            self.project_info = None
             self.setWindowTitle(self.window_title)
 
     @property

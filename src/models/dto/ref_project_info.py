@@ -6,31 +6,34 @@ from src.common.god.sqlite_db import SqliteDB
 from src.core.ksettings import KSettings
 from src.core.yolo_executor import YOLOExecutor
 from src.models.dto.annotation_category import AnnotationCategory
+from src.models.sql import gen_sql_tables
 
 
 class RefProjectInfo:
     """可变容器，用于同步 project_path 的变化，包含YOLO模型配置缓存功能"""
 
-    def __init__(self, path: Optional[Path] = None):
+    def __init__(self, path: Path):
         self.path = path  # 可变属性
         self.yolo_executor = YOLOExecutor()
         self.categories: list[AnnotationCategory] = []
-        self.sqlite_db: Optional[SqliteDB] = None
+
+        # 初始化数据库
+        gen_sql_tables(self.db_path)
+        self.sqlite_db: Optional[SqliteDB] = SqliteDB(self.db_path)
 
         # 初始化时检查是否有缓存的模型路径并尝试加载
         self._load_cached_yolo_model()
-
-    def set_path(self, new_path: Path):
-        old_path = self.path
-        self.path = new_path
-        # 当路径改变时，重新检查缓存的模型
-        if old_path != new_path:
-            self._load_cached_yolo_model()
 
     def exists(self) -> bool:
         if self.path is None:
             return False
         return self.path.exists()
+
+    @property
+    def db_path(self):
+        if self._config_dir is None:
+            return None
+        return self._config_dir / 'data.db'
 
     @property
     def project_name(self) -> str:
@@ -126,6 +129,19 @@ class RefProjectInfo:
         settings.setValue(self._yolo_model_key, str(model_path))
         # 确保配置被写入
         settings.sync()
+
+    @property
+    def _config_dir(self):
+        if self.path is None:
+            return None
+        # 如果存在同名的.kboxlabel文件夹，则使用它，如果不存在，则创建，然后返回路径
+        _config_dir = self.path / '.kboxlabel'
+        
+        # 检查目录是否存在，如果不存在则创建
+        if not _config_dir.exists():
+            _config_dir.mkdir(parents=True, exist_ok=True)
+        
+        return _config_dir
 
     @property
     def categories_path(self) -> Path:
