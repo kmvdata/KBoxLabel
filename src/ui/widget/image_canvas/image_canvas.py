@@ -211,64 +211,59 @@ class ImageCanvas(QGraphicsView):
         return self.project_info.categories
 
     def _load_kolo_file(self, image_path: Path, img_width: int, img_height: int):
-        """加载与图片同名的.kolo文件"""
-        # 将文件后缀改为.kolo
-        kolo_path = image_path.with_suffix('.kolo')
-
-        # 如果文件不存在，创建空文件
-        if not kolo_path.exists():
-            kolo_path.touch()
+        """从SQLite数据库加载与图片同名的kolo_item记录"""
+        # 获取图片文件名作为查询key
+        image_name = image_path.name
 
         # 创建类名到类别的映射字典
         class_name_map = {category.class_name: category for category in self.category_map.values()}
 
-        # 读取并解析标注文件
+        # 从数据库中查询所有匹配image_name的KoloItem对象
         try:
-            with open(kolo_path, 'r', encoding='utf-8') as f:
-                for line_idx, line in enumerate(f, 1):
-                    parts = line.strip().split()
-                    if len(parts) < 5:
-                        print(f"警告: 第{line_idx}行格式错误，跳过")
-                        continue
+            # 定义查询函数
+            def query_func(session):
+                from src.models.sql.kolo_item import KoloItem
+                return session.query(KoloItem).filter(KoloItem.image_name == image_name).all()
+            
+            # 执行查询
+            kolo_items = self.project_info.sqlite_db.execute_in_transaction(query_func)
 
-                    # 解码Base64格式的类名字符串
-                    base64_name = parts[0]
-                    class_name = StringUtil.base64_to_string(base64_name)
+            # 处理查询结果
+            for kolo_item in kolo_items:
+                class_name = kolo_item.class_name
+                
+                # 获取类别对象（如果不存在则创建并添加到映射中）
+                category = class_name_map.get(class_name)
+                if not category:
+                    # 动态创建新类别
+                    new_category = AnnotationCategory(
+                        class_id=len(self.category_map) + 1,
+                        class_name=class_name,
+                    )
+                    # 添加到类别映射
+                    self.category_map[new_category.class_name] = new_category
+                    class_name_map[class_name] = new_category
+                    category = new_category
+                    print(f"信息: 数据库中类别 '{class_name}' 未定义，已创建新类别（ID={new_category.class_id}）")
 
-                    # 获取类别对象（如果不存在则创建并添加到映射中）
-                    category = class_name_map.get(class_name)
-                    if not category:
-                        # 动态创建新类别
-                        new_category = AnnotationCategory(
-                            class_id=len(self.category_map) + 1,
-                            class_name=class_name,
-                        )
-                        # 添加到类别映射
-                        self.category_map[new_category.class_name] = new_category
-                        class_name_map[class_name] = new_category
-                        category = new_category
-                        print(
-                            f"信息: 第{line_idx}行类别 '{class_name}' 未定义，已创建新类别（ID={new_category.class_id}）")
+                # 从KoloItem获取归一化坐标
+                x_center = float(kolo_item.x_center)
+                y_center = float(kolo_item.y_center)
+                width = float(kolo_item.width)
+                height = float(kolo_item.height)
 
-                    # 解析归一化坐标
-                    try:
-                        x_center, y_center, width, height = map(float, parts[1:5])
-                    except ValueError:
-                        print(f"错误: 第{line_idx}行坐标解析失败，跳过")
-                        continue
+                # 转换为绝对坐标
+                x1 = (x_center - width / 2) * img_width
+                y1 = (y_center - height / 2) * img_height
+                rect_width = width * img_width
+                rect_height = height * img_height
 
-                    # 转换为绝对坐标
-                    x1 = (x_center - width / 2) * img_width
-                    y1 = (y_center - height / 2) * img_height
-                    rect_width = width * img_width
-                    rect_height = height * img_height
-
-                    # 创建AnnotationView并添加到场景
-                    item = AnnotationView(x1, y1, rect_width, rect_height, category, self)
-                    self.scene.addItem(item)
+                # 创建AnnotationView并添加到场景
+                item = AnnotationView(x1, y1, rect_width, rect_height, category, self)
+                self.scene.addItem(item)
 
         except Exception as e:
-            print(f"加载标注文件错误: {e}")
+            print(f"从数据库加载标注信息错误: {e}")
             
         # 根据规范，加载完标注后需要取消所有标注的选中状态
         self.unselect_all_annotations()
@@ -583,7 +578,7 @@ class ImageCanvas(QGraphicsView):
                     class_name_b64 = StringUtil.string_to_base64(item.category.class_name)
 
                     # 写入文件，保留9位小数
-                    f.write(f"{class_name_b64} {x_center:.9f} {y_center:.9f} {norm_width:.9f} {norm_height:.9f}\n")
+                    # f.write(f"{class_name_b64} {x_center:.9f} {y_center:.9f} {norm_width:.9f} {norm_height:.9f}\n")
                     
                     # 创建KoloItem对象并添加到列表中
                     # 从当前图片路径获取图片名称
@@ -839,13 +834,8 @@ class ImageCanvas(QGraphicsView):
                     f"Failed to load model:\n{error_message}"
                 )
         
-        # 开始异步加载
-        model_thread = self.project_info.load_yolo_async(model_path)
-        if model_thread:
-            model_thread.model_loaded.connect(on_model_loaded)
-        else:
-            loading_msg.close()
-            QMessageBox.warning(self, "Warning", "Model is already loading.")
+        # 开始加载模型
+        self.project_info.load_yolo(model_path)
 
     def delete_yolo_model(self):
         """删除已选择的YOLO模型配置"""
