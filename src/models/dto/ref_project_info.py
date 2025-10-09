@@ -7,6 +7,7 @@ from src.core.ksettings import KSettings
 from src.core.yolo_executor import YOLOExecutor
 from src.models.dto.annotation_category import AnnotationCategory
 from src.models.sql import gen_sql_tables
+from src.models.sql.annotation_category import AnnotationCategory as SQLAnnotationCategory
 
 
 class RefProjectInfo:
@@ -158,6 +159,39 @@ class RefProjectInfo:
         self.categories_path.parent.mkdir(parents=True, exist_ok=True)
         with self.categories_path.open('w', encoding='utf-8') as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
+        self.save_categories_to_db()
+
+    def save_categories_to_db(self):
+        """
+        将当前的 categories 列表保存到数据库中
+        """
+        if not self.sqlite_db:
+            raise Exception("数据库未初始化")
+
+        # 开始事务
+        session = self.sqlite_db.db_session()
+        try:
+            # 清除现有的所有类别
+            session.query(SQLAnnotationCategory).delete()
+            
+            # 添加所有当前类别
+            for category in self.categories:
+                sql_category = SQLAnnotationCategory()
+                sql_category.class_id = category.class_id
+                sql_category.class_name = category.class_name
+                sql_category.color_r = category.color.red()
+                sql_category.color_g = category.color.green()
+                sql_category.color_b = category.color.blue()
+                session.add(sql_category)
+            
+            # 提交事务
+            session.commit()
+        except Exception as e:
+            # 回滚事务
+            session.rollback()
+            raise e
+        finally:
+            session.close()
 
     def find_annotation_by_name(self, name: str) -> Optional[AnnotationCategory]:
         """根据类别名称查找标注类别"""

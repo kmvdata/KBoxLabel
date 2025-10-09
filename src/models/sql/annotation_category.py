@@ -14,6 +14,10 @@ class AnnotationCategory(KOrmBase):
     id = Column(INTEGER, primary_key=True, comment='自增id')
     class_id = Column(INTEGER, nullable=False, unique=False, comment='类别ID')
     class_name = Column(String(64), nullable=False, comment='类别名称')
+
+    color_r = Column(INTEGER, nullable=False, unique=False, comment='颜色R值')
+    color_g = Column(INTEGER, nullable=False, unique=False, comment='颜色G值')
+    color_b = Column(INTEGER, nullable=False, unique=False, comment='颜色B值')
     
     create_time = Column(DateTime, nullable=False, server_default=text("CURRENT_TIMESTAMP"), comment='创建时间')
     update_time = Column(DateTime,
