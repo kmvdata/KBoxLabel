@@ -1205,7 +1205,7 @@ class ImageCanvas(QGraphicsView):
         # 创建自定义标注列表组件
         self.annotation_list = AnnotationList(self.project_info)
         self.annotation_list.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
-        self.annotation_list.load_categories_from_json()
+        self.annotation_list.load_categories_from_db()
 
         return self.annotation_list
 

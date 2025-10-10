@@ -10,6 +10,7 @@ from PyQt5.QtWidgets import QLineEdit, QSpinBox, QListView, QStyledItemDelegate,
 
 from src.models.dto.annotation_category import AnnotationCategory
 from src.models.dto.ref_project_info import RefProjectInfo
+from src.models.sql.annotation_category import AnnotationCategory as SQLAnnotationCategory
 
 
 class AnnotationDelegate(QStyledItemDelegate):
@@ -35,46 +36,28 @@ class AnnotationDelegate(QStyledItemDelegate):
         class_id = index.data(Qt.UserRole + 1)
         category_name = index.data(Qt.DisplayRole)
 
-        if not all([category_color, category_name, class_id is not None]):
-            return
-
-        # 处理选中状态
+        # 绘制背景（根据选中状态）
         if option.state & QStyle.State_Selected:
             painter.fillRect(option.rect, option.palette.highlight())
             painter.setPen(option.palette.highlightedText().color())
         else:
-            painter.fillRect(option.rect, option.palette.window())
             painter.setPen(option.palette.windowText().color())
 
         # 计算各区域尺寸
-        # color区域：正方形，宽度和高度等于item高度
-        color_size = self.row_height - 2 * self.MARGIN
-        color_rect = QRect(
-            option.rect.left() + self.MARGIN,
-            option.rect.top() + self.MARGIN,
-            color_size,
-            color_size
-        )
+        color_rect = QRect(option.rect.left() + self.MARGIN,
+                           option.rect.top() + self.MARGIN,
+                           self.row_height - 2 * self.MARGIN,
+                           self.row_height - 2 * self.MARGIN)
 
-        # id区域：与color区域大小相同
-        id_rect = QRect(
-            option.rect.right() - color_size - self.MARGIN,
-            option.rect.top() + self.MARGIN,
-            color_size,
-            color_size
-        )
+        name_rect = QRect(color_rect.right() + self.SPACING,
+                          option.rect.top(),
+                          option.rect.width() - color_rect.width() - self.SPACING - 60 - self.SPACING,
+                          option.rect.height())
 
-        # name区域：可伸缩，最小宽度为高度的两倍
-        name_min_width = 2 * self.row_height
-        available_width = option.rect.width() - (color_size + self.MARGIN + self.SPACING) * 2
-        name_width = max(available_width, name_min_width)
-
-        name_rect = QRect(
-            color_rect.right() + self.SPACING,
-            option.rect.top(),
-            name_width,
-            self.row_height
-        )
+        id_rect = QRect(name_rect.right() + self.SPACING,
+                        option.rect.top(),
+                        60,
+                        option.rect.height())
 
         # 绘制元素
         painter.fillRect(color_rect, category_color)  # 颜色方块
@@ -116,45 +99,11 @@ class EditableAnnotationDelegate(AnnotationDelegate):
 
         return None
 
-    def get_edit_rects(self, option, index):
-        """计算可编辑区域"""
-        # 获取数据
-        category_color = index.data(Qt.UserRole)
-        class_id = index.data(Qt.UserRole + 1)
-        category_name = index.data(Qt.DisplayRole)
-
-        if not all([category_color, category_name, class_id is not None]):
-            return {"text": QRect(), "id": QRect()}
-
-        # 计算各区域尺寸
-        color_size = self.row_height - 2 * self.MARGIN
-
-        # name区域
-        name_min_width = 2 * self.row_height
-        available_width = option.rect.width() - (color_size + self.MARGIN + self.SPACING) * 2
-        name_width = max(available_width, name_min_width)
-
-        name_rect = QRect(
-            option.rect.left() + color_size + self.MARGIN + self.SPACING,
-            option.rect.top(),
-            name_width,
-            self.row_height
-        )
-
-        # id区域
-        id_rect = QRect(
-            option.rect.right() - color_size - self.MARGIN,
-            option.rect.top() + self.MARGIN,
-            color_size,
-            color_size
-        )
-
-        return {"text": name_rect, "id": id_rect}
-
     def setEditorData(self, editor, index):
         """设置编辑器数据"""
         if isinstance(editor, QLineEdit):
-            editor.setText(index.data(Qt.DisplayRole))
+            self.original_name = index.data(Qt.DisplayRole)
+            editor.setText(self.original_name)
         elif isinstance(editor, QSpinBox):
             editor.setValue(index.data(Qt.UserRole + 1))
 
@@ -187,37 +136,24 @@ class EditableAnnotationDelegate(AnnotationDelegate):
                     pass
 
         elif isinstance(editor, QSpinBox):
-            class_id = editor.value()
-            if class_id > 0:
-                success = model.setData(index, class_id, Qt.UserRole + 1)
+            new_id = editor.value()
+            success = model.setData(index, new_id, Qt.UserRole + 1)
 
-        # 只有在设置数据成功时才保存
-        if success:
-            view = self.parent()
-            if view is not None and hasattr(view, 'save_categories'):
-                view.save_categories()  # 调用AnnotationList的save_categories方法
+        # 重置编辑类型
+        self.current_edit_type = None
 
     def updateEditorGeometry(self, editor, option, index):
-        """更新编辑器几何形状"""
-        edit_rects = self.get_edit_rects(option, index)
-
-        if self.current_edit_type == self.EDIT_TYPE_TEXT:
-            editor.setGeometry(edit_rects["text"])
-        elif self.current_edit_type == self.EDIT_TYPE_ID:
-            editor.setGeometry(edit_rects["id"])
-
-        editor.setVisible(True)
-        editor.setFocus()
+        editor.setGeometry(option.rect)
 
 
-class AnnotationListModel(QStandardItemModel):
-    """自定义模型，存储带序号的标注类别数据"""
-
-    def __init__(self, parent=None):
-        super().__init__(0, 1, parent)
+class AnnotationItemModel(QStandardItemModel):
+    """优化后的模型类，支持自定义角色数据存储"""
+    def __init__(self):
+        super().__init__()
+        self.setColumnCount(1)
 
     def add_annotation(self, category: AnnotationCategory):
-        """添加带序号的标注项"""
+        """添加标注项"""
         item = QStandardItem(category.class_name)
         item.setData(category.color, Qt.UserRole)
         item.setData(category.class_id, Qt.UserRole + 1)
@@ -265,61 +201,78 @@ class AnnotationList(QListView):
         # 创建工具栏
         self.toolbar = self.create_toolbar()
 
-        # 创建模型
-        self.source_model = AnnotationListModel(self)
-
-        # 创建代理模型用于过滤
+        # 设置自定义委托和模型
+        self.source_model = AnnotationItemModel()
         self.proxy_model = QSortFilterProxyModel(self)
         self.proxy_model.setSourceModel(self.source_model)
         self.proxy_model.setFilterCaseSensitivity(Qt.CaseInsensitive)
-        self.proxy_model.setFilterKeyColumn(0)
         self.setModel(self.proxy_model)
 
-        # 设置视图行为 - 移除双击编辑触发
-        self.setEditTriggers(QAbstractItemView.EditKeyPressed)
-        self.setSelectionBehavior(QAbstractItemView.SelectItems)
-        self.setSelectionMode(QAbstractItemView.SingleSelection)
-        self.setDragEnabled(True)
-        self.setDragDropMode(QAbstractItemView.DragOnly)
-        self.setDefaultDropAction(Qt.CopyAction)
-        self.setFocusPolicy(Qt.StrongFocus)
-        self.setAttribute(Qt.WA_AlwaysShowToolTips)
-
         # 设置委托
-        self.delegate = EditableAnnotationDelegate(row_height, self)
-        self.setItemDelegate(self.delegate)
+        self.setItemDelegate(EditableAnnotationDelegate(row_height=row_height, parent=self))
+
+        # 设置选择模式
+        self.setSelectionMode(QAbstractItemView.SingleSelection)
+        self.setEditTriggers(QAbstractItemView.NoEditTriggers)  # 禁用默认编辑触发器
+
+        # 启用拖拽
+        self.setDragEnabled(True)
+        self.setAcceptDrops(False)  # 不接受放置
 
         # 连接信号
         self.clicked.connect(self._handle_item_click)  # type: ignore
         self.selectionModel().selectionChanged.connect(self._handle_selection_change)  # type: ignore
-        self.source_model.dataChanged.connect(self._handle_model_data_changed)
+        self.source_model.dataChanged.connect(self._handle_model_data_changed)  # type: ignore
 
     def calculate_min_width(self):
-        """计算最小宽度"""
-        # color区域 + name最小区域 + id区域 + 间距和边距
-        return (self.row_height + AnnotationDelegate.SPACING) * 2 + 2 * self.row_height + 2 * AnnotationDelegate.MARGIN
+        """计算最小宽度以适应所有元素"""
+        # 预估最小宽度：颜色方块 + 间距 + 类别名称(预估100px) + 间距 + ID区域(60px) + 边距
+        return (self.row_height + 8) * 2 + 100 + 60 + 8
 
-    def set_row_height(self, height: int):
-        """设置行高并更新最小宽度"""
-        self.row_height = height
-        self.delegate.set_row_height(height)
-        self.setMinimumWidth(self.calculate_min_width())
+    def create_toolbar(self):
+        """创建并返回一个工具栏，包含始终显示的搜索框和添加按钮"""
+        toolbar = QToolBar("Annotation Tools")
+        toolbar.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)
+        toolbar.setIconSize(QSize(24, 24))
 
-    def set_toolbar_height(self, height: int):
-        """动态设置工具栏高度并刷新界面"""
-        self.TOOLBAR_HEIGHT = height
-        if self.toolbar:
-            # 更新工具栏高度
-            self.toolbar.setStyleSheet(f"""
-                QToolBar {{
-                    min-height: {height}px;
-                    max-height: {height}px;
-                    padding: 0px;
-                }}
-            """)
-            # 更新搜索框高度
-            if self.search_edit:
-                self._configure_search_edit()
+        # 设置工具栏样式
+        toolbar.setStyleSheet("""
+            QToolBar {
+                border: none;
+                background-color: palette(window);
+                spacing: 10px;
+            }
+            QToolButton {
+                border: 1px solid palette(mid);
+                border-radius: 4px;
+                padding: 4px;
+                background: palette(button);
+            }
+            QToolButton:hover {
+                background: palette(light);
+            }
+        """)
+
+        # 添加按钮
+        add_action = QAction("➕", self)
+        add_action.setToolTip("添加新类别")
+        add_action.triggered.connect(self._handle_add)  # type: ignore
+        toolbar.addAction(add_action)
+
+        # 添加弹性空间
+        toolbar.addWidget(QWidget())
+
+        # 搜索框
+        from PyQt5.QtWidgets import QLineEdit
+        self.search_edit = QLineEdit()
+        self.search_edit.setPlaceholderText("搜索类别...")
+        self._configure_search_edit()
+        toolbar.addWidget(self.search_edit)
+
+        # 连接搜索信号
+        self.search_edit.textChanged.connect(self._handle_search_text_changed)  # type: ignore
+
+        return toolbar
 
     def _configure_search_edit(self):
         """配置搜索框样式和尺寸"""
@@ -349,54 +302,6 @@ class AnnotationList(QListView):
                 color: palette(mid);
             }}
         """)
-
-    def create_toolbar(self):
-        """创建并返回一个工具栏，包含始终显示的搜索框和添加按钮"""
-        toolbar = QToolBar("Annotation Tools")
-        toolbar.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)
-        toolbar.setIconSize(QSize(24, 24))
-
-        # 设置工具栏固定高度
-        toolbar.setStyleSheet(f"""
-            QToolBar {{
-                min-height: {self.TOOLBAR_HEIGHT}px;
-                max-height: {self.TOOLBAR_HEIGHT}px;
-                padding: 0px;
-            }}
-            QToolButton {{
-                min-height: {self.TOOLBAR_HEIGHT}px;
-                max-height: {self.TOOLBAR_HEIGHT}px;
-                padding: 0px 10px;
-            }}
-        """)
-
-        # 创建搜索容器（包含图标和搜索框）
-        search_container = QWidget()
-        search_layout = QHBoxLayout(search_container)
-        search_layout.setContentsMargins(0, 0, 0, 0)
-        search_layout.setSpacing(0)  # 移除内部间距
-
-        # 创建搜索框
-        self.search_edit = QLineEdit()
-        self.search_edit.setPlaceholderText("搜索类别...")
-        self.search_edit.setFixedWidth(150)
-        self.search_edit.setMinimumWidth(120)
-        self.search_edit.setMaximumWidth(200)
-
-        # 配置搜索框样式和尺寸
-        self._configure_search_edit()
-
-        # 添加到搜索容器
-        search_layout.addWidget(self.search_edit)
-        search_container.setLayout(search_layout)
-
-        # 添加控件到工具栏
-        toolbar.addWidget(search_container)
-
-        # 连接搜索信号
-        self.search_edit.textChanged.connect(self._handle_search_text_changed)  # type: ignore
-
-        return toolbar
 
     def startDrag(self, supportedActions):
         """重写拖拽开始事件"""
@@ -475,195 +380,37 @@ class AnnotationList(QListView):
         self.proxy_model.setFilterCaseSensitivity(Qt.CaseInsensitive)
         self.proxy_model.setFilterRole(Qt.DisplayRole)
 
-    def handle_add_annotation(self, position=None, reference_id=None, default_name=None):
-        """处理添加新类别，position为源模型中的位置索引，None表示添加到末尾"""
-        # 根据参考ID生成新ID
-        if reference_id is not None:
-            new_id = reference_id + 1
-        else:
-            # 如果没有参考ID，使用原逻辑（最大值+1）
-            max_id = max((cat.class_id for cat in self.project_info.categories), default=0)
-            new_id = max_id + 1
-
-        if default_name is None:
-            new_name = f"新类别 {new_id}"
-        else:
-            new_name = default_name
-
-        new_category = AnnotationCategory(
-            class_id=new_id,
-            class_name=new_name
-        )
-
-        # 根据position决定插入位置
-        if position is not None and 0 <= position <= len(self.project_info.categories):
-            self.project_info.categories.insert(position, new_category)
-            self.source_model.insert_annotation(new_category, position)
-        else:
-            self.project_info.categories.append(new_category)
-            self.source_model.add_annotation(new_category)
-
-        # 获取新添加项的索引
-        if position is not None:
-            proxy_index = self.proxy_model.mapFromSource(self.source_model.index(position, 0))
-        else:
-            proxy_index = self.proxy_model.index(self.proxy_model.rowCount() - 1, 0)
-
-        # 滚动到新项位置
-        self.scrollTo(proxy_index)
-
-        # 选中新项
-        self.selectionModel().select(
-            proxy_index,
-            QItemSelectionModel.ClearAndSelect
-        )
-
-        self.save_categories()
-
-    def _handle_rename(self):
-        """处理重命名操作"""
-        if self.right_click_index and self.right_click_index.isValid():
-            self.delegate.current_edit_type = EditableAnnotationDelegate.EDIT_TYPE_TEXT
-            # 获取当前要重命名的项的索引和名称
-            source_index = self.proxy_model.mapToSource(self.right_click_index)
-            current_name = self.source_model.data(source_index, Qt.DisplayRole)
-            
-            # 保存当前名称，以便在委托中进行重复性检查
-            self.delegate.original_name = current_name
-            self.edit(self.right_click_index)
-
-    def _handle_modify_id(self):
-        """处理修改ID操作"""
-        if self.right_click_index and self.right_click_index.isValid():
-            self.delegate.current_edit_type = EditableAnnotationDelegate.EDIT_TYPE_ID
-            self.edit(self.right_click_index)
-
-    def _handle_delete(self):
-        """处理删除操作"""
-        if self.right_click_index and self.right_click_index.isValid():
-            source_index = self.proxy_model.mapToSource(self.right_click_index)
-            row = source_index.row()
-
-            if 0 <= row < len(self.project_info.categories):
-                # 从数据源中删除
-                del self.project_info.categories[row]
-                # 从模型中删除
-                self.source_model.removeRow(row)
-                # 保存更改
-                self.save_categories()
-
-    def _sort_by_name(self):
-        """按名称排序类别"""
-        if not self.project_info.categories:
-            return
-        # 按名称升序排序
-        self.project_info.categories.sort(key=lambda x: x.class_name)
-        # 更新模型
-        self.source_model.update_from_categories(self.project_info.categories)
-        # 保存排序结果
-        self.save_categories()
-
-    def _sort_by_id(self):
-        """按ID排序类别"""
-        if not self.project_info.categories:
-            return
-        # 按ID升序排序
-        self.project_info.categories.sort(key=lambda x: x.class_id)
-        # 更新模型
-        self.source_model.update_from_categories(self.project_info.categories)
-        # 保存排序结果
-        self.save_categories()
-
-    def contextMenuEvent(self, event):
-        """重写右键菜单事件"""
-        # 获取右键点击位置对应的索引
-        index = self.indexAt(event.pos())
-
-        # 如果点击位置有item，则选中它
-        if index.isValid():
-            self.right_click_index = index
-            self.selectionModel().clearSelection()
-            self.selectionModel().select(index, QItemSelectionModel.ClearAndSelect)
-        else:
-            self.right_click_index = None
-
-        # 创建右键菜单
-        menu = QMenu(self)
-
-        # 添加菜单项
-        add_action = QAction("新增", self)
-        add_action.triggered.connect(self._context_add)
-
-        rename_action = QAction("重命名", self)
-        rename_action.triggered.connect(self._handle_rename)
-        rename_action.setEnabled(index.isValid())  # 只有选中项时可用
-
-        modify_id_action = QAction("修改ID", self)
-        modify_id_action.triggered.connect(self._handle_modify_id)
-        modify_id_action.setEnabled(index.isValid())  # 只有选中项时可用
-
-        delete_action = QAction("删除", self)
-        delete_action.triggered.connect(self._handle_delete)
-        delete_action.setEnabled(index.isValid())  # 只有选中项时可用
-
-        # 添加排序相关菜单项
-        menu.addSeparator()
-        sort_name_action = QAction("按名称排序", self)
-        sort_name_action.triggered.connect(self._sort_by_name)
-        sort_id_action = QAction("按ID排序", self)
-        sort_id_action.triggered.connect(self._sort_by_id)
-
-        menu.addAction(sort_name_action)
-        menu.addAction(sort_id_action)
-
-        # 添加到菜单
-        menu.insertAction(None, add_action)
-        menu.insertSeparator(rename_action)
-        menu.insertAction(None, rename_action)
-        menu.insertAction(None, modify_id_action)
-        menu.insertAction(None, delete_action)
-
-        # 显示菜单
-        menu.exec_(event.globalPos())
-
-    def _context_add(self):
-        """处理右键菜单中的新增操作"""
-        reference_id = None
-        insert_position = None
-
-        if self.right_click_index and self.right_click_index.isValid():
-            # 如果有选中项，获取其ID作为参考
-            source_index = self.proxy_model.mapToSource(self.right_click_index)
-            row = source_index.row()
-            if 0 <= row < len(self.project_info.categories):
-                reference_id = self.project_info.categories[row].class_id
-                insert_position = row + 1  # 在选中项后插入
-
-        # 调用添加方法，传递参考ID和位置
-        self.handle_add_annotation(insert_position, reference_id)
-
-    def save_categories(self):
+    def load_categories_from_db(self):
         """
-        使用每个 AnnotationCategory 对象的 to_json 方法保存 categories 列表到指定文件。
-        按照列表当前显示顺序保存
-        """
-        self.project_info.save_categories()
-
-    def load_categories_from_json(self):
-        """
-        从 JSON 文件加载类别，与现有类别合并（仅当 class_id 和 class_name 都相同时视为重复）。
+        从数据库加载类别，与现有类别合并（仅当 class_id 和 class_name 都相同时视为重复）。
         重复项将重新生成颜色，最终列表按 class_id 排序。
         """
-        if not self.project_info.categories_path.exists():
+        if not self.project_info.sqlite_db:
             return
 
         try:
-            with self.project_info.categories_path.open('r', encoding='utf-8') as f:
-                data = json.load(f)
-
-            new_categories = [AnnotationCategory.from_json(item) for item in data]
+            # 从数据库获取所有类别
+            session = self.project_info.sqlite_db.db_session()
+            try:
+                db_categories = session.query(SQLAnnotationCategory).all()
+                
+                # 转换为DTO对象
+                new_categories = []
+                for db_cat in db_categories:
+                    # 创建DTO对象
+                    category = AnnotationCategory(
+                        class_id=db_cat.class_id,
+                        class_name=db_cat.class_name
+                    )
+                    # 设置颜色
+                    from PyQt5.QtGui import QColor
+                    category.color = QColor(db_cat.color_r, db_cat.color_g, db_cat.color_b)
+                    new_categories.append(category)
+            finally:
+                session.close()
+                
         except Exception as e:
-            raise IOError(f"无法读取或解析JSON文件 {self.project_info.categories_path}: {e}")
+            raise IOError(f"无法从数据库读取类别: {e}")
 
         self._merge_and_update_categories(new_categories)
 
