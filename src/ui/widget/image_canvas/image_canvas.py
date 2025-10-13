@@ -858,19 +858,30 @@ class ImageCanvas(QGraphicsView):
             # 更新Run按钮状态为不可用
             if self.run_tool_button:
                 self.run_tool_button.setEnabled(False)
-            # 删除配置文件
+            # 删除配置信息
             try:
-                config_path = self.project_info.path / "config" / "yolo_config.json"
-                if config_path.exists():
-                    config_path.unlink()
-                    print(f"YOLO model configuration file deleted: {config_path}")
-                QMessageBox.information(self, "Success", "YOLO model configuration has been deleted.")
+                # 从数据库中删除配置项
+                session = self.project_info.sqlite_db.thread_session()
+                try:
+                    key_name = "yolo_model_path"
+                    config_item = session.query(KVConfig).filter(KVConfig.key == key_name).first()
+                    if config_item:
+                        session.delete(config_item)
+                        session.commit()
+                        print(f"YOLO model configuration deleted from database with key: {key_name}")
+                    QMessageBox.information(self, "Success", "YOLO model configuration has been deleted.")
+                except Exception as e:
+                    session.rollback()
+                    raise e
+                finally:
+                    session.close()
             except Exception as e:
                 print(f"Error deleting YOLO model configuration: {e}")
                 QMessageBox.warning(self, "Error", f"Failed to delete model configuration: {str(e)}")
 
-    def save_model_config(self, model_path: Path):
+    def save_model_config(self):
         """保存模型配置到工程文件"""
+        model_path = self.project_info.yolo_model_path
         session = self.project_info.sqlite_db.thread_session()
         try:
             # 查找或创建配置项

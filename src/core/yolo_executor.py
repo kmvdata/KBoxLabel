@@ -40,6 +40,9 @@ class YOLOExecutor:
                 logging.error(error_msg)
                 raise FileNotFoundError(error_msg)
 
+            self.yolo_model = None  # 存储加载好的YOLO模型
+            self.model_name = None  # 存储模型名称
+
             # 加载模型
             self.yolo_model = YOLO(str(model_path))
             self.model_name = model_path.name
