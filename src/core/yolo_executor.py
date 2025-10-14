@@ -55,17 +55,18 @@ class YOLOExecutor:
         except ImportError:
             error_msg = "Please install ultralytics library first: pip install ultralytics"
             logging.error(error_msg)
-            self.yolo_model = None  # 存储加载好的YOLO模型
-            self.model_name = None  # 存储模型名称
-            self.yolo_model_path = None  # 实例属性，存储加载的模型路径
+            self.clear_model()
             raise Exception(error_msg)
         except Exception as e:
             error_msg = f"Error loading YOLO model: {str(e)}"
             logging.error(error_msg)
-            self.yolo_model = None  # 存储加载好的YOLO模型
-            self.model_name = None  # 存储模型名称
-            self.yolo_model_path = None  # 实例属性，存储加载的模型路径
+            self.clear_model()
             raise Exception(error_msg) from e
+
+    def clear_model(self):
+        self.yolo_model = None  # 存储加载好的YOLO模型
+        self.model_name = None  # 存储模型名称
+        self.yolo_model_path = None  # 实例属性，存储加载的模型路径
 
     def process_detection_results(self, results, img_width, img_height) -> list:
         """

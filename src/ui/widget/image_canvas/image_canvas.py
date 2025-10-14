@@ -805,77 +805,12 @@ class ImageCanvas(QGraphicsView):
 
     def _load_yolo_model_async(self, model_path: Path):
         # 开始加载模型
-        self.project_info.load_yolo(model_path)
+        self.project_info.load_yolo_model(model_path)
         self.run_action.setEnabled(self.project_info.is_model_loaded)
 
     def delete_yolo_model(self):
         """删除已选择的YOLO模型配置"""
-        # 通过project_info判断模型是否存在（替代原self.yolo_model_path）
-        if not getattr(self.project_info, 'yolo_model_path', None):
-            QMessageBox.information(self, "Information", "No YOLO model selected to delete.")
-            return
-
-        # 确认删除
-        model_name = Path(self.project_info.yolo_model_path).name
-        reply = QMessageBox.question(
-            self, "Confirm Delete",
-            f"Are you sure you want to remove the selected YOLO model '{model_name}'?",
-            QMessageBox.Yes | QMessageBox.No, QMessageBox.No
-        )
-
-        if reply == QMessageBox.Yes:
-            # 清空project_info中的模型路径（替代原self.yolo_model_path = None）
-            self.project_info.yolo_model_path = None
-            # 更新Run按钮状态为不可用
-            if self.run_tool_button:
-                self.run_tool_button.setEnabled(False)
-            # 删除配置信息
-            try:
-                # 从数据库中删除配置项
-                session = self.project_info.sqlite_db.thread_session()
-                try:
-                    key_name = "yolo_model_path"
-                    config_item = session.query(KVConfig).filter(KVConfig.key == key_name).first()
-                    if config_item:
-                        session.delete(config_item)
-                        session.commit()
-                        print(f"YOLO model configuration deleted from database with key: {key_name}")
-                    QMessageBox.information(self, "Success", "YOLO model configuration has been deleted.")
-                except Exception as e:
-                    session.rollback()
-                    raise e
-                finally:
-                    session.close()
-            except Exception as e:
-                print(f"Error deleting YOLO model configuration: {e}")
-                QMessageBox.warning(self, "Error", f"Failed to delete model configuration: {str(e)}")
-
-    def save_model_config(self):
-        """保存模型配置到工程文件"""
-        model_path = self.project_info.yolo_model_path
-        session = self.project_info.sqlite_db.thread_session()
-        try:
-            # 查找或创建配置项
-            key_name = "yolo_model_path"
-            config_item = session.query(KVConfig).filter(KVConfig.key == key_name).first()
-
-            if not config_item:
-                # 创建新的配置项
-                config_item = KVConfig()
-                config_item.kid = KVConfig.gen_kid()
-                config_item.key = key_name
-
-            config_item.value = model_path
-            config_item.comment = "YOLO模型路径"
-
-            session.add(config_item)
-            session.commit()
-            print(f"YOLO model configuration saved to database with key: {key_name}")
-        except Exception as e:
-            print(f"Error saving YOLO model configuration: {e}")
-            QMessageBox.warning(self, "Error", f"Failed to save model configuration: {str(e)}")
-        finally:
-            session.close()
+        self.project_info.delete_yolo_model()
 
     # 然后是调用YOLOExecutor的代码（例如UI类中的方法）
     def exec_yolo(self):
