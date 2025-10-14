@@ -47,9 +47,6 @@ class ImageCanvas(QGraphicsView):
         # 连接模型加载完成的信号
         self._connect_model_signals()
 
-        # 加载已保存的模型配置
-        self.load_model_config()
-
         # 创建棋盘格背景，模拟透明背景
         checkerboard = QPixmap(20, 20)
         checkerboard.fill(QColor(200, 200, 200))  # 浅灰色背景
@@ -806,34 +803,6 @@ class ImageCanvas(QGraphicsView):
             QMessageBox.information(self, "Cancelled", "Model selection cancelled.")
 
     def _load_yolo_model_async(self, model_path: Path):
-        """异步加载YOLO模型"""
-        # 显示加载提示
-        loading_msg = QMessageBox()
-        loading_msg.setWindowTitle("Loading Model")
-        loading_msg.setText("Loading YOLO model, please wait...")
-        loading_msg.setStandardButtons(QMessageBox.NoButton)
-        loading_msg.show()
-
-        # 连接加载完成的回调
-        def on_model_loaded(success: bool, error_message: str):
-            loading_msg.close()
-            if success:
-                # 保存配置+启用Run按钮
-                self.save_model_config()
-                if self.run_tool_button:
-                    self.run_tool_button.setEnabled(True)
-
-                QMessageBox.information(
-                    self, "Success",
-                    f"Model '{model_path.name}' selected successfully!\nPath: {model_path}"
-                )
-            else:
-                # 加载失败，显示错误信息
-                QMessageBox.warning(
-                    self, "Load Failed",
-                    f"Failed to load model:\n{error_message}"
-                )
-
         # 开始加载模型
         self.project_info.load_yolo(model_path)
 
@@ -906,46 +875,6 @@ class ImageCanvas(QGraphicsView):
         finally:
             session.close()
 
-    def load_model_config(self):
-        """从工程文件加载模型配置"""
-        try:
-            # 初始化project_info的模型路径属性（避免AttributeError）
-            self.project_info.yolo_model_path = None
-
-            # 使用KVConfig从数据库加载模型路径
-            from src.models.sql.kv_config import KVConfig
-            from src.common.god.sqlite_db import SqliteDB
-
-            # 获取数据库连接
-            db_path = self.project_info.db_path
-            sqlite_db = SqliteDB(db_path)
-            session = sqlite_db.db_session()
-
-            try:
-                # 查找配置项
-                key_name = "yolo_model_path"
-                config_item = session.query(KVConfig).filter(KVConfig.key == key_name).first()
-
-                if config_item:
-                    # 加载模型路径到project_info（替代原self.yolo_model_path）
-                    self.project_info.yolo_model_path = config_item.value
-                    print(f"Loaded YOLO model from {self.project_info.yolo_model_path}")
-                    # 如果有模型，启用Run按钮
-                    if self.run_tool_button and self.project_info.yolo_model_path:
-                        # 检查模型是否已经加载或者正在加载
-                        if self.project_info.is_model_loaded:
-                            self.run_tool_button.setEnabled(True)
-                        else:
-                            # 模型未加载也未在加载，尝试加载
-                            model_path = Path(self.project_info.yolo_model_path)
-                            if model_path.exists():
-                                self._load_yolo_model_async(model_path)
-            finally:
-                session.close()
-
-        except Exception as e:
-            print(f"Error loading YOLO model configuration: {e}")
-
     # 然后是调用YOLOExecutor的代码（例如UI类中的方法）
     def exec_yolo(self):
         """执行YOLO模型的方法，识别当前图片目标并按指定格式输出日志"""
@@ -953,7 +882,7 @@ class ImageCanvas(QGraphicsView):
         # 移除函数内重复导入，统一放在模块顶部
 
         # 检查模型是否正在加载
-        if self.project_info.is_model_loading:
+        if self.project_info.is_model_loaded:
             QMessageBox.warning(self, "Warning", "Model is still loading, please wait.")
             return
 
