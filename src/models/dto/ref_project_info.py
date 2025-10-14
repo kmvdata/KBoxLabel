@@ -22,9 +22,6 @@ class RefProjectInfo:
         gen_sql_tables(self.db_path)
         self.sqlite_db: Optional[SqliteDB] = SqliteDB(self.db_path)
 
-        # 初始化时检查是否有缓存的模型路径并尝试加载
-        self._load_cached_yolo_model()
-
     def exists(self) -> bool:
         if self.path is None:
             return False
@@ -69,9 +66,7 @@ class RefProjectInfo:
         try:
             # 尝试加载模型
             self.yolo_executor.load_yolo(model_path)
-            # 加载成功，缓存模型路径
-            self._save_yolo_model_to_cache(model_path)
-            return True
+            return self.yolo_executor.is_model_loaded()
         except Exception as e:
             # 可以根据实际需求修改异常处理方式
             print(f"加载YOLO模型失败: {str(e)}")
@@ -101,36 +96,6 @@ class RefProjectInfo:
 
         return results
 
-    def _load_cached_yolo_model(self):
-        """从配置中加载缓存的YOLO模型路径"""
-        if self.path is None:
-            return
-
-        # 使用自定义的KSettings确保配置一致性
-        settings = KSettings()
-
-        # 从配置中获取保存的模型路径
-        cached_model_path = settings.value(self._yolo_model_key)
-        if cached_model_path:
-            model_path = Path(cached_model_path)
-            # 检查模型文件是否存在
-            if model_path.exists():
-                self.load_yolo(model_path)
-
-    def _save_yolo_model_to_cache(self, model_path: Path):
-        """将模型路径保存到配置中"""
-        if self.path is None:
-            return
-
-        # 使用自定义的KSettings确保配置一致性
-        settings = KSettings()
-        # 使用项目路径作为key
-
-        # 保存模型路径
-        settings.setValue(self._yolo_model_key, str(model_path))
-        # 确保配置被写入
-        settings.sync()
-
     @property
     def _config_dir(self):
         if self.path is None:
@@ -144,24 +109,7 @@ class RefProjectInfo:
         
         return _config_dir
 
-    @property
-    def categories_path(self) -> Path:
-        if not self.path.exists():
-            raise FileNotFoundError(f"项目路径不存在: {self.path}")
-        return self.path / '__categories__.json'
-
     def save_categories(self):
-        """
-        使用每个 AnnotationCategory 对象的 to_json 方法保存 categories 列表到指定文件。
-        按照列表当前显示顺序保存
-        """
-        data = [cat.to_json() for cat in self.categories]
-        self.categories_path.parent.mkdir(parents=True, exist_ok=True)
-        with self.categories_path.open('w', encoding='utf-8') as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
-        self.save_categories_to_db()
-
-    def save_categories_to_db(self):
         """
         将当前的 categories 列表保存到数据库中
         """

@@ -1,15 +1,20 @@
 import base64
 import logging
 from pathlib import Path
+from typing import Optional
+
 from PIL import Image  # 用于获取图像尺寸
 
 
 class YOLOExecutor:
     """YOLO模型执行器，负责加载模型和执行目标检测"""
+    
+    yolo_model_path_key = "yolo_model_path"  # 类属性，固定值为"yolo_model_path"
 
     def __init__(self):
         self.yolo_model = None  # 存储加载好的YOLO模型
         self.model_name = None  # 存储模型名称
+        self.yolo_model_path: Optional[Path] = None  # 实例属性，存储加载的模型路径
 
     def is_model_loaded(self) -> bool:
         """
@@ -18,7 +23,7 @@ class YOLOExecutor:
         返回:
             如果模型已加载则返回True，否则返回False
         """
-        return self.yolo_model is not None
+        return self.yolo_model is not None and self.yolo_model_path is not None and self.yolo_model_path.exists()
 
     def load_yolo(self, model_path: Path):
         """
@@ -40,21 +45,26 @@ class YOLOExecutor:
                 logging.error(error_msg)
                 raise FileNotFoundError(error_msg)
 
-            self.yolo_model = None  # 存储加载好的YOLO模型
-            self.model_name = None  # 存储模型名称
-
             # 加载模型
             self.yolo_model = YOLO(str(model_path))
             self.model_name = model_path.name
+            self.yolo_model_path = model_path  # 保存模型路径
             logging.info(f"Loaded YOLO model: {self.model_name}")
+            return True
 
         except ImportError:
             error_msg = "Please install ultralytics library first: pip install ultralytics"
             logging.error(error_msg)
+            self.yolo_model = None  # 存储加载好的YOLO模型
+            self.model_name = None  # 存储模型名称
+            self.yolo_model_path = None  # 实例属性，存储加载的模型路径
             raise Exception(error_msg)
         except Exception as e:
             error_msg = f"Error loading YOLO model: {str(e)}"
             logging.error(error_msg)
+            self.yolo_model = None  # 存储加载好的YOLO模型
+            self.model_name = None  # 存储模型名称
+            self.yolo_model_path = None  # 实例属性，存储加载的模型路径
             raise Exception(error_msg) from e
 
     def process_detection_results(self, results, img_width, img_height) -> list:
