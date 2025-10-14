@@ -7,6 +7,7 @@ from PyQt5.QtCore import pyqtSignal, Qt, QSize, QRect, QItemSelectionModel, QMim
 from PyQt5.QtGui import QStandardItemModel, QStandardItem, QPen, QDrag
 from PyQt5.QtWidgets import QLineEdit, QSpinBox, QListView, QStyledItemDelegate, QAbstractItemView, \
     QStyle, QToolBar, QWidget, QHBoxLayout, QMenu, QAction
+from ultralytics import YOLO
 
 from src.models.dto.annotation_category import AnnotationCategory
 from src.models.dto.ref_project_info import RefProjectInfo
@@ -651,28 +652,16 @@ class AnnotationList(QListView):
 
     def load_categories_from_json(self):
         """
-        从 JSON 文件加载类别，与现有类别合并（仅当 class_id 和 class_name 都相同时视为重复）。
+        从数据库加载类别，与现有类别合并（仅当 class_id 和 class_name 都相同时视为重复）。
         重复项将重新生成颜色，最终列表按 class_id 排序。
         """
-        if not self.project_info.categories_path.exists():
-            return
-
-        try:
-            with self.project_info.categories_path.open('r', encoding='utf-8') as f:
-                data = json.load(f)
-
-            new_categories = [AnnotationCategory.from_json(item) for item in data]
-        except Exception as e:
-            raise IOError(f"无法读取或解析JSON文件 {self.project_info.categories_path}: {e}")
-
-        self._merge_and_update_categories(new_categories)
+        self._merge_and_update_categories(self.project_info.load_categories())
 
     def load_categories_from_yolo_model(self, model_path):
         """
         从YOLO模型文件(.pt)加载类别信息，并与现有类别合并。
         """
         try:
-            from ultralytics import YOLO
             model = YOLO(model_path)
             class_dict = model.names  # {0: 'person', 1: 'car', ...}
 

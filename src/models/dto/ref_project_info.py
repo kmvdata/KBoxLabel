@@ -1,6 +1,8 @@
 import json
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List
+
+from PyQt5.QtGui import QColor
 
 from src.common.god.sqlite_db import SqliteDB
 from src.core.ksettings import KSettings
@@ -138,6 +140,33 @@ class RefProjectInfo:
             # 回滚事务
             session.rollback()
             raise e
+        finally:
+            session.close()
+
+    def load_categories(self) -> List[AnnotationCategory]:
+        """
+        从数据库加载类别列表
+        """
+        if not self.sqlite_db:
+            return []
+            
+        # 开始会话
+        session = self.sqlite_db.db_session()
+        try:
+            # 查询所有类别
+            sql_categories = session.query(SQLAnnotationCategory).all()
+            
+            # 转换为AnnotationCategory对象列表
+            categories = []
+            for sql_cat in sql_categories:
+                category = AnnotationCategory(
+                    class_id=sql_cat.class_id,
+                    class_name=sql_cat.class_name
+                )
+                category.color = QColor(sql_cat.color_r, sql_cat.color_g, sql_cat.color_b)
+                categories.append(category)
+                
+            return categories
         finally:
             session.close()
 
