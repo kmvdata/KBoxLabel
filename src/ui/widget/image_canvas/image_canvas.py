@@ -27,6 +27,7 @@ class ImageCanvas(QGraphicsView):
 
     def __init__(self, project_info: RefProjectInfo):
         super().__init__()
+        self.run_action = None
         self.set_needs_save_annotations = False
         self.project_info = project_info
         self.last_scale_factor = None
@@ -740,11 +741,11 @@ class ImageCanvas(QGraphicsView):
         self.config_menu = QMenu(self)
 
         # 运行子菜单
-        run_action = QAction("Run", self)
-        run_action.triggered.connect(self.exec_yolo)
+        self.run_action = QAction("Run", self)
+        self.run_action.triggered.connect(self.exec_yolo)
         # 运行选项状态通过project_info判断
-        run_action.setEnabled(bool(getattr(self.project_info, 'yolo_model_path', None)))
-        self.config_menu.addAction(run_action)
+        self.run_action.setEnabled(self.project_info.is_model_loaded)
+        self.config_menu.addAction(self.run_action)
 
         # 编辑子菜单
         edit_action = QAction("Edit", self)
@@ -755,14 +756,14 @@ class ImageCanvas(QGraphicsView):
         delete_action = QAction("Delete", self)
         delete_action.triggered.connect(self.delete_yolo_model)
         # 删除选项只在有模型时可用（通过project_info判断）
-        delete_action.setEnabled(bool(getattr(self.project_info, 'yolo_model_path', None)))
+        delete_action.setEnabled(self.project_info.is_model_loaded)
         self.config_menu.addAction(delete_action)
 
     def show_config_menu(self):
         """显示配置菜单，在按钮位置弹出"""
         if self.config_menu:
             # 更新菜单状态（通过project_info判断模型是否存在）
-            model_exists = bool(getattr(self.project_info, 'yolo_model_path', None))
+            model_exists = self.project_info.is_model_loaded
             for action in self.config_menu.actions():
                 if action.text() == "Run" or action.text() == "Delete":
                     action.setEnabled(model_exists)
@@ -805,6 +806,7 @@ class ImageCanvas(QGraphicsView):
     def _load_yolo_model_async(self, model_path: Path):
         # 开始加载模型
         self.project_info.load_yolo(model_path)
+        self.run_action.setEnabled(self.project_info.is_model_loaded)
 
     def delete_yolo_model(self):
         """删除已选择的YOLO模型配置"""

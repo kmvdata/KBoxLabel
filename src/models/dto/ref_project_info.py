@@ -10,6 +10,8 @@ from src.core.yolo_executor import YOLOExecutor
 from src.models.dto.annotation_category import AnnotationCategory
 from src.models.sql import gen_sql_tables
 from src.models.sql.annotation_category import AnnotationCategory as SQLAnnotationCategory
+from src.models.sql.kv_config import KVConfig
+from src.common.god.ksnowflake import KSnowflake
 
 
 class RefProjectInfo:
@@ -63,12 +65,60 @@ class RefProjectInfo:
             return None
         return self.path / '__sql_config__.sql'
 
-    def load_yolo(self, model_path: Path) -> bool:
+    def load_yolo(self, model_path: Optional[Path] = None) -> bool:
         """加载YOLO模型并在成功后缓存路径"""
         try:
+            # 如果没有提供model_path，则从数据库获取
+            if model_path is None:
+                # 创建数据库会话
+                session = self.sqlite_db.db_session()
+                try:
+                    # 查询数据库中的模型路径
+                    kv_record = session.query(KVConfig).filter(KVConfig.key == self._yolo_model_key).first()
+                    if kv_record and kv_record.value:
+                        model_path = Path(kv_record.value)
+                    else:
+                        return False  # 数据库中没有模型路径
+                finally:
+                    session.close()
+            
             # 尝试加载模型
             self.yolo_executor.load_yolo(model_path)
-            return self.yolo_executor.is_model_loaded()
+            is_loaded = self.yolo_executor.is_model_loaded()
+            
+            # 如果传入了具体路径并且加载成功，则保存新的路径到数据库
+            # 如果加载失败，则清空数据库中的记录
+            if model_path is not None:
+                session = self.sqlite_db.db_session()
+                try:
+                    # 查询是否已有记录
+                    kv_record = session.query(KVConfig).filter(KVConfig.key == self._yolo_model_key).first()
+                    
+                    if is_loaded:
+                        # 加载成功，保存或更新路径
+                        if kv_record:
+                            kv_record.value = str(model_path)
+                        else:
+                            # 创建新记录
+                            kv_record = KVConfig()
+                            kv_record.kid = KSnowflake().gen_kid()
+                            kv_record.key = self._yolo_model_key
+                            kv_record.value = str(model_path)
+                            kv_record.comment = "YOLO模型路径"
+                            session.add(kv_record)
+                    else:
+                        # 加载失败，清空记录
+                        if kv_record:
+                            session.delete(kv_record)
+                    
+                    session.commit()
+                except Exception as e:
+                    session.rollback()
+                    print(f"更新数据库中的YOLO模型路径失败: {str(e)}")
+                finally:
+                    session.close()
+            
+            return is_loaded
         except Exception as e:
             # 可以根据实际需求修改异常处理方式
             print(f"加载YOLO模型失败: {str(e)}")
