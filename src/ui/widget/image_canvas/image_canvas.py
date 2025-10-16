@@ -135,6 +135,10 @@ class ImageCanvas(QGraphicsView):
         self.setContextMenuPolicy(Qt.CustomContextMenu)
         self.customContextMenuRequested.connect(self.show_context_menu)
 
+        # 改为使用QTimer延迟调用
+        from PyQt5.QtCore import QTimer
+        QTimer.singleShot(1000, lambda: self._load_yolo_model_async())
+
     def clear_canvas(self):
         """清空画布，只保留背景"""
         self.scene.clear()
@@ -803,10 +807,11 @@ class ImageCanvas(QGraphicsView):
         else:
             QMessageBox.information(self, "Cancelled", "Model selection cancelled.")
 
-    def _load_yolo_model_async(self, model_path: Path):
+    def _load_yolo_model_async(self, model_path: Optional[Path] =None):
         # 开始加载模型
         self.project_info.load_yolo_model(model_path)
         self.run_action.setEnabled(self.project_info.is_model_loaded)
+        self.run_tool_button.setEnabled(self.project_info.is_model_loaded)
 
     def delete_yolo_model(self):
         """删除已选择的YOLO模型配置"""
