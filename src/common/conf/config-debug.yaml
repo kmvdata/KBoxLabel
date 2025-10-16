@@ -1,0 +1,39 @@
+general:
+  debug: true
+  env: "dev"
+
+logging:
+  # NOTSET | DEBUG | INFO | WARN | WARNING | ERROR | FATAL | CRITICAL
+  level: "DEBUG"
+  path: "/var/log/app.log"
+
+proxies:
+  http: "http://127.0.0.1:1087"
+  https: "http://127.0.0.1:1087"
+
+service:
+  host: "0.0.0.0"
+  port: 8000
+  workers: 1
+  reload: false
+  socket_io:
+    mount_location: "/ws"
+    socketio_path: "/socket.io"
+
+i18n:
+  path: "locales"
+  locale: "zh_CN"
+
+database:
+  url: "mysql://user:pass@localhost/dbname"
+  pool_size: 20
+  max_overflow: 10
+  pool_recycle: 3600
+  echo: true
+
+redis:
+  host: "redis.local"
+  port: 6379
+  db: 0
+  password: "redis-pass"
+  decode_responses: true

@@ -93,7 +93,9 @@ class AnnotationCategory:
         category = cls(class_id=data["class_id"], class_name=data["class_name"])
         if "color" in data and isinstance(data["color"], dict):
             color_data = data["color"]
-            category.color = QColor(color_data.get("r", 0), color_data.get("g", 0), color_data.get("b", 0))
+            category.color = QColor(color_data.get("r", 0),
+                                    color_data.get("g", 0),
+                                    color_data.get("b", 0))
         return category
 
     def key(self) -> (int, str):

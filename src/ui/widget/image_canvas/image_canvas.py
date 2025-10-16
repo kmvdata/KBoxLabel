@@ -1,6 +1,5 @@
 # image_canvas.py
 import json
-import shutil
 import sys
 from pathlib import Path
 from typing import Optional
@@ -10,9 +9,11 @@ from PyQt5.QtGui import QPixmap, QPen, QColor, QPainter, QBrush, QKeySequence, Q
 from PyQt5.QtWidgets import (QGraphicsView, QGraphicsScene, QGraphicsPixmapItem, QAction,
                              QToolBar, QSizePolicy, QMenu, QFileDialog, QMessageBox, QToolButton)
 
+from src.common.god.korm_base import KOrmBase
 from src.core.utils.string_util import StringUtil
-from src.models.annotation_category import AnnotationCategory
-from src.models.ref_project_info import RefProjectInfo
+from src.models.dto.annotation_category import AnnotationCategory
+from src.models.dto.ref_project_info import RefProjectInfo
+from src.models.sql import KoloItem, KVConfig
 from src.ui.widget.image_canvas.annotation_list import AnnotationList
 from src.ui.widget.image_canvas.annotation_view import AnnotationView
 
@@ -26,6 +27,7 @@ class ImageCanvas(QGraphicsView):
 
     def __init__(self, project_info: RefProjectInfo):
         super().__init__()
+        self.run_action = None
         self.set_needs_save_annotations = False
         self.project_info = project_info
         self.last_scale_factor = None
@@ -43,8 +45,8 @@ class ImageCanvas(QGraphicsView):
         # 添加标志防止递归调用
         self._updating_delete_state = False
 
-        # 加载已保存的模型配置
-        self.load_model_config()
+        # 连接模型加载完成的信号
+        self._connect_model_signals()
 
         # 创建棋盘格背景，模拟透明背景
         checkerboard = QPixmap(20, 20)
@@ -129,6 +131,14 @@ class ImageCanvas(QGraphicsView):
         if self.annotation_list:
             self.annotation_list.annotation_selected.connect(self.on_list_annotation_selected)
 
+        # 添加上下文菜单策略
+        self.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.customContextMenuRequested.connect(self.show_context_menu)
+
+        # 改为使用QTimer延迟调用
+        from PyQt5.QtCore import QTimer
+        QTimer.singleShot(1000, lambda: self._load_yolo_model_async())
+
     def clear_canvas(self):
         """清空画布，只保留背景"""
         self.scene.clear()
@@ -158,7 +168,7 @@ class ImageCanvas(QGraphicsView):
             return len(annotation_items)
         finally:
             self.scene.blockSignals(False)
-            
+
     def unselect_all_annotations(self):
         """取消所有标注的选中状态"""
         for item in self.scene.items():
@@ -194,7 +204,7 @@ class ImageCanvas(QGraphicsView):
 
         # 加载图片后更新删除按钮状态
         self.update_delete_button_state()
-        
+
         # 根据规范，加载图片后需要取消所有标注的选中状态
         self.unselect_all_annotations()
 
@@ -203,65 +213,60 @@ class ImageCanvas(QGraphicsView):
         return self.project_info.categories
 
     def _load_kolo_file(self, image_path: Path, img_width: int, img_height: int):
-        """加载与图片同名的.kolo文件"""
-        # 将文件后缀改为.kolo
-        kolo_path = image_path.with_suffix('.kolo')
-
-        # 如果文件不存在，创建空文件
-        if not kolo_path.exists():
-            kolo_path.touch()
+        """从SQLite数据库加载与图片同名的kolo_item记录"""
+        # 获取图片文件名作为查询key
+        image_name = image_path.name
 
         # 创建类名到类别的映射字典
         class_name_map = {category.class_name: category for category in self.category_map.values()}
 
-        # 读取并解析标注文件
+        # 从数据库中查询所有匹配image_name的KoloItem对象
         try:
-            with open(kolo_path, 'r', encoding='utf-8') as f:
-                for line_idx, line in enumerate(f, 1):
-                    parts = line.strip().split()
-                    if len(parts) < 5:
-                        print(f"警告: 第{line_idx}行格式错误，跳过")
-                        continue
+            # 定义查询函数
+            def query_func(session):
+                from src.models.sql.kolo_item import KoloItem
+                return session.query(KoloItem).filter(KoloItem.image_name == image_name).all()
 
-                    # 解码Base64格式的类名字符串
-                    base64_name = parts[0]
-                    class_name = StringUtil.base64_to_string(base64_name)
+            # 执行查询
+            kolo_items = self.project_info.sqlite_db.execute_in_transaction(query_func)
 
-                    # 获取类别对象（如果不存在则创建并添加到映射中）
-                    category = class_name_map.get(class_name)
-                    if not category:
-                        # 动态创建新类别
-                        new_category = AnnotationCategory(
-                            class_id=len(self.category_map) + 1,
-                            class_name=class_name,
-                        )
-                        # 添加到类别映射
-                        self.category_map[new_category.class_name] = new_category
-                        class_name_map[class_name] = new_category
-                        category = new_category
-                        print(
-                            f"信息: 第{line_idx}行类别 '{class_name}' 未定义，已创建新类别（ID={new_category.class_id}）")
+            # 处理查询结果
+            for kolo_item in kolo_items:
+                class_name = kolo_item.class_name
 
-                    # 解析归一化坐标
-                    try:
-                        x_center, y_center, width, height = map(float, parts[1:5])
-                    except ValueError:
-                        print(f"错误: 第{line_idx}行坐标解析失败，跳过")
-                        continue
+                # 获取类别对象（如果不存在则创建并添加到映射中）
+                category = class_name_map.get(class_name)
+                if not category:
+                    # 动态创建新类别
+                    new_category = AnnotationCategory(
+                        class_id=len(self.category_map) + 1,
+                        class_name=class_name,
+                    )
+                    # 添加到类别映射
+                    self.category_map[new_category.class_name] = new_category
+                    class_name_map[class_name] = new_category
+                    category = new_category
+                    print(f"信息: 数据库中类别 '{class_name}' 未定义，已创建新类别（ID={new_category.class_id}）")
 
-                    # 转换为绝对坐标
-                    x1 = (x_center - width / 2) * img_width
-                    y1 = (y_center - height / 2) * img_height
-                    rect_width = width * img_width
-                    rect_height = height * img_height
+                # 从KoloItem获取归一化坐标
+                x_center = float(kolo_item.x_center)
+                y_center = float(kolo_item.y_center)
+                width = float(kolo_item.width)
+                height = float(kolo_item.height)
 
-                    # 创建AnnotationView并添加到场景
-                    item = AnnotationView(x1, y1, rect_width, rect_height, category, self)
-                    self.scene.addItem(item)
+                # 转换为绝对坐标
+                x1 = (x_center - width / 2) * img_width
+                y1 = (y_center - height / 2) * img_height
+                rect_width = width * img_width
+                rect_height = height * img_height
+
+                # 创建AnnotationView并添加到场景
+                item = AnnotationView(x1, y1, rect_width, rect_height, category, self)
+                self.scene.addItem(item)
 
         except Exception as e:
-            print(f"加载标注文件错误: {e}")
-            
+            print(f"从数据库加载标注信息错误: {e}")
+
         # 根据规范，加载完标注后需要取消所有标注的选中状态
         self.unselect_all_annotations()
 
@@ -553,6 +558,9 @@ class ImageCanvas(QGraphicsView):
             # 按class_id排序
             annotations.sort(key=lambda _item: _item.category.class_name)
 
+            # 创建kolo_item_list用于存储KoloItem对象
+            kolo_item_list = []
+
             with open(txt_path, 'w') as f:
                 for item in annotations:
                     # 获取当前在场景中的绝对位置和大小（修复：使用sceneBoundingRect获取最新位置）
@@ -572,7 +580,32 @@ class ImageCanvas(QGraphicsView):
                     class_name_b64 = StringUtil.string_to_base64(item.category.class_name)
 
                     # 写入文件，保留9位小数
-                    f.write(f"{class_name_b64} {x_center:.9f} {y_center:.9f} {norm_width:.9f} {norm_height:.9f}\n")
+                    # f.write(f"{class_name_b64} {x_center:.9f} {y_center:.9f} {norm_width:.9f} {norm_height:.9f}\n")
+
+                    # 创建KoloItem对象并添加到列表中
+                    # 从当前图片路径获取图片名称
+                    image_name = self.current_image_path.name
+                    kolo_item_list.append(KoloItem(
+                        kid=KOrmBase.snowflake.gen_kid(),
+                        image_name=image_name,
+                        class_name=item.category.class_name,
+                        x_center=x_center,
+                        y_center=y_center,
+                        width=norm_width,
+                        height=norm_height
+                    ))
+
+            # 在事务中删除所有image_name的kolo_item, 然后插入新的kolo_item_list中的对象
+            def transaction_func(session):
+                # 删除所有与当前图片相关的旧记录
+                session.query(KoloItem).filter(KoloItem.image_name == self.current_image_path.name).delete()
+
+                # 插入新的KoloItem对象
+                for kolo_item in kolo_item_list:
+                    session.add(kolo_item)
+
+            # 执行事务
+            self.project_info.sqlite_db.execute_in_transaction(transaction_func)
 
             print(f"保存标注文件成功: {txt_path}")
             return True
@@ -712,11 +745,11 @@ class ImageCanvas(QGraphicsView):
         self.config_menu = QMenu(self)
 
         # 运行子菜单
-        run_action = QAction("Run", self)
-        run_action.triggered.connect(self.exec_yolo)
+        self.run_action = QAction("Run", self)
+        self.run_action.triggered.connect(self.exec_yolo)
         # 运行选项状态通过project_info判断
-        run_action.setEnabled(bool(getattr(self.project_info, 'yolo_model_path', None)))
-        self.config_menu.addAction(run_action)
+        self.run_action.setEnabled(self.project_info.is_model_loaded)
+        self.config_menu.addAction(self.run_action)
 
         # 编辑子菜单
         edit_action = QAction("Edit", self)
@@ -727,14 +760,14 @@ class ImageCanvas(QGraphicsView):
         delete_action = QAction("Delete", self)
         delete_action.triggered.connect(self.delete_yolo_model)
         # 删除选项只在有模型时可用（通过project_info判断）
-        delete_action.setEnabled(bool(getattr(self.project_info, 'yolo_model_path', None)))
+        delete_action.setEnabled(self.project_info.is_model_loaded)
         self.config_menu.addAction(delete_action)
 
     def show_config_menu(self):
         """显示配置菜单，在按钮位置弹出"""
         if self.config_menu:
             # 更新菜单状态（通过project_info判断模型是否存在）
-            model_exists = bool(getattr(self.project_info, 'yolo_model_path', None))
+            model_exists = self.project_info.is_model_loaded
             for action in self.config_menu.actions():
                 if action.text() == "Run" or action.text() == "Delete":
                     action.setEnabled(model_exists)
@@ -742,12 +775,12 @@ class ImageCanvas(QGraphicsView):
             self.config_menu.exec_(self.config_button.mapToGlobal(self.config_button.rect().bottomLeft()))
 
     def select_yolo_model(self):
-        """选择YOLO模型的pt文件，并复制到项目目录"""
+        """选择YOLO模型的pt文件，直接引用原位置文件"""
         # 获取上次打开的目录
         from src.core.ksettings import KSettings
         settings = KSettings()
         last_directory = settings.get_last_opened_directory()
-        
+
         # 打开文件选择对话框，使用上次打开的目录作为默认目录
         file_path, _ = QFileDialog.getOpenFileName(
             self, "Select YOLO Model", last_directory, "YOLO Model Files (*.pt)"
@@ -756,127 +789,38 @@ class ImageCanvas(QGraphicsView):
         if file_path:
             # 保存当前选择的目录
             settings.set_last_opened_directory(str(Path(file_path).parent))
-            
-            src_path = Path(file_path)  # 源文件路径
-            dest_path = self.project_info.path / src_path.name  # 目标路径：项目目录/文件名.pt
-            replace_file = False
 
-            # 1. 检查目标路径是否已存在同名文件
-            if dest_path.exists():
-                reply = QMessageBox.question(
-                    self, "File Exists",
-                    f"Model '{dest_path.name}' already exists in project.\nDo you want to replace it?",
-                    QMessageBox.Yes | QMessageBox.No,
-                    QMessageBox.No  # 默认不替换
+            model_path = Path(file_path)  # 模型文件路径
+
+            try:
+                # 直接引用原位置的模型文件
+                self.project_info.yolo_model_path = str(model_path)
+                # 异步加载模型到project_info的yolo_executor
+                self._load_yolo_model_async(model_path)
+
+            except Exception as e:
+                # 捕获加载异常
+                QMessageBox.warning(
+                    self, "Load Failed",
+                    f"Failed to load model:\n{str(e)}"
                 )
-                replace_file = (reply == QMessageBox.Yes)
-            else:
-                replace_file = True  # 不存在则直接复制
+        else:
+            QMessageBox.information(self, "Cancelled", "Model selection cancelled.")
 
-            # 2. 执行文件复制
-            if replace_file:
-                try:
-                    # 复制文件（保留元数据，如修改时间）
-                    shutil.copy2(src_path, dest_path)
-                    # 更新模型路径到project_info（替代原self.yolo_model_path）
-                    self.project_info.yolo_model_path = str(dest_path)
-                    # 加载模型到project_info的yolo_executor
-                    self.project_info.load_yolo(dest_path)
-                    # 保存配置+启用Run按钮
-                    self.save_model_config()
-                    if self.run_tool_button:
-                        self.run_tool_button.setEnabled(True)
-
-                    QMessageBox.information(
-                        self, "Success",
-                        f"Model '{dest_path.name}' copied to project successfully!\nPath: {dest_path}"
-                    )
-                except Exception as e:
-                    # 捕获复制异常（如权限不足、文件占用）
-                    QMessageBox.warning(
-                        self, "Copy Failed",
-                        f"Failed to copy model:\n{str(e)}"
-                    )
-            else:
-                QMessageBox.information(self, "Cancelled", "Model selection cancelled (no file copied).")
+    def _load_yolo_model_async(self, model_path: Optional[Path] =None):
+        # 开始加载模型
+        self.project_info.load_yolo_model(model_path)
+        self.run_action.setEnabled(self.project_info.is_model_loaded)
+        self.run_tool_button.setEnabled(self.project_info.is_model_loaded)
 
     def delete_yolo_model(self):
         """删除已选择的YOLO模型配置"""
-        # 通过project_info判断模型是否存在（替代原self.yolo_model_path）
-        if not getattr(self.project_info, 'yolo_model_path', None):
-            QMessageBox.information(self, "Information", "No YOLO model selected to delete.")
-            return
-
-        # 确认删除
-        model_name = Path(self.project_info.yolo_model_path).name
-        reply = QMessageBox.question(
-            self, "Confirm Delete",
-            f"Are you sure you want to remove the selected YOLO model '{model_name}'?",
-            QMessageBox.Yes | QMessageBox.No, QMessageBox.No
-        )
-
-        if reply == QMessageBox.Yes:
-            # 清空project_info中的模型路径（替代原self.yolo_model_path = None）
-            self.project_info.yolo_model_path = None
-            # 更新Run按钮状态为不可用
-            if self.run_tool_button:
-                self.run_tool_button.setEnabled(False)
-            # 删除配置文件
-            try:
-                config_path = self.project_info.path / "config" / "yolo_config.json"
-                if config_path.exists():
-                    config_path.unlink()
-                    print(f"YOLO model configuration file deleted: {config_path}")
-                QMessageBox.information(self, "Success", "YOLO model configuration has been deleted.")
-            except Exception as e:
-                print(f"Error deleting YOLO model configuration: {e}")
-                QMessageBox.warning(self, "Error", f"Failed to delete model configuration: {str(e)}")
-
-    def save_model_config(self):
-        """保存模型配置到工程文件"""
-        # 通过project_info获取模型路径（替代原self.yolo_model_path）
-        model_path = getattr(self.project_info, 'yolo_model_path', None)
-        if not model_path:
-            return
-
-        try:
-            # 确保配置文件目录存在
-            config_dir = self.project_info.path / "config"
-            config_dir.mkdir(exist_ok=True)
-
-            # 保存模型路径到配置文件（使用project_info中的模型路径）
-            config_path = config_dir / "yolo_config.json"
-            with open(config_path, 'w') as f:
-                json.dump({"model_path": model_path}, f, indent=4)
-            print(f"YOLO model configuration saved to {config_path}")
-        except Exception as e:
-            print(f"Error saving YOLO model configuration: {e}")
-            QMessageBox.warning(self, "Error", f"Failed to save model configuration: {str(e)}")
-
-    def load_model_config(self):
-        """从工程文件加载模型配置"""
-        try:
-            # 初始化project_info的模型路径属性（避免AttributeError）
-            self.project_info.yolo_model_path = None
-            config_path = self.project_info.path / "config" / "yolo_config.json"
-            if config_path.exists():
-                with open(config_path, 'r') as f:
-                    config = json.load(f)
-                    # 加载模型路径到project_info（替代原self.yolo_model_path）
-                    self.project_info.yolo_model_path = config.get("model_path")
-                    print(f"Loaded YOLO model from {self.project_info.yolo_model_path}")
-                    # 如果有模型，启用Run按钮
-                    if self.run_tool_button and self.project_info.yolo_model_path:
-                        self.run_tool_button.setEnabled(True)
-        except Exception as e:
-            print(f"Error loading YOLO model configuration: {e}")
+        self.project_info.delete_yolo_model()
 
     # 然后是调用YOLOExecutor的代码（例如UI类中的方法）
     def exec_yolo(self):
         """执行YOLO模型的方法，识别当前图片目标并按指定格式输出日志"""
         import logging
-        # 移除函数内重复导入，统一放在模块顶部
-
         # 检查模型是否加载
         if not self.project_info.is_model_loaded:
             QMessageBox.warning(self, "Warning", "No YOLO model selected! Please configure a model first.")
@@ -1208,9 +1152,64 @@ class ImageCanvas(QGraphicsView):
         finally:
             self.scene.blockSignals(False)
 
+    def show_context_menu(self, position):
+        """显示上下文菜单"""
+        context_menu = QMenu(self)
+
+        # 添加"全部清空"选项
+        clear_all_action = QAction("全部清空", self)
+        clear_all_action.triggered.connect(self.clear_all_annotations)
+        context_menu.addAction(clear_all_action)
+
+        # 在鼠标位置显示菜单
+        context_menu.exec_(self.mapToGlobal(position))
+
+    def clear_all_annotations(self):
+        """清空所有标注并删除对应的.kolo文件"""
+        if not self.current_image_path or self.image_item is None:
+            return
+
+        # 确认操作
+        reply = QMessageBox.question(
+            self, "确认清空", "确定要清空所有标注并删除标注文件吗？",
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No
+        )
+
+        if reply == QMessageBox.Yes:
+            # 清空画布上的所有标注
+            self.clear_annotation_views()
+
+            # 删除对应的.kolo文件
+            kolo_path = self.current_image_path.with_suffix('.kolo')
+            if kolo_path.exists():
+                try:
+                    kolo_path.unlink()
+                    print(f"已删除标注文件: {kolo_path}")
+                except Exception as e:
+                    print(f"删除标注文件时出错: {e}")
+                    QMessageBox.warning(self, "错误", f"删除标注文件时出错:\n{str(e)}")
+
+            # 保存状态更新
+            self.set_needs_save_annotations = False
+
     def reload_image(self):
         """重新加载当前显示的图片（如果存在）"""
         # 检查当前是否有图片路径，即是否有图片正在显示
         if self.current_image_path is not None:
             # 调用已有的load_image方法重新加载当前图片
             self.load_image(self.current_image_path)
+
+    def _connect_model_signals(self):
+        """连接模型加载相关的信号"""
+        # 为了确保能接收到模型加载完成的信号，我们需要在project_info中添加信号连接
+        pass  # 实际的信号连接在RefProjectInfo中处理
+
+    def _on_model_load_finished(self, success: bool, error_message: str):
+        """缓存模型加载完成的回调"""
+        if success:
+            # 模型加载成功，启用Run按钮
+            if self.run_tool_button:
+                self.run_tool_button.setEnabled(True)
+            print("缓存的YOLO模型加载成功")
+        else:
+            print(f"缓存的YOLO模型加载失败: {error_message}")

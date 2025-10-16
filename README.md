@@ -20,7 +20,7 @@ KBoxLabel 是一个基于 PyQt5 开发的图像标注工具，支持目标检测
 
 ### 系统要求
 
-- Python 3.10 或更高版本
+- Python 3.11 或更高版本
 - 支持的系统：Windows、macOS、Linux
 
 ### 安装步骤
@@ -34,14 +34,14 @@ cd KBoxLabel
 2. 创建虚拟环境（推荐）：
 ```bash
 # 使用conda创建虚拟环境
-conda create -n kboxlabel python=3.10
+conda create -n kboxlabel python=3.11
 conda activate kboxlabel
 ```
 
 3. 安装依赖：
 ```bash
 # Linux/macOS
-./app/pip_install.sh
+bash ./app/pip_install.sh
 
 # Windows
 pip install -r app/requirements.txt

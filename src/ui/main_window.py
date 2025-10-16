@@ -1,4 +1,5 @@
 # main_window.py
+import json
 import os
 from pathlib import Path
 from typing import cast
@@ -9,7 +10,7 @@ from PyQt5.QtWidgets import (QMainWindow, QWidget, QHBoxLayout, QVBoxLayout,
                              QPushButton, QInputDialog, QFileDialog, QDialogButtonBox,
                              )  # 新增导入
 
-from src.models.ref_project_info import RefProjectInfo
+from src.models.dto.ref_project_info import RefProjectInfo
 from src.ui.widget.image_canvas.image_canvas import ImageCanvas
 from src.ui.widget.image_list import ImageListView
 from src.ui.widget.main_menu_bar import MainMenuBar
@@ -49,6 +50,7 @@ class MainWindow(QMainWindow):
         self.image_list = ImageListView(self.project_info)
         left_layout.addWidget(self.image_list)
         # 连接选中项变化信号
+        self.image_list.sig_selection_changed.connect(self.on_image_list_selection_changed)  # type: ignore
         self.image_list.selectionModel().selectionChanged.connect(self.on_image_selection_changed)  # type: ignore
 
         # ===== 中间图片编辑区域 =====
@@ -269,6 +271,8 @@ class MainWindow(QMainWindow):
             if not self.project_info.path.exists():
                 raise FileNotFoundError(f"项目目录不存在: {project_path}")
 
+            # todo: 判断self.project_info.sqlite_path位置是否存在，如果不存在，创建这个sqlite文件
+
             # 更新UI
             self.setWindowTitle(self.window_title)
             self.statusBar().showMessage(f"已打开项目: {project_path}", 5000)
@@ -283,7 +287,7 @@ class MainWindow(QMainWindow):
                 f"无法打开项目: {str(e)}"
             )
             # 确保项目路径为无效状态
-            self.project_info = RefProjectInfo(Path(""))
+            self.project_info = None
             self.setWindowTitle(self.window_title)
 
     @property
@@ -329,7 +333,6 @@ class MainWindow(QMainWindow):
         """
         from PyQt5.QtWidgets import QProgressDialog, QMessageBox
         from PyQt5.QtCore import Qt
-        import glob
 
         # 检查项目路径是否存在
         if not self.project_info.path.exists():
@@ -435,7 +438,6 @@ class MainWindow(QMainWindow):
         """
         from PyQt5.QtWidgets import QProgressDialog, QMessageBox, QFileDialog
         from PyQt5.QtCore import Qt
-        import glob
         import json
         from datetime import datetime
 
@@ -731,6 +733,14 @@ class MainWindow(QMainWindow):
     def set_left_status(self, text: str):
         if self.left_status:
             self.left_status.setText(text)
+
+    def on_image_list_selection_changed(self, total_count, current_index):
+        """处理图片列表选择变化，更新状态栏"""
+        if current_index > 0:
+            status_text = f"共加载 {total_count} 张图片，当前选中第 {current_index} 张"
+        else:
+            status_text = f"共加载 {total_count} 张图片，未选中任何图片"
+        self.statusBar().showMessage(status_text)
 
     def handle_import_images(self):
         """处理图片导入功能"""

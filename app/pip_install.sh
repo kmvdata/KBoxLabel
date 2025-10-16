@@ -9,8 +9,12 @@ core_packages=(
     opencv-python
     Pillow
     ultralytics
+    pydantic
     pyqtgraph
     pyqt5
+    sqlalchemy
+    i18n
+    "numpy<2"
 )
 
 # 使用国内镜像源加速安装

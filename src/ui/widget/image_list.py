@@ -10,7 +10,7 @@ from PyQt5.QtWidgets import (QListView, QStyledItemDelegate, QStyle,
                              QMenu, QInputDialog, QMessageBox, QDialog, QVBoxLayout,
                              QLabel, QPushButton, QProgressBar)
 
-from src.models.ref_project_info import RefProjectInfo
+from src.models.dto.ref_project_info import RefProjectInfo
 
 
 class ThumbnailLoaderSignals(QObject):
@@ -219,6 +219,7 @@ class ImageListItemDelegate(QStyledItemDelegate):
         thumbnail = index.data(Qt.DecorationRole)
         thumbnail.paint(painter, thumbnail_rect, Qt.AlignCenter)
 
+
         # 设置文本位置（缩略图右侧）
         text_rect = option.rect.adjusted(
             self.thumbnail_size.width() + 6,
@@ -292,6 +293,7 @@ class YoloWorker(QThread):
 class ImageListView(QListView):
     sig_image_clicked = pyqtSignal(str)
     sig_canvas_needs_reload = pyqtSignal()  # 发送canvas需要reload的信号
+    sig_selection_changed = pyqtSignal(int, int)  # 发送图片总数和当前选中索引信号
 
     def __init__(self, project_info: RefProjectInfo):
         super().__init__()
@@ -309,6 +311,7 @@ class ImageListView(QListView):
 
         # 连接信号
         self.doubleClicked.connect(self.handle_item_clicked)  # type: ignore
+        self.selectionModel().selectionChanged.connect(self.on_selection_changed)  # type: ignore
 
     def set_row_height(self, height):
         """统一设置行高（更新模型和委托）"""
@@ -322,6 +325,18 @@ class ImageListView(QListView):
     def load_images_from_path(self, project_path: Path):
         """从项目路径加载图片"""
         self.model.load_images_from_path(project_path)
+
+    def on_selection_changed(self, selected, deselected):
+        """处理选择变化事件"""
+        # 获取当前选中索引
+        indexes = selected.indexes()
+        current_index = indexes[0].row() + 1 if indexes else 0
+        
+        # 获取总图片数
+        total_count = self.model.rowCount()
+        
+        # 发送信号
+        self.sig_selection_changed.emit(total_count, current_index)
 
     def handle_item_clicked(self, index):
         """处理项点击事件"""
@@ -351,6 +366,10 @@ class ImageListView(QListView):
         # 添加新增的Run和Run All菜单项
         run_action = menu.addAction("Run")
         run_all_action = menu.addAction("Run All")
+        
+        # 添加新的菜单项
+        jump_to_action = menu.addAction("跳转至...")
+        smart_jump_action = menu.addAction("跳转到最后标注")
 
         # 检查模型是否已加载，控制Run相关菜单项的可用性
         model_loaded = self.project_info.is_model_loaded
@@ -361,6 +380,10 @@ class ImageListView(QListView):
         rename_action.setEnabled(is_item_clicked)
         delete_action.setEnabled(is_item_clicked)
         open_action.setEnabled(is_item_clicked)
+        
+        # 设置新菜单项的可用性
+        jump_to_action.setEnabled(True)
+        smart_jump_action.setEnabled(self.model.rowCount() > 0)
 
         # 连接菜单项信号
         rename_action.triggered.connect(lambda: self.rename_selected(index))  # type: ignore
@@ -368,6 +391,10 @@ class ImageListView(QListView):
         open_action.triggered.connect(lambda: self.open_in_explorer(index))  # type: ignore
         run_action.triggered.connect(lambda: self.on_run_clicked(index))  # type: ignore
         run_all_action.triggered.connect(self.on_run_all_clicked)  # type: ignore
+        
+        # 连接新菜单项的信号
+        jump_to_action.triggered.connect(self.on_jump_to_clicked)  # type: ignore
+        smart_jump_action.triggered.connect(self.on_smart_jump_clicked)  # type: ignore
 
         # 显示菜单
         menu.exec_(self.mapToGlobal(event.pos()))
@@ -789,4 +816,68 @@ class ImageListView(QListView):
         # 显示进度对话框
         progress_dialog.exec_()
 
+    def on_jump_to_clicked(self):
+        """跳转至...菜单项点击事件"""
+        if self.model.rowCount() == 0:
+            return
+            
+        # 弹出输入对话框让用户输入要跳转到的图片序号
+        max_index = self.model.rowCount()
+        jump_to, ok = QInputDialog.getInt(
+            self,
+            "跳转至...",
+            f"请输入图片序号 (1-{max_index}):",
+            1, 1, max_index, 1
+        )
+        
+        if ok:
+            # 跳转到指定图片（索引从0开始，所以需要减1）
+            index = self.model.index(jump_to - 1, 0)
+            if index.isValid():
+                self.setCurrentIndex(index)
+                # 模拟点击事件以加载图片
+                self.handle_item_clicked(index)
 
+    def on_smart_jump_clicked(self):
+        """智能跳转菜单项点击事件：按照id排序，获取最后一个kolo_item，然后跳转至这个item对应的图片"""
+        if self.model.rowCount() == 0:
+            return
+            
+        try:
+            # 定义查询函数，获取按ID排序的最后一个KoloItem
+            def query_func(session):
+                from src.models.sql.kolo_item import KoloItem
+                return session.query(KoloItem).order_by(KoloItem.id.desc()).first()
+            
+            # 执行查询
+            last_kolo_item = self.project_info.sqlite_db.execute_in_transaction(query_func)
+            
+            # 如果没有找到任何KoloItem，显示提示信息
+            if not last_kolo_item:
+                QMessageBox.information(self, "智能跳转", "数据库中没有找到任何标注记录。")
+                return
+                
+            # 获取最后一个KoloItem对应的图片名称
+            target_image_name = last_kolo_item.image_name
+            
+            # 遍历所有图片，查找对应的图片文件
+            for i in range(self.model.rowCount()):
+                file_path = self.model.image_paths[i]
+                # 获取图片文件名
+                image_file_name = os.path.basename(file_path)
+                
+                # 如果图片文件名匹配，则跳转到该图片
+                if image_file_name == target_image_name:
+                    index = self.model.index(i, 0)
+                    if index.isValid():
+                        self.setCurrentIndex(index)
+                        # 模拟点击事件以加载图片
+                        self.handle_item_clicked(index)
+                    return
+                    
+            # 如果没有找到对应的图片文件，显示提示信息
+            QMessageBox.information(self, "智能跳转", f"未找到与最后一条标注记录关联的图片文件: {target_image_name}")
+            
+        except Exception as e:
+            print(f"智能跳转时出错: {e}")
+            QMessageBox.warning(self, "错误", f"智能跳转时发生错误: {str(e)}")

@@ -3,7 +3,7 @@ requires = ["setuptools>=45", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "KBoxLabel"
+name = "kboxlabel"
 version = "1.0.0"
 authors = [
     {name = "Your Name", email = "your.email@example.com"},
@@ -78,8 +78,8 @@ dependencies = [
 ]
 
 [project.scripts]
-KBoxLabel = "main:main"
+kboxlabel = "main:main"
 
 [project.urls]
-Homepage = "https://github.com/your-username/KBoxLabel"
-Repository = "https://github.com/your-username/KBoxLabel"
+Homepage = "https://github.com/kmvdata/KBoxLabel"
+Repository = "https://github.com/kmvdata/KBoxLabel"

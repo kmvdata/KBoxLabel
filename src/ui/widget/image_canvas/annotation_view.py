@@ -8,7 +8,7 @@ from PyQt5.QtGui import QPen, QPainter, QBrush, QColor
 from PyQt5.QtWidgets import QGraphicsRectItem, QGraphicsItem, QStyle
 
 from src.core.utils.string_util import StringUtil
-from src.models.annotation_category import AnnotationCategory
+from src.models.dto.annotation_category import AnnotationCategory
 
 
 class AnnotationView(QGraphicsRectItem):
@@ -438,7 +438,7 @@ class AnnotationView(QGraphicsRectItem):
             category_data = json.loads(json_data)
 
             # 创建AnnotationCategory对象
-            from src.models.annotation_category import AnnotationCategory
+            from src.models.dto.annotation_category import AnnotationCategory
             dropped_category = AnnotationCategory(
                 class_id=category_data['class_id'],
                 class_name=category_data['class_name']
@@ -454,6 +454,9 @@ class AnnotationView(QGraphicsRectItem):
         """处理拖拽的标注类别"""
         self.set_category(category)
         print(f"拖拽成功! 接收到标注: ID={category.class_id}, 名称='{category.class_name}'")
+        self.set_needs_save_annotation()
+        if self.image_canvas is not None:
+            self.image_canvas.save_annotations()
 
     def set_selected(self, selected: bool) -> None:
         """重写选中状态设置方法，确保状态变化时触发重绘"""
