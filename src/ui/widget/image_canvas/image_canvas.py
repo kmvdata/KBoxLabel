@@ -816,13 +816,6 @@ class ImageCanvas(QGraphicsView):
     def exec_yolo(self):
         """执行YOLO模型的方法，识别当前图片目标并按指定格式输出日志"""
         import logging
-        # 移除函数内重复导入，统一放在模块顶部
-
-        # 检查模型是否正在加载
-        if self.project_info.is_model_loaded:
-            QMessageBox.warning(self, "Warning", "Model is still loading, please wait.")
-            return
-
         # 检查模型是否加载
         if not self.project_info.is_model_loaded:
             QMessageBox.warning(self, "Warning", "No YOLO model selected! Please configure a model first.")
