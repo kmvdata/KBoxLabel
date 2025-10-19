@@ -329,54 +329,90 @@ class MainWindow(QMainWindow):
 
     def export_project_to_yolo(self):
         """
-        读取工程下所有kolo文件，转换为YOLO格式，显示进度条和取消按钮
+        从数据库读取所有kolo_item对象，转换为YOLO格式，显示进度条和取消按钮
         """
         from PyQt5.QtWidgets import QProgressDialog, QMessageBox
         from PyQt5.QtCore import Qt
+        from src.models.sql.kolo_item import KoloItem
 
         # 检查项目路径是否存在
         if not self.project_info.path.exists():
             QMessageBox.warning(self, "导出失败", "项目路径不存在")
             return
 
-        # 查找所有kolo文件
-        kolo_files = list(self.project_info.path.glob("*.kolo"))
-
-        if not kolo_files:
-            QMessageBox.information(self, "导出完成", "未找到任何kolo文件")
-            return
-
-        # 创建进度对话框
-        progress_dialog = QProgressDialog("正在导出kolo文件...", "取消", 0, len(kolo_files), self)
-        progress_dialog.setWindowTitle("导出进度")
-        progress_dialog.setWindowModality(Qt.WindowModal)
-        progress_dialog.setMinimumDuration(0)
-        progress_dialog.setAutoClose(True)
-
-        # 处理每个kolo文件
-        for i, kolo_file in enumerate(kolo_files):
-            # 检查是否取消
-            if progress_dialog.wasCanceled():
-                QMessageBox.information(self, "导出中止", "用户取消了导出操作")
+        # 创建数据库会话
+        session = self.project_info.sqlite_db.db_session()
+        
+        try:
+            # 获取总记录数用于进度条
+            total_items = session.query(KoloItem).count()
+            
+            if total_items == 0:
+                QMessageBox.information(self, "导出完成", "未找到任何标注数据")
                 return
 
-            # 更新进度对话框
-            progress_dialog.setValue(i)
-            progress_dialog.setLabelText(f"正在导出: {kolo_file.name}")
+            # 创建进度对话框
+            progress_dialog = QProgressDialog("正在导出标注数据...", "取消", 0, total_items, self)
+            progress_dialog.setWindowTitle("导出进度")
+            progress_dialog.setWindowModality(Qt.WindowModal)
+            progress_dialog.setMinimumDuration(0)
+            progress_dialog.setAutoClose(True)
 
-            # 处理事件队列，确保UI更新
-            from PyQt5.QtWidgets import QApplication
-            QApplication.processEvents()
+            # 创建类别名称到ID的映射
+            class_name_to_id = {category.class_name: category.class_id for category in self.project_info.categories}
+            
+            # 按image_name分组查询，避免一次性加载所有数据到内存
+            image_names = session.query(KoloItem.image_name).distinct().all()
+            image_names = [name[0] for name in image_names]
+            
+            # 处理每个图片的标注数据
+            processed_count = 0
+            for i, image_name in enumerate(image_names):
+                # 检查是否取消
+                if progress_dialog.wasCanceled():
+                    QMessageBox.information(self, "导出中止", "用户取消了导出操作")
+                    return
 
-            # 转换当前kolo文件
-            try:
-                self.export_to_yolo(kolo_file)
-            except Exception as e:
-                print(f"导出文件 {kolo_file.name} 时出错: {str(e)}")
+                # 更新进度对话框
+                progress_dialog.setValue(processed_count)
+                progress_dialog.setLabelText(f"正在导出: {image_name}")
 
-        # 完成进度
-        progress_dialog.setValue(len(kolo_files))
-        QMessageBox.information(self, "导出完成", f"成功导出 {len(kolo_files)} 个文件")
+                # 处理事件队列，确保UI更新
+                from PyQt5.QtWidgets import QApplication
+                QApplication.processEvents()
+
+                # 构造输出文件路径（同名的txt文件）
+                txt_path = self.project_info.path / f"{Path(image_name).stem}.txt"
+                
+                try:
+                    # 查询该图片的所有标注
+                    kolo_items = session.query(KoloItem).filter(KoloItem.image_name == image_name).all()
+                    
+                    # 写入YOLO格式的txt文件
+                    with open(txt_path, 'w', encoding='utf-8') as txt_file:
+                        for item in kolo_items:
+                            # 获取类别ID
+                            class_id = class_name_to_id.get(item.class_name, -1)
+                            if class_id == -1:
+                                print(f"警告: 未找到类别 '{item.class_name}' 的ID，跳过该标注")
+                                continue
+
+                            # 写入YOLO格式: class_id x_center y_center width height
+                            yolo_line = f"{class_id} {item.x_center} {item.y_center} {item.width} {item.height}\n"
+                            txt_file.write(yolo_line)
+                            
+                    processed_count += len(kolo_items)
+                    
+                except Exception as e:
+                    print(f"导出图片 {image_name} 的标注时出错: {str(e)}")
+                    # 继续处理其他图片而不是中断整个过程
+
+            # 完成进度
+            progress_dialog.setValue(total_items)
+            QMessageBox.information(self, "导出完成", f"成功导出 {len(image_names)} 个文件，共 {processed_count} 条标注")
+
+        finally:
+            session.close()
 
     def export_to_yolo(self, kolo_path: Path):
         """
