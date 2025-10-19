@@ -6,7 +6,8 @@ from src.common.god.korm_base import KOrmBase
 class KoloItem(KOrmBase):
     __tablename__ = 'kolo_item'
     __table_args__ = (
-        Index('idx_image_name', 'image_name'),
+        Index('kolo_item_idx_image_name', 'image_name'),
+        Index('kolo_item_idx_class_name', 'class_name'),
         {'comment': 'Kolo项目表'}
     )
 
