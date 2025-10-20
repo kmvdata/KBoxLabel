@@ -1,10 +1,13 @@
 import logging
 from pathlib import Path
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
 from PIL import Image  # 用于获取图像尺寸
 
 from src.models.sql.kolo_item import KoloItem
+
+if TYPE_CHECKING:
+    from src.models.dto.ref_project_info import RefProjectInfo
 
 
 class YOLOExecutor:
@@ -12,10 +15,11 @@ class YOLOExecutor:
     
     yolo_model_path_key = "yolo_model_path"  # 类属性，固定值为"yolo_model_path"
 
-    def __init__(self):
+    def __init__(self, parent: 'RefProjectInfo' = None):
         self.yolo_model = None  # 存储加载好的YOLO模型
         self.model_name = None  # 存储模型名称
         self.yolo_model_path: Optional[Path] = None  # 实例属性，存储加载的模型路径
+        self.parent: Optional['RefProjectInfo'] = parent  # RefProjectInfo类型的父对象
 
     def is_model_loaded(self) -> bool:
         """
@@ -111,7 +115,20 @@ class YOLOExecutor:
                 detection_results.append(kolo_item)
         return detection_results
 
-    def exec_yolo(self, img_path: Path):
+    def load_kolo_item_from_db(self, img_path: Path) -> list[KoloItem]:
+        # 创建数据库会话
+        session = self.parent.sqlite_db.db_session()
+        try:
+            # 从数据库读取image_name为img_path.name的行
+            kolo_items = session.query(KoloItem).filter(KoloItem.image_name == img_path.name).all()
+            return kolo_items
+        except Exception as e:
+            logging.error(f"从数据库加载Kolo项目时出错: {str(e)}")
+            return []
+        finally:
+            session.close()
+
+    def exec_yolo(self, img_path: Path)-> list[KoloItem]:
         """使用yolo识别目标，从.kolo文件读取现有数据，合并结果"""
         # 保留原有参数检查逻辑
         if not self.is_model_loaded():
@@ -140,72 +157,9 @@ class YOLOExecutor:
         )
         logging.debug(f"YOLO检测到 {len(detection_results)} 个目标")
 
-        # 读取同名.kolo文件并合并符合格式的内容
-        kolo_path = img_path.with_suffix('.kolo')
-        logging.debug(f"尝试读取.kolo文件: {kolo_path}")
-
-        if kolo_path.exists():
-            try:
-                with open(kolo_path, 'r', encoding='utf-8') as f:  # 支持带BOM的UTF-8文件
-                    kolo_lines = f.readlines()
-
-                logging.debug(f"成功读取.kolo文件，共 {len(kolo_lines)} 行")
-                added_count = 0  # 统计成功添加的行数
-
-                # 验证每行格式并合并
-                for line_num, line in enumerate(kolo_lines, 1):
-                    original_line = line
-                    line = line.strip()
-
-                    if not line:  # 跳过空行
-                        continue
-
-                    # 检查格式是否匹配（5个部分）
-                    parts = line.split()
-                    if len(parts) != 5:
-                        logging.warning(f".kolo文件第{line_num}行格式错误（部分数量不对）: {original_line[:50]}...")
-                        continue
-
-                    # 验证坐标部分是否为浮点数
-                    try:
-                        # 只验证后四个坐标部分
-                        float(parts[1])  # x_center
-                        float(parts[2])  # y_center
-                        float(parts[3])  # width
-                        float(parts[4])  # height
-                        
-                        # 解码类别名称
-                        import base64
-                        class_name = base64.b64decode(parts[0]).decode('utf-8')
-                        
-                        # 创建对应的KoloItem对象
-                        from src.models.sql.kolo_item import KoloItem
-                        kolo_item = KoloItem()
-                        kolo_item.kid = KoloItem.gen_kid()
-                        kolo_item.image_name = img_path.name
-                        kolo_item.class_name = class_name
-                        kolo_item.x_center = parts[1]
-                        kolo_item.y_center = parts[2]
-                        kolo_item.width = parts[3]
-                        kolo_item.height = parts[4]
-
-                        # 格式验证通过，添加到结果中
-                        detection_results.append(kolo_item)
-                        added_count += 1
-                    except (ValueError, base64.binascii.Error, UnicodeDecodeError):
-                        logging.warning(f".kolo文件第{line_num}行坐标格式错误: {original_line[:50]}...")
-                        continue
-
-                logging.debug(f"从.kolo文件成功添加 {added_count} 个标注")
-
-            except Exception as e:
-                # 记录错误并提示用户
-                error_msg = f"读取或处理.kolo文件时出错: {str(e)}"
-                logging.error(error_msg)
-                # 这里可以根据需要决定是否抛出异常中断执行
-                # raise Exception(error_msg)
-        else:
-            logging.debug(f".kolo文件不存在: {kolo_path}")
+        # 从数据库加载项目并添加到检测结果中
+        kolo_items_in_db = self.load_kolo_item_from_db(img_path)
+        detection_results.extend(kolo_items_in_db)
 
         # 合并相似结果并返回
         merged_results = self.merge_similar_detections(detection_results)

@@ -848,10 +848,10 @@ class ImageCanvas(QGraphicsView):
             model_name = self.project_info.model_name
             if detection_results:
                 logging.info("YOLO detection results:")
-                for line in detection_results:
-                    print(line)
-                    logging.info(line)
-                    self.load_kolo_line(line)  # 复用加载到画布的方法
+                for kolo_item in detection_results:
+                    print(kolo_item)
+                    logging.info(kolo_item)
+                    self.load_kolo_line(kolo_item)  # 复用加载到画布的方法
             else:
                 logging.info("No objects detected by YOLO model")
                 QMessageBox.information(

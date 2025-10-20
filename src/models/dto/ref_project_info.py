@@ -8,7 +8,7 @@ from src.common.god.sqlite_db import SqliteDB
 from src.core.ksettings import KSettings
 from src.core.yolo_executor import YOLOExecutor
 from src.models.dto.annotation_category import AnnotationCategory
-from src.models.sql import gen_sql_tables
+from src.models.sql import gen_sql_tables, KoloItem
 from src.models.sql.annotation_category import AnnotationCategory as SQLAnnotationCategory
 from src.models.sql.kv_config import KVConfig
 from src.common.god.ksnowflake import KSnowflake
@@ -19,7 +19,7 @@ class RefProjectInfo:
 
     def __init__(self, path: Path):
         self.path = path  # 可变属性
-        self.yolo_executor = YOLOExecutor()
+        self.yolo_executor = YOLOExecutor(self)  # 将自身作为parent传递给YOLOExecutor
         self.categories: list[AnnotationCategory] = []
 
         # 初始化数据库
@@ -137,7 +137,7 @@ class RefProjectInfo:
         finally:
             session.close()
 
-    def exec_yolo(self, img_path: Path):
+    def exec_yolo(self, img_path: Path)-> list[KoloItem]:
         results = self.yolo_executor.exec_yolo(img_path)
         # 生成与图片同名的.kolo文件路径
         kolo_path = img_path.with_suffix('.kolo')
