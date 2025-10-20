@@ -239,8 +239,51 @@ class AnnotationView(QGraphicsRectItem):
             resize_distance = Decimal('1.0')  # 调整大小距离为1像素
             rect = self.rect()
             
+            # 检查是否按住Ctrl+Shift键 (在macOS上是Meta+Shift)
+            modifiers = event.modifiers()
+            ctrl_shift_pressed = (modifiers & Qt.ControlModifier and modifiers & Qt.ShiftModifier) or \
+                                (modifiers & Qt.MetaModifier and modifiers & Qt.ShiftModifier)
+                                
+            if ctrl_shift_pressed:
+                # 按住Ctrl+Shift时，方向键用于收缩标注框（保持一边固定，另一边向内移动）
+                if event.key() == Qt.Key_Left:
+                    # Ctrl+Shift+左箭头：保持左边固定，右边向左移动，使标注框宽度减小
+                    if rect.width() > float(resize_distance):
+                        new_rect = QRectF(rect.x(), rect.y(), rect.width() - float(resize_distance), rect.height())
+                        self.setRect(new_rect)
+                        self.update_handles()
+                        self.set_needs_save_annotation()
+                    event.accept()
+                    return
+                elif event.key() == Qt.Key_Right:
+                    # Ctrl+Shift+右箭头：保持右边固定，左边向右移动，使标注框宽度减小
+                    if rect.width() > float(resize_distance):
+                        new_rect = QRectF(rect.x() + float(resize_distance), rect.y(), rect.width() - float(resize_distance), rect.height())
+                        self.setRect(new_rect)
+                        self.update_handles()
+                        self.set_needs_save_annotation()
+                    event.accept()
+                    return
+                elif event.key() == Qt.Key_Up:
+                    # Ctrl+Shift+上箭头：保持上边固定，下边向上移动，使标注框高度减小
+                    if rect.height() > float(resize_distance):
+                        new_rect = QRectF(rect.x(), rect.y(), rect.width(), rect.height() - float(resize_distance))
+                        self.setRect(new_rect)
+                        self.update_handles()
+                        self.set_needs_save_annotation()
+                    event.accept()
+                    return
+                elif event.key() == Qt.Key_Down:
+                    # Ctrl+Shift+下箭头：保持下边固定，上边向下移动，使标注框高度减小
+                    if rect.height() > float(resize_distance):
+                        new_rect = QRectF(rect.x(), rect.y() + float(resize_distance), rect.width(), rect.height() - float(resize_distance))
+                        self.setRect(new_rect)
+                        self.update_handles()
+                        self.set_needs_save_annotation()
+                    event.accept()
+                    return
             # 检查是否按住Shift键
-            if event.modifiers() & Qt.ShiftModifier:
+            elif event.modifiers() & Qt.ShiftModifier:
                 # 按住Shift时，方向键用于扩大/缩小标注框
                 if event.key() == Qt.Key_Left:
                     # 向左扩展：右边保持不动，向左扩展（x减小，宽度增加）
