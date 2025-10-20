@@ -1,4 +1,4 @@
-from sqlalchemy import Column, INTEGER, String, DateTime, text, Numeric, func, Index
+from sqlalchemy import Column, INTEGER, String, DateTime, text, func, Index
 
 from src.common.god.korm_base import KOrmBase
 
@@ -17,11 +17,11 @@ class KoloItem(KOrmBase):
     image_name = Column(String(255), nullable=False, comment='名称')
     class_name = Column(String(64), nullable=False, comment='名称')
 
-    # 4个浮点类型的Column，精确到小数点后19位
-    x_center = Column(Numeric(precision=30, scale=19), comment='中心点X坐标')
-    y_center = Column(Numeric(precision=30, scale=19), comment='中心点Y坐标')
-    width = Column(Numeric(precision=30, scale=19), comment='宽度')
-    height = Column(Numeric(precision=30, scale=19), comment='高度')
+    # 4个字符串类型的Column，用于存储高精度坐标值
+    x_center = Column(String(64), nullable=False, comment='中心点X坐标')
+    y_center = Column(String(64), nullable=False, comment='中心点Y坐标')
+    width = Column(String(64), nullable=False, comment='宽度')
+    height = Column(String(64), nullable=False, comment='高度')
 
     create_time = Column(DateTime, nullable=False, server_default=text("CURRENT_TIMESTAMP"), comment='创建时间')
     update_time = Column(DateTime,
