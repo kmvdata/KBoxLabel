@@ -116,17 +116,16 @@ class YOLOExecutor:
         return detection_results
 
     def load_kolo_item_from_db(self, img_path: Path) -> list[KoloItem]:
-        # 创建数据库会话
-        session = self.parent.sqlite_db.db_session()
         try:
-            # 从数据库读取image_name为img_path.name的行
-            kolo_items = session.query(KoloItem).filter(KoloItem.image_name == img_path.name).all()
-            return kolo_items
+            # 创建数据库会话
+            with self.parent.sqlite_db.db_session() as session:
+                # 从数据库读取image_name为img_path.name的行
+                kolo_items = session.query(KoloItem).filter(KoloItem.image_name == img_path.name).all()
+                logging.debug(f"从数据库加载到 {len(kolo_items)} 个Kolo项目")
+                return kolo_items
         except Exception as e:
             logging.error(f"从数据库加载Kolo项目时出错: {str(e)}")
             return []
-        finally:
-            session.close()
 
     def exec_yolo(self, img_path: Path)-> list[KoloItem]:
         """使用yolo识别目标，从.kolo文件读取现有数据，合并结果"""

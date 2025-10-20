@@ -274,27 +274,18 @@ class ImageCanvas(QGraphicsView):
         # 打印所有标注坐标
         self.print_all_annotation_coordinates()
 
-    def load_kolo_line(self, detection: str):
-        """加载单行kolo格式数据并在画布上添加对应的标注"""
+    def load_annotation_view_from_kilo_item(self, kolo_item: KoloItem):
+        """根据KoloItem对象在画布上添加对应的标注"""
         if not self.current_image_path or self.image_item is None:
             return False  # 没有加载图片，无法添加标注
 
         try:
-            # 分割检测结果字符串
-            parts = detection.strip().split()
-            if len(parts) != 5:
-                print(f"无效的kolo格式: {detection}")
-                return False
-
-            # 解析各个部分
-            class_name_b64 = parts[0]
-            x_center = float(parts[1])
-            y_center = float(parts[2])
-            width = float(parts[3])
-            height = float(parts[4])
-
-            # 解码类名
-            class_name = StringUtil.base64_to_string(class_name_b64)
+            # 从KoloItem对象获取数据
+            class_name = kolo_item.class_name
+            x_center = Decimal(kolo_item.x_center)
+            y_center = Decimal(kolo_item.y_center)
+            width = Decimal(kolo_item.width)
+            height = Decimal(kolo_item.height)
 
             # 获取图像尺寸
             img_width = self.image_item.pixmap().width()
@@ -851,7 +842,7 @@ class ImageCanvas(QGraphicsView):
                 for kolo_item in detection_results:
                     print(kolo_item)
                     logging.info(kolo_item)
-                    self.load_kolo_line(kolo_item)  # 复用加载到画布的方法
+                    self.load_annotation_view_from_kilo_item(kolo_item)  # 复用加载到画布的方法
             else:
                 logging.info("No objects detected by YOLO model")
                 QMessageBox.information(
