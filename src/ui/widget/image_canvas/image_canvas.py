@@ -315,7 +315,7 @@ class ImageCanvas(QGraphicsView):
                 )
 
             # 创建并添加AnnotationView
-            item = AnnotationView(Decimal(x1), Decimal(y1), Decimal(rect_width), Decimal(rect_height), category, self)
+            item = AnnotationView(x1, y1, rect_width, rect_height, category, self)
             self.scene.addItem(item)
             return True
 
