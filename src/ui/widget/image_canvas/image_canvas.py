@@ -539,7 +539,6 @@ class ImageCanvas(QGraphicsView):
 
         self.set_needs_save_annotations = False
 
-        txt_path = self.current_image_path.with_suffix('.kolo')
         img_width = self.image_item.pixmap().width()
         img_height = self.image_item.pixmap().height()
 
@@ -556,39 +555,31 @@ class ImageCanvas(QGraphicsView):
             # 创建kolo_item_list用于存储KoloItem对象
             kolo_item_list = []
 
-            with open(txt_path, 'w') as f:
-                for item in annotations:
-                    # 获取当前在场景中的绝对位置和大小（修复：使用sceneBoundingRect获取最新位置）
-                    rect = item.sceneBoundingRect()
-                    x = rect.x()
-                    y = rect.y()
-                    width = rect.width()
-                    height = rect.height()
+            for item in annotations:
+                # 获取当前在场景中的绝对位置和大小（修复：使用sceneBoundingRect获取最新位置）
+                rect = item.sceneBoundingRect()
+                x = rect.x()
+                y = rect.y()
+                width = rect.width()
+                height = rect.height()
 
-                    # 计算归一化坐标
-                    x_center = (x + width / 2) / img_width
-                    y_center = (y + height / 2) / img_height
-                    norm_width = width / img_width
-                    norm_height = height / img_height
+                # 计算归一化坐标
+                x_center = (x + width / 2) / img_width
+                y_center = (y + height / 2) / img_height
+                norm_width = width / img_width
+                norm_height = height / img_height
 
-                    # 对类名进行base64编码
-                    class_name_b64 = StringUtil.string_to_base64(item.category.class_name)
-
-                    # 写入文件，保留9位小数
-                    # f.write(f"{class_name_b64} {x_center:.9f} {y_center:.9f} {norm_width:.9f} {norm_height:.9f}\n")
-
-                    # 创建KoloItem对象并添加到列表中
-                    # 从当前图片路径获取图片名称
-                    image_name = self.current_image_path.name
-                    kolo_item_list.append(KoloItem(
-                        kid=KOrmBase.snowflake.gen_kid(),
-                        image_name=image_name,
-                        class_name=item.category.class_name,
-                        x_center=x_center,
-                        y_center=y_center,
-                        width=norm_width,
-                        height=norm_height
-                    ))
+                # 从当前图片路径获取图片名称
+                image_name = self.current_image_path.name
+                kolo_item_list.append(KoloItem(
+                    kid=KOrmBase.snowflake.gen_kid(),
+                    image_name=image_name,
+                    class_name=item.category.class_name,
+                    x_center=x_center,
+                    y_center=y_center,
+                    width=norm_width,
+                    height=norm_height
+                ))
 
             # 在事务中删除所有image_name的kolo_item, 然后插入新的kolo_item_list中的对象
             def transaction_func(session):
@@ -601,9 +592,6 @@ class ImageCanvas(QGraphicsView):
 
             # 执行事务
             self.project_info.sqlite_db.execute_in_transaction(transaction_func)
-
-            print(f"保存标注文件成功: {txt_path}")
-            
             # 打印所有标注坐标
             self.print_all_annotation_coordinates()
             
@@ -1237,11 +1225,11 @@ class ImageCanvas(QGraphicsView):
 
         for i, item in enumerate(annotations):
             # 获取当前在场景中的绝对位置和大小
-            rect = item.sceneBoundingRect()
-            x = rect.x()
-            y = rect.y()
-            width = rect.width()
-            height = rect.height()
+            rect_to_log = item.sceneBoundingRect()
+            x = rect_to_log.x()
+            y = rect_to_log.y()
+            width = rect_to_log.width()
+            height = rect_to_log.height()
 
             # 计算归一化坐标
             x_center = (x + width / 2) / img_width
@@ -1250,5 +1238,5 @@ class ImageCanvas(QGraphicsView):
             norm_height = height / img_height
 
             print(f"  {i+1}. {item.category.class_name}: "
-                  f"x_center={x_center:.6f}, y_center={y_center:.6f}, "
-                  f"width={norm_width:.6f}, height={norm_height:.6f}")
+                  f"x_center={x_center:.19f}, y_center={y_center:.19f}, "
+                  f"width={norm_width:.19f}, height={norm_height:.19f}")
