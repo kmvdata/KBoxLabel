@@ -1,6 +1,7 @@
 # image_canvas.py
 import json
 import sys
+from decimal import Decimal
 from pathlib import Path
 from typing import Optional
 
@@ -261,7 +262,7 @@ class ImageCanvas(QGraphicsView):
                 rect_height = height * img_height
 
                 # 创建AnnotationView并添加到场景
-                item = AnnotationView(x1, y1, rect_width, rect_height, category, self)
+                item = AnnotationView(Decimal(x1), Decimal(y1), Decimal(rect_width), Decimal(rect_height), category, self)
                 self.scene.addItem(item)
 
         except Exception as e:
@@ -320,7 +321,7 @@ class ImageCanvas(QGraphicsView):
                 )
 
             # 创建并添加AnnotationView
-            item = AnnotationView(x1, y1, rect_width, rect_height, category, self)
+            item = AnnotationView(Decimal(x1), Decimal(y1), Decimal(rect_width), Decimal(rect_height), category, self)
             self.scene.addItem(item)
             return True
 

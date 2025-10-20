@@ -1,6 +1,7 @@
 # annotation_view.py
 import json
 import time  # 导入time模块用于睡眠
+from decimal import Decimal
 from typing import Tuple, Optional
 
 from PyQt5.QtCore import Qt, QRectF
@@ -14,10 +15,10 @@ from src.models.dto.annotation_category import AnnotationCategory
 class AnnotationView(QGraphicsRectItem):
     """表示一个可交互的标注项，使用双线绘制以确保在任何背景下可见"""
 
-    HANDLE_SIZE = 9  # 控制点大小
-    HANDLE_MARGIN = 0  # 控制点边距
-    OUTER_LINE_WIDTH = 1  # 外侧线宽
-    INNER_LINE_WIDTH = 3  # 内侧线宽
+    HANDLE_SIZE = Decimal('9')  # 控制点大小
+    HANDLE_MARGIN = Decimal('0')  # 控制点边距
+    OUTER_LINE_WIDTH = Decimal('1')  # 外侧线宽
+    INNER_LINE_WIDTH = Decimal('3')  # 内侧线宽
 
     # 控制点类型
     NO_HANDLE = 0
@@ -30,8 +31,8 @@ class AnnotationView(QGraphicsRectItem):
     BOTTOM_LEFT = 7
     LEFT_MIDDLE = 8
 
-    def __init__(self, x: float, y: float, width: float, height: float, category: AnnotationCategory, parent: any):
-        super().__init__(x, y, width, height)
+    def __init__(self, x: Decimal, y: Decimal, width: Decimal, height: Decimal, category: AnnotationCategory, parent: any):
+        super().__init__(float(x), float(y), float(width), float(height))
         self.opposite_color = None
         self.current_color = None
         self.category = None
@@ -81,7 +82,7 @@ class AnnotationView(QGraphicsRectItem):
     def get_outer_rect(self) -> QRectF:
         """计算外侧线条的矩形（比内侧适当扩大）"""
         # 外侧线条向外扩展的距离，基于外侧线宽计算
-        expand = self.OUTER_LINE_WIDTH / 2
+        expand = float(self.OUTER_LINE_WIDTH / 2)
         inner_rect = self.rect()
         # 向外扩展矩形
         return QRectF(
@@ -94,19 +95,19 @@ class AnnotationView(QGraphicsRectItem):
     def boundingRect(self):
         """返回包含所有线条和控制点的边界矩形"""
         # 计算需要包含外侧线条的额外空间
-        line_expand = self.OUTER_LINE_WIDTH / 2
+        line_expand = float(self.OUTER_LINE_WIDTH / 2)
         rect = self.rect().adjusted(-line_expand, -line_expand, line_expand, line_expand)
 
         if self.is_selected():
             # 计算需要扩展的边距 (控制点半径 + 边距)
-            extra = self.HANDLE_SIZE / 2 + self.HANDLE_MARGIN
+            extra = float(self.HANDLE_SIZE / 2 + self.HANDLE_MARGIN)
             return rect.adjusted(-extra, -extra, extra, extra)
         return rect
 
     def update_handles(self):
         """更新控制点位置"""
-        s = self.HANDLE_SIZE
-        m = self.HANDLE_MARGIN
+        s = float(self.HANDLE_SIZE)
+        m = float(self.HANDLE_MARGIN)
         rect = self.rect()
         x, y, w, h = rect.x(), rect.y(), rect.width(), rect.height()
 
@@ -139,7 +140,7 @@ class AnnotationView(QGraphicsRectItem):
         painter.save()
 
         # 1. 绘制内侧线条（当前颜色，原始坐标）
-        inner_pen = QPen(self.current_color, self.INNER_LINE_WIDTH)
+        inner_pen = QPen(self.current_color, float(self.INNER_LINE_WIDTH))
         inner_pen.setStyle(Qt.SolidLine)
         inner_pen.setCapStyle(Qt.SquareCap)
         inner_pen.setJoinStyle(Qt.MiterJoin)
@@ -149,7 +150,7 @@ class AnnotationView(QGraphicsRectItem):
 
         # 2. 绘制外侧线条（反色，扩大后的坐标）
         outer_rect = self.get_outer_rect()
-        outer_pen = QPen(self.opposite_color, self.OUTER_LINE_WIDTH)
+        outer_pen = QPen(self.opposite_color, float(self.OUTER_LINE_WIDTH))
         outer_pen.setStyle(Qt.SolidLine)
         outer_pen.setCapStyle(Qt.SquareCap)
         outer_pen.setJoinStyle(Qt.MiterJoin)
@@ -234,8 +235,8 @@ class AnnotationView(QGraphicsRectItem):
         """处理键盘按键事件"""
         # 只有在选中状态下才响应方向键
         if self.is_selected():
-            move_distance = 1.0  # 移动距离为1像素
-            resize_distance = 1.0  # 调整大小距离为1像素
+            move_distance = Decimal('1.0')  # 移动距离为1像素
+            resize_distance = Decimal('1.0')  # 调整大小距离为1像素
             rect = self.rect()
             
             # 检查是否按住Shift键
@@ -243,7 +244,7 @@ class AnnotationView(QGraphicsRectItem):
                 # 按住Shift时，方向键用于扩大/缩小标注框
                 if event.key() == Qt.Key_Left:
                     # 向左扩展：右边保持不动，向左扩展（x减小，宽度增加）
-                    new_rect = QRectF(rect.x() - resize_distance, rect.y(), rect.width() + resize_distance, rect.height())
+                    new_rect = QRectF(rect.x() - float(resize_distance), rect.y(), rect.width() + float(resize_distance), rect.height())
                     self.setRect(new_rect)
                     self.update_handles()
                     self.set_needs_save_annotation()
@@ -251,7 +252,7 @@ class AnnotationView(QGraphicsRectItem):
                     return
                 elif event.key() == Qt.Key_Right:
                     # 向右扩展：左边保持不动，向右扩展（宽度增加）
-                    new_rect = QRectF(rect.x(), rect.y(), rect.width() + resize_distance, rect.height())
+                    new_rect = QRectF(rect.x(), rect.y(), rect.width() + float(resize_distance), rect.height())
                     self.setRect(new_rect)
                     self.update_handles()
                     self.set_needs_save_annotation()
@@ -259,7 +260,7 @@ class AnnotationView(QGraphicsRectItem):
                     return
                 elif event.key() == Qt.Key_Up:
                     # 向上扩展：下边保持不动，向上扩展（y减小，高度增加）
-                    new_rect = QRectF(rect.x(), rect.y() - resize_distance, rect.width(), rect.height() + resize_distance)
+                    new_rect = QRectF(rect.x(), rect.y() - float(resize_distance), rect.width(), rect.height() + float(resize_distance))
                     self.setRect(new_rect)
                     self.update_handles()
                     self.set_needs_save_annotation()
@@ -267,7 +268,7 @@ class AnnotationView(QGraphicsRectItem):
                     return
                 elif event.key() == Qt.Key_Down:
                     # 向下扩展：上边保持不动，向下扩展（高度增加）
-                    new_rect = QRectF(rect.x(), rect.y(), rect.width(), rect.height() + resize_distance)
+                    new_rect = QRectF(rect.x(), rect.y(), rect.width(), rect.height() + float(resize_distance))
                     self.setRect(new_rect)
                     self.update_handles()
                     self.set_needs_save_annotation()
@@ -276,25 +277,25 @@ class AnnotationView(QGraphicsRectItem):
             else:
                 # 根据按键方向移动标注框
                 if event.key() == Qt.Key_Left:
-                    self.setRect(rect.translated(-move_distance, 0))
+                    self.setRect(rect.translated(-float(move_distance), 0))
                     self.update_handles()
                     self.set_needs_save_annotation()
                     event.accept()
                     return
                 elif event.key() == Qt.Key_Right:
-                    self.setRect(rect.translated(move_distance, 0))
+                    self.setRect(rect.translated(float(move_distance), 0))
                     self.update_handles()
                     self.set_needs_save_annotation()
                     event.accept()
                     return
                 elif event.key() == Qt.Key_Up:
-                    self.setRect(rect.translated(0, -move_distance))
+                    self.setRect(rect.translated(0, -float(move_distance)))
                     self.update_handles()
                     self.set_needs_save_annotation()
                     event.accept()
                     return
                 elif event.key() == Qt.Key_Down:
-                    self.setRect(rect.translated(0, move_distance))
+                    self.setRect(rect.translated(0, float(move_distance)))
                     self.update_handles()
                     self.set_needs_save_annotation()
                     event.accept()
@@ -401,23 +402,23 @@ class AnnotationView(QGraphicsRectItem):
         self.update_handles()
         self.update()  # 调整大小后强制重绘
 
-    def to_yolo_format(self, img_width: int, img_height: int) -> Tuple[int, float, float, float, float]:
+    def to_yolo_format(self, img_width: int, img_height: int) -> Tuple[int, Decimal, Decimal, Decimal, Decimal]:
         """转换为YOLO格式"""
         rect = self.rect()
-        x_center = (rect.left() + rect.right()) / 2 / img_width
-        y_center = (rect.top() + rect.bottom()) / 2 / img_height
-        width = rect.width() / img_width
-        height = rect.height() / img_height
+        x_center = Decimal((rect.left() + rect.right()) / 2 / img_width)
+        y_center = Decimal((rect.top() + rect.bottom()) / 2 / img_height)
+        width = Decimal(rect.width() / img_width)
+        height = Decimal(rect.height() / img_height)
 
         return self.category.class_id, x_center, y_center, width, height
 
-    def to_kolo_format(self, img_width: int, img_height: int) -> Tuple[str, float, float, float, float]:
+    def to_kolo_format(self, img_width: int, img_height: int) -> Tuple[str, Decimal, Decimal, Decimal, Decimal]:
         """转换为KOLO格式"""
         rect = self.rect()
-        x_center = (rect.left() + rect.right()) / 2 / img_width
-        y_center = (rect.top() + rect.bottom()) / 2 / img_height
-        width = rect.width() / img_width
-        height = rect.height() / img_height
+        x_center = Decimal((rect.left() + rect.right()) / 2 / img_width)
+        y_center = Decimal((rect.top() + rect.bottom()) / 2 / img_height)
+        width = Decimal(rect.width() / img_width)
+        height = Decimal(rect.height() / img_height)
 
         return StringUtil.string_to_base64(self.category.class_name), x_center, y_center, width, height
 
