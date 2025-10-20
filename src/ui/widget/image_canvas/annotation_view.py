@@ -186,17 +186,17 @@ class AnnotationView(QGraphicsRectItem):
         # 设置控制点光标
         if handle != self.NO_HANDLE:
             if handle in [self.TOP_MIDDLE, self.BOTTOM_MIDDLE]:
-                self.setCursor(Qt.SizeVerCursor)
+                self.setCursor(Qt.SizeVerCursor)  # type: ignore
             elif handle in [self.LEFT_MIDDLE, self.RIGHT_MIDDLE]:
-                self.setCursor(Qt.SizeHorCursor)
+                self.setCursor(Qt.SizeHorCursor)  # type: ignore
             elif handle in [self.TOP_LEFT, self.BOTTOM_RIGHT]:
-                self.setCursor(Qt.SizeFDiagCursor)
+                self.setCursor(Qt.SizeFDiagCursor)  # type: ignore
             elif handle in [self.TOP_RIGHT, self.BOTTOM_LEFT]:
-                self.setCursor(Qt.SizeBDiagCursor)
+                self.setCursor(Qt.SizeBDiagCursor)  # type: ignore
         elif rect.contains(pos):
-            self.setCursor(Qt.SizeAllCursor)  # 可移动光标
+            self.setCursor(Qt.SizeAllCursor)  # type: ignore
         else:
-            self.setCursor(Qt.ArrowCursor)
+            self.setCursor(Qt.ArrowCursor)   # type: ignore
 
     def hoverLeaveEvent(self, event):
         """鼠标离开时恢复默认光标"""
