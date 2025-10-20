@@ -250,10 +250,10 @@ class ImageCanvas(QGraphicsView):
                     print(f"信息: 数据库中类别 '{class_name}' 未定义，已创建新类别（ID={new_category.class_id}）")
 
                 # 从KoloItem获取归一化坐标
-                x_center = float(kolo_item.x_center)
-                y_center = float(kolo_item.y_center)
-                width = float(kolo_item.width)
-                height = float(kolo_item.height)
+                x_center = Decimal(kolo_item.x_center)
+                y_center = Decimal(kolo_item.y_center)
+                width = Decimal(kolo_item.width)
+                height = Decimal(kolo_item.height)
 
                 # 转换为绝对坐标
                 x1 = (x_center - width / 2) * img_width
@@ -262,7 +262,7 @@ class ImageCanvas(QGraphicsView):
                 rect_height = height * img_height
 
                 # 创建AnnotationView并添加到场景
-                item = AnnotationView(Decimal(x1), Decimal(y1), Decimal(rect_width), Decimal(rect_height), category, self)
+                item = AnnotationView(x1, y1, rect_width, rect_height, category, self)
                 self.scene.addItem(item)
 
         except Exception as e:
