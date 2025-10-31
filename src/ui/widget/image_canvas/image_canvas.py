@@ -861,6 +861,9 @@ class ImageCanvas(QGraphicsView):
                     print(kolo_item)
                     logging.info(kolo_item)
                     self.load_annotation_view_from_kilo_item(kolo_item)  # 复用加载到画布的方法
+                
+                # 保存自动生成的标注结果
+                self.save_annotations()
             else:
                 logging.info("No objects detected by YOLO model")
                 QMessageBox.information(
