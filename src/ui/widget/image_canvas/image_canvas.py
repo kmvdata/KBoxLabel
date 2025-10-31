@@ -457,6 +457,33 @@ class ImageCanvas(QGraphicsView):
 
         super().mousePressEvent(event)  # 继续默认事件处理
 
+    def mouseDoubleClickEvent(self, event):
+        """处理鼠标双击事件"""
+        if event.button() == Qt.LeftButton:
+            # 获取双击位置的项
+            clicked_item = self.itemAt(event.pos())
+            
+            # 检查是否是AnnotationView且当前已选中
+            if isinstance(clicked_item, AnnotationView) and clicked_item.is_selected():
+                # 调用send_selected_to_back方法
+                self.send_selected_to_back()
+                
+                # 重新选择双击位置的项
+                scene_pos = self.mapToScene(event.pos())
+                items_at_pos = self.scene.items(scene_pos)
+                
+                # 查找AnnotationView项并选中第一个
+                for item in items_at_pos:
+                    if isinstance(item, AnnotationView):
+                        item.set_selected(True)
+                        break
+                        
+                # 更新删除按钮状态
+                self.update_delete_button_state()
+                return
+                
+        super().mouseDoubleClickEvent(event)
+
     def mouseMoveEvent(self, event):
         """处理鼠标移动事件"""
         # 更新临时矩形框
