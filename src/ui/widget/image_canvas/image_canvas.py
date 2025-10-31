@@ -524,7 +524,10 @@ class ImageCanvas(QGraphicsView):
                 self.scene.addItem(item)
                 self.save_annotations()
 
-                # 新创建的标注未被选中，更新删除按钮状态
+                # 自动选中新创建的标注
+                item.set_selected(True)
+
+                # 更新删除按钮状态
                 self.update_delete_button_state()
 
         # 每次鼠标释放都保存标注
