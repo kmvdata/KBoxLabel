@@ -881,3 +881,42 @@ class ImageListView(QListView):
         except Exception as e:
             print(f"智能跳转时出错: {e}")
             QMessageBox.warning(self, "错误", f"智能跳转时发生错误: {str(e)}")
+
+    def auto_jump_to_last_annotated_image(self):
+        """自动跳转到最后一个有标注的图片（在项目加载后调用）"""
+        if self.model.rowCount() == 0:
+            return
+            
+        try:
+            # 定义查询函数，获取按ID排序的最后一个KoloItem
+            def query_func(session):
+                from src.models.sql.kolo_item import KoloItem
+                return session.query(KoloItem).order_by(KoloItem.id.desc()).first()
+            
+            # 执行查询
+            last_kolo_item = self.project_info.sqlite_db.execute_in_transaction(query_func)
+            
+            # 如果没有找到任何KoloItem，不执行任何操作
+            if not last_kolo_item:
+                return
+                
+            # 获取最后一个KoloItem对应的图片名称
+            target_image_name = last_kolo_item.image_name
+            
+            # 遍历所有图片，查找对应的图片文件
+            for i in range(self.model.rowCount()):
+                file_path = self.model.image_paths[i]
+                # 获取图片文件名
+                image_file_name = os.path.basename(file_path)
+                
+                # 如果图片文件名匹配，则跳转到该图片
+                if image_file_name == target_image_name:
+                    index = self.model.index(i, 0)
+                    if index.isValid():
+                        self.setCurrentIndex(index)
+                        # 模拟点击事件以加载图片
+                        self.handle_item_clicked(index)
+                    return
+                    
+        except Exception as e:
+            print(f"自动跳转到最后标注图片时出错: {e}")
