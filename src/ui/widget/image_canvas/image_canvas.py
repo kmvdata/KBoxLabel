@@ -1143,6 +1143,19 @@ class ImageCanvas(QGraphicsView):
         """显示上下文菜单"""
         context_menu = QMenu(self)
 
+        # 检查是否有选中的标注项
+        selected_items = [item for item in self.scene.items()
+                          if isinstance(item, AnnotationView) and item.is_selected()]
+        
+        # 如果有选中的标注项，添加"放置最底层"选项
+        if selected_items:
+            send_to_back_action = QAction("放置最底层", self)
+            send_to_back_action.triggered.connect(self.send_selected_to_back)
+            context_menu.addAction(send_to_back_action)
+            
+            # 添加分隔线
+            context_menu.addSeparator()
+
         # 添加"全部清空"选项
         clear_all_action = QAction("全部清空", self)
         clear_all_action.triggered.connect(self.clear_all_annotations)
@@ -1150,6 +1163,39 @@ class ImageCanvas(QGraphicsView):
 
         # 在鼠标位置显示菜单
         context_menu.exec_(self.mapToGlobal(position))
+
+    def send_selected_to_back(self):
+        """将选中的标注项放置到最底层"""
+        # 获取所有AnnotationView项
+        annotation_items = [item for item in self.scene.items() 
+                           if isinstance(item, AnnotationView)]
+        
+        if not annotation_items:
+            return
+            
+        # 按当前ZValue排序（从小到大）
+        annotation_items.sort(key=lambda item: item.zValue())
+        
+        # 重新设置ZValue，从10开始，间隔为10
+        for i, item in enumerate(annotation_items, 1):
+            item.setZValue(i * 10)
+        
+        # 获取当前选中的项
+        selected_items = [item for item in annotation_items if item.isSelected()]
+        
+        # 将选中项的ZValue设置为0（最底层）
+        for item in selected_items:
+            item.setZValue(0)
+            
+        # 取消所有标注的选中状态
+        for item in annotation_items:
+            item.setSelected(False)
+            # 如果使用了自定义选中方法，也需要调用
+            if hasattr(item, 'set_selected'):
+                item.set_selected(False)
+        
+        # 更新删除按钮状态
+        self.update_delete_button_state()
 
     def clear_all_annotations(self):
         """清空所有标注并删除对应的.kolo文件"""
