@@ -151,13 +151,25 @@ class AnnotationView(QGraphicsRectItem):
         # 保存画家状态
         painter.save()
 
-        # 1. 绘制内侧线条（当前颜色，原始坐标）
-        inner_pen = QPen(self.current_color, float(self.INNER_LINE_WIDTH))
+        # 1. 绘制内侧矩形（当前颜色，原始坐标）
+        # 创建带透明度的颜色
+        transparent_color = QColor(self.current_color)
+        transparent_color.setAlphaF(0.35)
+        
+        # 先绘制填充区域
+        fill_brush = QBrush(transparent_color)
+        painter.setBrush(fill_brush)
+        painter.setPen(QPen(Qt.NoPen))  # 不绘制边框
+        painter.drawRect(self.rect())
+        
+        # 再绘制内侧边框线
+        inner_pen = QPen(transparent_color, float(self.INNER_LINE_WIDTH))
         inner_pen.setStyle(Qt.SolidLine)
         inner_pen.setCapStyle(Qt.SquareCap)
         inner_pen.setJoinStyle(Qt.MiterJoin)
         inner_pen.setCosmetic(True)
         painter.setPen(inner_pen)
+        painter.setBrush(QBrush())  # 清除画刷
         painter.drawRect(self.rect())
 
         # 2. 绘制外侧线条（反色，扩大后的坐标）
@@ -168,6 +180,7 @@ class AnnotationView(QGraphicsRectItem):
         outer_pen.setJoinStyle(Qt.MiterJoin)
         outer_pen.setCosmetic(True)
         painter.setPen(outer_pen)
+        painter.setBrush(QBrush())  # 确保不填充
         painter.drawRect(outer_rect)
 
         # 恢复画家状态
