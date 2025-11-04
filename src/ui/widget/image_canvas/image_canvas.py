@@ -453,7 +453,7 @@ class ImageCanvas(QGraphicsView):
             clicked_item = self.itemAt(event.pos())
             
             # 检查是否是AnnotationView且当前已选中
-            if isinstance(clicked_item, AnnotationView) and clicked_item.is_selected():
+            if isinstance(clicked_item, AnnotationView) and clicked_item.isSelected():
                 # 调用send_selected_to_back方法
                 self.send_selected_to_back()
                 
@@ -531,7 +531,7 @@ class ImageCanvas(QGraphicsView):
             
             # 获取通过自定义set_selected方法选中的项
             custom_selected_items = [item for item in self.scene.items()
-                                   if isinstance(item, AnnotationView) and item.is_selected()]
+                                     if isinstance(item, AnnotationView) and item.isSelected()]
             
             # 合并两种方式选中的项并去重
             selected_items = list(set(qt_selected_items + custom_selected_items))
@@ -1104,7 +1104,7 @@ class ImageCanvas(QGraphicsView):
 
         # 检查是否有选中的标注项
         selected_items = [item for item in self.scene.items()
-                          if isinstance(item, AnnotationView) and item.is_selected()]
+                          if isinstance(item, AnnotationView) and item.isSelected()]
         
         # 如果有选中的标注项，添加"放置最底层"选项
         if selected_items:

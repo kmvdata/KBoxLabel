@@ -39,7 +39,6 @@ class AnnotationView(QGraphicsRectItem):
         self.opposite_color = None
         self.current_color = None
         self.category = None
-        self.selected: bool = False
         self.set_category(category)
         self.setAcceptDrops(True)  # 启用拖放接受
 
@@ -110,7 +109,7 @@ class AnnotationView(QGraphicsRectItem):
         line_expand = float(self.OUTER_LINE_WIDTH / 2)
         rect = self.rect().adjusted(-line_expand, -line_expand, line_expand, line_expand)
 
-        if self.is_selected() and self.handles_visible:
+        if self.isSelected() and self.handles_visible:
             # 计算需要扩展的边距 (控制点半径 + 边距)
             extra = float(self.HANDLE_SIZE / 2 + self.HANDLE_MARGIN)
             return rect.adjusted(-extra, -extra, extra, extra)
@@ -190,7 +189,7 @@ class AnnotationView(QGraphicsRectItem):
         option.state = original_state
 
         # 如果选中且锚点可见，绘制控制点
-        if self.is_selected() and self.handles_visible:
+        if self.isSelected() and self.handles_visible:
             painter.setRenderHint(QPainter.Antialiasing, True)
             painter.setPen(QPen(Qt.black, 1, Qt.SolidLine))
             painter.setBrush(QBrush(Qt.white))
@@ -200,7 +199,7 @@ class AnnotationView(QGraphicsRectItem):
 
     def hoverMoveEvent(self, event):
         """处理鼠标悬停事件，动态改变光标形状"""
-        if not self.is_selected():
+        if not self.isSelected():
             self.setCursor(Qt.ArrowCursor)
             return
 
@@ -265,7 +264,7 @@ class AnnotationView(QGraphicsRectItem):
     def keyPressEvent(self, event):
         """处理键盘按键事件"""
         # 只有在选中状态下才响应方向键
-        if self.is_selected():
+        if self.isSelected():
             move_distance = Decimal('1.0')  # 移动距离为1像素
             resize_distance = Decimal('1.0')  # 调整大小距离为1像素
             rect = self.rect()
@@ -588,18 +587,17 @@ class AnnotationView(QGraphicsRectItem):
             self.image_canvas.save_annotations()
 
     def set_selected_flag_internal(self, selected: bool):
-        self.selected = selected
-        if self.selected:
+        if selected:
             self.setFlags(self.flags() | QGraphicsItem.ItemIsMovable)  # type: ignore
             self.setZValue(10000)
         else:
             self.setFlags(self.flags() & ~QGraphicsItem.ItemIsMovable)  # type: ignore
             self.setZValue(0)
-        self.setSelected(self.selected)
+        self.setSelected(selected)
 
     def set_selected(self, selected: bool) -> None:
         """重写选中状态设置方法，确保状态变化时触发重绘"""
-        if self.selected == selected:
+        if self.isSelected() == selected:
             return
             # 只有在选中时才启用移动功能
         if selected:
@@ -611,9 +609,6 @@ class AnnotationView(QGraphicsRectItem):
                         item.set_selected_flag_internal(not selected)
         self.set_selected_flag_internal(selected)
         self.update()
-
-    def is_selected(self):
-        return self.selected
 
     def set_needs_save_annotation(self):
         if self.image_canvas is not None:
