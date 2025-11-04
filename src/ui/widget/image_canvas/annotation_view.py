@@ -602,8 +602,10 @@ class AnnotationView(QGraphicsRectItem):
             if scene:
                 for item in scene.items():
                     if isinstance(item, AnnotationView) and item != self and hasattr(item, 'set_selected_flag_internal'):
-                        item.set_selected_flag_internal(not selected)
+                        item.set_selected_flag_internal(False)
+                self.setZValue(len(scene.items()) * 10)
         self.set_selected_flag_internal(selected)
+        self.reset_z_values()
         self.update()
 
     def clicked_with_shift(self):
@@ -653,3 +655,20 @@ class AnnotationView(QGraphicsRectItem):
     def set_handle_visibility_delay(self, delay_ms: int):
         """设置锚点显示延迟时间（毫秒）"""
         self.HANDLE_VISIBILITY_DELAY = delay_ms
+    
+    def reset_z_values(self):
+        """重置所有AnnotationView的Z值，首先按照当前顺序排序，然后最底层的Z值设置为10，并以10为间隔依次递增"""
+        scene = self.scene()
+        if not scene:
+            return
+        
+        # 获取所有AnnotationView项
+        annotation_items = [item for item in scene.items() 
+                           if isinstance(item, AnnotationView)]
+        
+        # 按当前ZValue排序（从小到大）
+        annotation_items.sort(key=lambda item: item.zValue())
+        
+        # 重新设置ZValue，从10开始，间隔为10
+        for i, item in enumerate(annotation_items, 1):
+            item.setZValue(i * 10)

@@ -1197,21 +1197,22 @@ class ImageCanvas(QGraphicsView):
         # 获取所有AnnotationView项
         annotation_items = [item for item in self.scene.items() 
                            if isinstance(item, AnnotationView)]
-        
+
         if not annotation_items:
             return
-        
-        # 获取当前选中的项
-        selected_items = [item for item in annotation_items if item.isSelected()]
 
-        # 给未选中的项重新分配Z值，从0开始，间隔为10
+        # 把选中的item值设置为最小值
+        for item in annotation_items:
+            if item.isSelected():
+                item.setZValue(0)
+
+        # 按当前ZValue排序（从小到大）
+        annotation_items.sort(key=lambda item: item.zValue())
+
+        # 重新设置ZValue，从10开始，间隔为10
         for i, item in enumerate(annotation_items, 1):
             item.setZValue(i * 10)
 
-        # 先给选中项分配负数Z值（确保它们在最底层）
-        for i, item in enumerate(selected_items):
-            item.setZValue(i)
-            
         # 取消所有标注的选中状态
         self.unselect_all_annotations()
 
