@@ -587,30 +587,30 @@ class AnnotationView(QGraphicsRectItem):
         if self.image_canvas is not None:
             self.image_canvas.save_annotations()
 
+    def set_selected_flag_internal(self, selected: bool):
+        self.selected = selected
+        if self.selected:
+            self.setFlags(self.flags() | QGraphicsItem.ItemIsMovable)  # type: ignore
+            self.setZValue(10000)
+        else:
+            self.setFlags(self.flags() & ~QGraphicsItem.ItemIsMovable)  # type: ignore
+            self.setZValue(0)
+        self.setSelected(self.selected)
+
     def set_selected(self, selected: bool) -> None:
         """重写选中状态设置方法，确保状态变化时触发重绘"""
-        if self.selected != selected:
-            self.selected = selected
+        if self.selected == selected:
+            return
             # 只有在选中时才启用移动功能
-            if selected:
-                # 强制取消其他AnnotationView的选中状态
-                scene = self.scene()
-                if scene:
-                    for item in scene.items():
-                        if isinstance(item, AnnotationView) and item != self:
-                            item.setFlags(item.flags() & ~QGraphicsItem.ItemIsMovable)
-                            item.selected = False
-                            item.setSelected(False)
-                
-                self.setFlags(self.flags() | QGraphicsItem.ItemIsMovable)
-                # 将选中的标注项提升到最顶层
-                self.setZValue(1000)
-            else:
-                self.setFlags(self.flags() & ~QGraphicsItem.ItemIsMovable)
-                # 取消选中时恢复原来的层级
-                self.setZValue(10)
-            self.setSelected(selected)
-            self.update()
+        if selected:
+            # 强制取消其他AnnotationView的选中状态
+            scene = self.scene()
+            if scene:
+                for item in scene.items():
+                    if isinstance(item, AnnotationView) and item != self and hasattr(item, 'set_selected_flag_internal'):
+                        item.set_selected_flag_internal(not selected)
+        self.set_selected_flag_internal(selected)
+        self.update()
 
     def is_selected(self):
         return self.selected
