@@ -1209,6 +1209,9 @@ class ImageCanvas(QGraphicsView):
             top_annotation = max(annotation_views_at_pos, key=lambda item: item.zValue())
             top_annotation.set_selected(True)
             
+            # 更新删除按钮状态
+            self.update_delete_button_state()
+            
             # 按zValue排序，从高到低显示
             sorted_annotations = sorted(annotation_views_at_pos, 
                                      key=lambda item: item.zValue(), reverse=True)
