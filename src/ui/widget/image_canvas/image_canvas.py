@@ -165,6 +165,7 @@ class ImageCanvas(QGraphicsView):
 
     def unselect_all_annotations(self):
         """取消所有标注的选中状态"""
+        self.scene.clearSelection()  # 先清除Qt原生项的默认选择状态
         for item in self.scene.items():
             if isinstance(item, AnnotationView):
                 item.set_selected_flag_internal(False)
@@ -477,14 +478,7 @@ class ImageCanvas(QGraphicsView):
             
             # 点击空白区域时清除选择
             if not is_annotation:
-                self.scene.clearSelection()  # 先清除Qt原生项的默认选择状态
-                for item in self.scene.items():
-                    # 1. 若为自定义的AnnotationView，调用其重写的set_selected方法
-                    if isinstance(item, AnnotationView):
-                        item.set_selected_flag_internal(False)
-                    # 2. 若为Qt原生项，调用标准setSelected方法
-                    else:
-                        item.setSelected(False)
+                self.unselect_all_annotations()
                         
                 # 取消annotation_list中的选中状态
                 if self.annotation_list and self.annotation_list.selectionModel():
@@ -543,7 +537,7 @@ class ImageCanvas(QGraphicsView):
             # 获取通过Qt标准选择机制选中的项
             qt_selected_items = self.scene.selectedItems()
             
-            # 获取通过自定义set_selected方法选中的项
+            # 获取选中的项
             custom_selected_items = [item for item in self.scene.items()
                                      if isinstance(item, AnnotationView) and item.isSelected()]
             
@@ -1193,8 +1187,7 @@ class ImageCanvas(QGraphicsView):
         annotation_view.setZValue(max_z_value)
         
         # 取消所有标注的选中状态
-        for item in annotation_items:
-            item.set_selected_flag_internal(False)
+        self.unselect_all_annotations()
         
         # 选中被置顶的项
         annotation_view.set_selected(True)
@@ -1207,24 +1200,20 @@ class ImageCanvas(QGraphicsView):
         
         if not annotation_items:
             return
-            
-        # 按当前ZValue排序（从小到大）
-        annotation_items.sort(key=lambda item: item.zValue())
-        
-        # 重新设置ZValue，从10开始，间隔为10
-        for i, item in enumerate(annotation_items, 1):
-            item.setZValue(i * 10)
         
         # 获取当前选中的项
         selected_items = [item for item in annotation_items if item.isSelected()]
-        
-        # 将选中项的ZValue设置为0（最底层）
-        for item in selected_items:
-            item.setZValue(0)
+
+        # 给未选中的项重新分配Z值，从0开始，间隔为10
+        for i, item in enumerate(annotation_items, 1):
+            item.setZValue(i * 10)
+
+        # 先给选中项分配负数Z值（确保它们在最底层）
+        for i, item in enumerate(selected_items):
+            item.setZValue(i)
             
         # 取消所有标注的选中状态
-        for item in annotation_items:
-            item.set_selected_flag_internal(False)
+        self.unselect_all_annotations()
 
     def clear_all_annotations(self):
         """清空所有标注并删除对应的.kolo文件"""
