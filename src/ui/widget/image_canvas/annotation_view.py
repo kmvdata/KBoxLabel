@@ -593,6 +593,13 @@ class AnnotationView(QGraphicsRectItem):
             self.selected = selected
             # 只有在选中时才启用移动功能
             if selected:
+                # 强制取消其他AnnotationView的选中状态
+                scene = self.scene()
+                if scene:
+                    for item in scene.items():
+                        if isinstance(item, AnnotationView) and item != self:
+                            item.set_selected(False)
+                
                 self.setFlags(self.flags() | QGraphicsItem.ItemIsMovable)
                 # 将选中的标注项提升到最顶层
                 self.setZValue(1000)
