@@ -430,6 +430,10 @@ class ImageCanvas(QGraphicsView):
                     # 2. 若为Qt原生项，调用标准setSelected方法
                     else:
                         item.setSelected(False)
+                        
+                # 取消annotation_list中的选中状态
+                if self.annotation_list and self.annotation_list.selectionModel():
+                    self.annotation_list.selectionModel().clearSelection()
 
                 # 当设置了当前类别时开始绘制新标注
                 if self.current_category is not None:
