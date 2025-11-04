@@ -527,8 +527,15 @@ class ImageCanvas(QGraphicsView):
         self.scene.blockSignals(True)
 
         try:
-            selected_items = [item for item in self.scene.selectedItems()
-                              if isinstance(item, AnnotationView)]
+            # 获取通过Qt标准选择机制选中的项
+            qt_selected_items = self.scene.selectedItems()
+            
+            # 获取通过自定义set_selected方法选中的项
+            custom_selected_items = [item for item in self.scene.items()
+                                   if isinstance(item, AnnotationView) and item.is_selected()]
+            
+            # 合并两种方式选中的项并去重
+            selected_items = list(set(qt_selected_items + custom_selected_items))
 
             if not selected_items:
                 return
@@ -1189,7 +1196,7 @@ class ImageCanvas(QGraphicsView):
         
         # 取消所有标注的选中状态
         for item in annotation_items:
-            item.setSelected(False)
+            item.set_selected(False)
             # 如果使用了自定义选中方法，也需要调用
             if hasattr(item, 'set_selected'):
                 item.set_selected(False)
@@ -1222,7 +1229,7 @@ class ImageCanvas(QGraphicsView):
             
         # 取消所有标注的选中状态
         for item in annotation_items:
-            item.setSelected(False)
+            item.set_selected(False)
             # 如果使用了自定义选中方法，也需要调用
             if hasattr(item, 'set_selected'):
                 item.set_selected(False)

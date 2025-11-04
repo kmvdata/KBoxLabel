@@ -600,6 +600,7 @@ class AnnotationView(QGraphicsRectItem):
                 self.setFlags(self.flags() & ~QGraphicsItem.ItemIsMovable)
                 # 取消选中时恢复原来的层级
                 self.setZValue(10)
+            self.setSelected(selected)
             self.update()
 
     def is_selected(self):
