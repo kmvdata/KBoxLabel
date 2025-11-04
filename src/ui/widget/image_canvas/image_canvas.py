@@ -514,6 +514,7 @@ class ImageCanvas(QGraphicsView):
                 # 自动选中新创建的标注
                 item.set_selected(True)
 
+
         # 每次鼠标释放都保存标注
         if self.set_needs_save_annotations:
             self.save_annotations()

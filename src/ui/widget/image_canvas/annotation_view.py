@@ -590,6 +590,8 @@ class AnnotationView(QGraphicsRectItem):
         if selected:
             self.setFlags(self.flags() | QGraphicsItem.ItemIsMovable)  # type: ignore
             self.setZValue(10000)
+            # 确保新创建的标注获得键盘焦点，以便能响应键盘事件
+            self.setFocus(Qt.OtherFocusReason)
         else:
             self.setFlags(self.flags() & ~QGraphicsItem.ItemIsMovable)  # type: ignore
             self.setZValue(0)
