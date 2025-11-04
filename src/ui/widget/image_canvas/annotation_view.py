@@ -609,7 +609,8 @@ class AnnotationView(QGraphicsRectItem):
         self.update()
 
     def clicked_with_shift(self):
-        self.set_selected(not self.isSelected())
+        self.set_selected_flag_internal(not self.isSelected())
+        self.update()
 
     def set_needs_save_annotation(self):
         if self.image_canvas is not None:
