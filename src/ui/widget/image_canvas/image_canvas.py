@@ -147,7 +147,6 @@ class ImageCanvas(QGraphicsView):
         self.current_image_path = None
         self.resetTransform()
         self.current_scale = 1.0
-        self.update_delete_button_state()
 
     def clear_annotation_views(self):
         """清理场景中所有的AnnotationView标注"""
@@ -161,9 +160,6 @@ class ImageCanvas(QGraphicsView):
             # 移除所有标注项
             for item in annotation_items:
                 self.scene.removeItem(item)
-
-            # 更新删除按钮状态
-            self.update_delete_button_state()
 
             print(f"已清理 {len(annotation_items)} 个标注项")
             return len(annotation_items)
@@ -202,9 +198,6 @@ class ImageCanvas(QGraphicsView):
 
         # 加载对应的txt标注文件
         self._load_kolo_file(image_path, pixmap.width(), pixmap.height())
-
-        # 加载图片后更新删除按钮状态
-        self.update_delete_button_state()
 
         # 根据规范，加载图片后需要取消所有标注的选中状态
         self.unselect_all_annotations()
@@ -439,9 +432,6 @@ class ImageCanvas(QGraphicsView):
                     else:
                         item.setSelected(False)
 
-                # 更新删除按钮状态
-                self.update_delete_button_state()
-
                 # 当设置了当前类别时开始绘制新标注
                 if self.current_category is not None:
                     self.start_point = self.mapToScene(event.pos())
@@ -477,9 +467,7 @@ class ImageCanvas(QGraphicsView):
                     if isinstance(item, AnnotationView):
                         item.set_selected(True)
                         break
-                        
-                # 更新删除按钮状态
-                self.update_delete_button_state()
+
                 return
                 
         super().mouseDoubleClickEvent(event)
@@ -527,9 +515,6 @@ class ImageCanvas(QGraphicsView):
                 # 自动选中新创建的标注
                 item.set_selected(True)
 
-                # 更新删除按钮状态
-                self.update_delete_button_state()
-
         # 每次鼠标释放都保存标注
         if self.set_needs_save_annotations:
             self.save_annotations()
@@ -556,8 +541,6 @@ class ImageCanvas(QGraphicsView):
                 self.save_annotations()
             print(f"已删除 {len(selected_items)} 个标注项")
 
-            # 删除后更新删除按钮状态
-            self.update_delete_button_state()
         finally:
             self.scene.blockSignals(False)
             self.save_annotations()
@@ -673,18 +656,6 @@ class ImageCanvas(QGraphicsView):
             fit_height_action.setToolTip("Fit image height to window")
             fit_height_action.triggered.connect(self.fit_to_height)
             toolbar.addAction(fit_height_action)
-
-            # 添加分隔线
-            toolbar.addSeparator()
-
-            # Delete Button
-            self.delete_toolbar_action = QAction("Delete", self)
-            self.delete_toolbar_action.setIcon(self._get_icon("edit-delete", "X"))
-            self.delete_toolbar_action.setToolTip("Delete selected annotations")
-            self.delete_toolbar_action.triggered.connect(self.delete_selected_items)
-            # 初始状态禁用
-            self.delete_toolbar_action.setEnabled(False)
-            toolbar.addAction(self.delete_toolbar_action)
 
             # 添加分隔线
             toolbar.addSeparator()
@@ -881,26 +852,6 @@ class ImageCanvas(QGraphicsView):
             logging.error(error_msg)
             QMessageBox.critical(self, "Execution Error", error_msg)
 
-    def update_delete_button_state(self):
-        """更新删除按钮的状态：当有选中的标注项时启用，否则禁用"""
-        # 防止递归调用
-        if self._updating_delete_state:
-            return
-
-        self._updating_delete_state = True
-        try:
-            if self.delete_toolbar_action:
-                # 直接迭代所有AnnotationView检查是否有选中项，避免触发额外事件
-                has_selected = False
-                for item in self.scene.items():
-                    if isinstance(item, AnnotationView) and item.isSelected():
-                        has_selected = True
-                        break
-
-                self.delete_toolbar_action.setEnabled(has_selected)
-        finally:
-            self._updating_delete_state = False
-
     @staticmethod
     def _get_icon(theme_name, fallback_text):
         """获取系统主题图标，如果不存在则创建一个简单的文本图标"""
@@ -963,17 +914,6 @@ class ImageCanvas(QGraphicsView):
         fit_height_action.setToolTip("Fit image height to window")
         fit_height_action.triggered.connect(self.fit_to_height)
         toolbar.addAction(fit_height_action)
-
-        # 添加分隔线
-        toolbar.addSeparator()
-
-        # Delete Button
-        self.delete_toolbar_action = QAction("Del", self)
-        self.delete_toolbar_action.setToolTip("Delete selected annotations")
-        self.delete_toolbar_action.triggered.connect(self.delete_selected_items)
-        # 初始状态禁用
-        self.delete_toolbar_action.setEnabled(False)
-        toolbar.addAction(self.delete_toolbar_action)
 
         # 添加分隔线
         toolbar.addSeparator()
@@ -1127,9 +1067,6 @@ class ImageCanvas(QGraphicsView):
         selected_items = [item for item in self.scene.items()
                           if isinstance(item, AnnotationView) and item.isSelected()]
 
-        # 更新删除按钮状态
-        self.update_delete_button_state()
-
         if not selected_items:
             return
 
@@ -1166,9 +1103,6 @@ class ImageCanvas(QGraphicsView):
             for item in self.scene.items():
                 if isinstance(item, AnnotationView) and item.category.class_id == category.class_id:
                     item.setSelected(True)
-
-            # 更新删除按钮状态
-            self.update_delete_button_state()
         finally:
             self.scene.blockSignals(False)
 
@@ -1186,6 +1120,11 @@ class ImageCanvas(QGraphicsView):
             send_to_back_action = QAction("放置最底层", self)
             send_to_back_action.triggered.connect(self.send_selected_to_back)
             context_menu.addAction(send_to_back_action)
+            
+            # 添加删除选项
+            delete_action = QAction("删除", self)
+            delete_action.triggered.connect(self.delete_selected_items)
+            context_menu.addAction(delete_action)
             
             # 添加分隔线
             context_menu.addSeparator()
@@ -1208,10 +1147,7 @@ class ImageCanvas(QGraphicsView):
             # 选中zValue最大的AnnotationView
             top_annotation = max(annotation_views_at_pos, key=lambda item: item.zValue())
             top_annotation.set_selected(True)
-            
-            # 更新删除按钮状态
-            self.update_delete_button_state()
-            
+
             # 按zValue排序，从高到低显示
             sorted_annotations = sorted(annotation_views_at_pos, 
                                      key=lambda item: item.zValue(), reverse=True)
@@ -1260,9 +1196,6 @@ class ImageCanvas(QGraphicsView):
         
         # 选中被置顶的项
         annotation_view.set_selected(True)
-        
-        # 更新删除按钮状态
-        self.update_delete_button_state()
 
     def send_selected_to_back(self):
         """将选中的标注项放置到最底层"""
@@ -1293,9 +1226,7 @@ class ImageCanvas(QGraphicsView):
             # 如果使用了自定义选中方法，也需要调用
             if hasattr(item, 'set_selected'):
                 item.set_selected(False)
-        
-        # 更新删除按钮状态
-        self.update_delete_button_state()
+
 
     def clear_all_annotations(self):
         """清空所有标注并删除对应的.kolo文件"""
