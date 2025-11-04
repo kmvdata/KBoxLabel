@@ -451,41 +451,6 @@ class ImageCanvas(QGraphicsView):
 
         super().mousePressEvent(event)  # 继续默认事件处理
 
-    def mouseDoubleClickEvent(self, event):
-        """处理鼠标双击事件"""
-        if event.button() == Qt.LeftButton:
-            # 获取双击位置的项
-            clicked_item = self.itemAt(event.pos())
-            
-            # 检查是否是AnnotationView且当前已选中
-            if isinstance(clicked_item, AnnotationView) and clicked_item.isSelected():
-                # 调用send_selected_to_back方法
-                self.send_selected_to_back()
-                
-                # 重新选择双击位置的项
-                scene_pos = self.mapToScene(event.pos())
-                items_at_pos = self.scene.items(scene_pos)
-                
-                # 查找AnnotationView项并选中第一个
-                for item in items_at_pos:
-                    if isinstance(item, AnnotationView):
-                        item.set_selected(True)
-                        break
-
-                return
-                
-        super().mouseDoubleClickEvent(event)
-
-    def mouseMoveEvent(self, event):
-        """处理鼠标移动事件"""
-        # 更新临时矩形框
-        if self.drawing and self.temp_rect_item is not None:
-            current_point = self.mapToScene(event.pos())
-            rect = QRectF(self.start_point, current_point).normalized()
-            self.temp_rect_item.setRect(rect)
-            return  # 拦截事件，避免默认处理
-
-        super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event):
         """处理鼠标释放事件，无论操作是什么都保存标注"""
@@ -525,6 +490,44 @@ class ImageCanvas(QGraphicsView):
             self.save_annotations()
 
         super().mouseReleaseEvent(event)
+
+
+    def mouseDoubleClickEvent(self, event):
+        """处理鼠标双击事件"""
+        if event.button() == Qt.LeftButton:
+            # 获取双击位置的项
+            clicked_item = self.itemAt(event.pos())
+            
+            # 检查是否是AnnotationView且当前已选中
+            if isinstance(clicked_item, AnnotationView) and clicked_item.isSelected():
+                # 调用send_selected_to_back方法
+                self.send_selected_to_back()
+                
+                # 重新选择双击位置的项
+                scene_pos = self.mapToScene(event.pos())
+                items_at_pos = self.scene.items(scene_pos)
+                
+                # 查找AnnotationView项并选中第一个
+                for item in items_at_pos:
+                    if isinstance(item, AnnotationView):
+                        item.set_selected(True)
+                        break
+
+                return
+                
+        super().mouseDoubleClickEvent(event)
+
+    def mouseMoveEvent(self, event):
+        """处理鼠标移动事件"""
+        # 更新临时矩形框
+        if self.drawing and self.temp_rect_item is not None:
+            current_point = self.mapToScene(event.pos())
+            rect = QRectF(self.start_point, current_point).normalized()
+            self.temp_rect_item.setRect(rect)
+            return  # 拦截事件，避免默认处理
+
+        super().mouseMoveEvent(event)
+
 
     def delete_selected_items(self):
         """删除所有选中的标注项"""
