@@ -194,16 +194,14 @@ class ImageCanvas(QGraphicsView):
         self.current_scale = self.transform().m11()
 
         # 加载对应的txt标注文件
-        self._load_kolo_file(image_path, pixmap.width(), pixmap.height())
+        self.load_annotations_on_image(image_path, pixmap.width(), pixmap.height())
 
-        # 根据规范，加载图片后需要取消所有标注的选中状态
-        self.unselect_all_annotations()
 
     @property
     def categories(self) -> list[AnnotationCategory]:
         return self.project_info.categories
 
-    def _load_kolo_file(self, image_path: Path, img_width: int, img_height: int):
+    def load_annotations_on_image(self, image_path: Path, img_width: int, img_height: int):
         """从SQLite数据库加载与图片同名的kolo_item记录"""
         # 获取图片文件名作为查询key
         image_name = image_path.name
@@ -258,9 +256,6 @@ class ImageCanvas(QGraphicsView):
         except Exception as e:
             print(f"从数据库加载标注信息错误: {e}")
 
-        # 根据规范，加载完标注后需要取消所有标注的选中状态
-        self.unselect_all_annotations()
-        
         # 打印所有标注坐标
         self.print_all_annotation_coordinates()
 
