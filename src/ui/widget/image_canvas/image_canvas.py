@@ -1175,6 +1175,36 @@ class ImageCanvas(QGraphicsView):
     def show_context_menu(self, position):
         """显示上下文菜单"""
         context_menu = QMenu(self)
+        scene_pos = self.mapToScene(position)
+
+        # 查找点击位置下的所有AnnotationView对象
+        items_at_pos = self.scene.items(scene_pos)
+        annotation_views_at_pos = [item for item in items_at_pos 
+                                  if isinstance(item, AnnotationView)]
+        
+        # 如果点击位置有AnnotationView，则添加图层菜单
+        if annotation_views_at_pos:
+            # 选中zValue最大的AnnotationView
+            top_annotation = max(annotation_views_at_pos, key=lambda item: item.zValue())
+            top_annotation.set_selected(True)
+            
+            # 创建图层子菜单
+            layers_menu = context_menu.addMenu("图层")
+            
+            # 按zValue排序，从高到低显示
+            sorted_annotations = sorted(annotation_views_at_pos, 
+                                     key=lambda item: item.zValue(), reverse=True)
+            
+            # 为每个AnnotationView添加菜单项
+            for annotation in sorted_annotations:
+                action = QAction(annotation.category.class_name, self)
+                action.triggered.connect(
+                    lambda checked, ann=annotation: self.bring_annotation_to_top(ann)
+                )
+                layers_menu.addAction(action)
+            
+            # 添加分隔线
+            context_menu.addSeparator()
 
         # 检查是否有选中的标注项
         selected_items = [item for item in self.scene.items()
@@ -1196,6 +1226,43 @@ class ImageCanvas(QGraphicsView):
 
         # 在鼠标位置显示菜单
         context_menu.exec_(self.mapToGlobal(position))
+
+    def bring_annotation_to_top(self, annotation_view):
+        """将指定的AnnotationView置于顶层，并重新排列其他项的zValue"""
+        # 获取所有AnnotationView项
+        annotation_items = [item for item in self.scene.items() 
+                           if isinstance(item, AnnotationView)]
+        
+        if not annotation_items:
+            return
+            
+        # 从annotation_items中移除要置顶的项
+        if annotation_view in annotation_items:
+            annotation_items.remove(annotation_view)
+        
+        # 按当前ZValue排序（从小到大）
+        annotation_items.sort(key=lambda item: item.zValue())
+        
+        # 重新设置ZValue，从10开始，间隔为10
+        for i, item in enumerate(annotation_items, 1):
+            item.setZValue(i * 10)
+        
+        # 将选中项的ZValue设置为最高
+        max_z_value = (len(annotation_items) + 1) * 10 if annotation_items else 10
+        annotation_view.setZValue(max_z_value)
+        
+        # 取消所有标注的选中状态
+        for item in annotation_items:
+            item.setSelected(False)
+            # 如果使用了自定义选中方法，也需要调用
+            if hasattr(item, 'set_selected'):
+                item.set_selected(False)
+        
+        # 选中被置顶的项
+        annotation_view.set_selected(True)
+        
+        # 更新删除按钮状态
+        self.update_delete_button_state()
 
     def send_selected_to_back(self):
         """将选中的标注项放置到最底层"""
