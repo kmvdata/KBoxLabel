@@ -421,39 +421,25 @@ class ImageCanvas(QGraphicsView):
                     isinstance(clicked_item.parentItem(), AnnotationView)
             )
 
-            # 点击空白区域时清除选择
-            if not is_annotation:
-                self.scene.clearSelection()  # 先清除Qt原生项的默认选择状态
-                for item in self.scene.items():
-                    # 1. 若为自定义的AnnotationView，调用其重写的set_selected方法
-                    if isinstance(item, AnnotationView):
-                        item.set_selected_flag_internal(False)
-                    # 2. 若为Qt原生项，调用标准setSelected方法
-                    else:
-                        item.setSelected(False)
-                        
-                # 取消annotation_list中的选中状态
-                if self.annotation_list and self.annotation_list.selectionModel():
-                    self.annotation_list.selectionModel().clearSelection()
+            # 当设置了当前类别时开始绘制新标注
+            if not is_annotation and self.current_category is not None:
+                self.start_point = self.mapToScene(event.pos())
+                self.drawing = True
 
-                # 当设置了当前类别时开始绘制新标注
-                if self.current_category is not None:
-                    self.start_point = self.mapToScene(event.pos())
-                    self.drawing = True
-
-                    # 创建临时矩形框
-                    self.temp_rect_item = self.scene.addRect(
-                        QRectF(self.start_point, self.start_point),
-                        QPen(Qt.red, 2, Qt.DashLine)
-                    )
-                    self.temp_rect_item.setZValue(10)  # 确保在最上层显示
-                    return  # 拦截事件，避免默认处理
+                # 创建临时矩形框
+                self.temp_rect_item = self.scene.addRect(
+                    QRectF(self.start_point, self.start_point),
+                    QPen(Qt.red, 2, Qt.DashLine)
+                )
+                self.temp_rect_item.setZValue(10)  # 确保在最上层显示
+                return  # 拦截事件，避免默认处理
 
         super().mousePressEvent(event)  # 继续默认事件处理
 
 
     def mouseReleaseEvent(self, event):
         """处理鼠标释放事件，无论操作是什么都保存标注"""
+        created_new_annotation = False
         if self.drawing and event.button() == Qt.LeftButton:
             self.drawing = False
             current_point = self.mapToScene(event.pos())
@@ -483,7 +469,31 @@ class ImageCanvas(QGraphicsView):
 
                 # 自动选中新创建的标注
                 item.set_selected(True)
+                created_new_annotation = True
 
+        # 如果没有创建新的标注，则清除选择
+        if not created_new_annotation:
+            # 检查是否点击在现有标注或其锚点上
+            clicked_item = self.itemAt(event.pos())
+            is_annotation = isinstance(clicked_item, AnnotationView) or (
+                    clicked_item and clicked_item.parentItem() and
+                    isinstance(clicked_item.parentItem(), AnnotationView)
+            )
+            
+            # 点击空白区域时清除选择
+            if not is_annotation:
+                self.scene.clearSelection()  # 先清除Qt原生项的默认选择状态
+                for item in self.scene.items():
+                    # 1. 若为自定义的AnnotationView，调用其重写的set_selected方法
+                    if isinstance(item, AnnotationView):
+                        item.set_selected_flag_internal(False)
+                    # 2. 若为Qt原生项，调用标准setSelected方法
+                    else:
+                        item.setSelected(False)
+                        
+                # 取消annotation_list中的选中状态
+                if self.annotation_list and self.annotation_list.selectionModel():
+                    self.annotation_list.selectionModel().clearSelection()
 
         # 每次鼠标释放都保存标注
         if self.set_needs_save_annotations:
