@@ -158,6 +158,7 @@ class ImageCanvas(QGraphicsView):
                 self.scene.removeItem(item)
 
             print(f"已清理 {len(annotation_items)} 个标注项")
+            self.save_annotations()
             return len(annotation_items)
         finally:
             self.scene.blockSignals(False)

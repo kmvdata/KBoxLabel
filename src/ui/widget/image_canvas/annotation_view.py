@@ -241,14 +241,6 @@ class AnnotationView(QGraphicsRectItem):
             event.accept()
             return  # 不触发选择逻辑
 
-        # 强制单选：选中当前项前清除所有AnnotationView项的选择
-        scene = self.scene()
-        if scene:
-            # 获取场景中所有AnnotationView类型的项并取消选择
-            for item in scene.items():
-                if isinstance(item, AnnotationView) and item != self:
-                    item.set_selected(False)
-
         self.set_selected(True)  # 选中当前项
         self.setFocus(Qt.MouseFocusReason)  # 设置焦点以接收键盘事件
         # 标记为鼠标操作
@@ -258,8 +250,8 @@ class AnnotationView(QGraphicsRectItem):
         print(f'set_selected: {self.category} - {self.get_outer_rect()}')
         super().mousePressEvent(event)  # 继续默认事件处理
 
-        # 添加100ms睡眠
-        time.sleep(0.1)
+        # 添加10ms睡眠
+        time.sleep(0.01)
 
     def keyPressEvent(self, event):
         """处理键盘按键事件"""
