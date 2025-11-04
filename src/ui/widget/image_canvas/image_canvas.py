@@ -1177,35 +1177,6 @@ class ImageCanvas(QGraphicsView):
         context_menu = QMenu(self)
         scene_pos = self.mapToScene(position)
 
-        # 查找点击位置下的所有AnnotationView对象
-        items_at_pos = self.scene.items(scene_pos)
-        annotation_views_at_pos = [item for item in items_at_pos 
-                                  if isinstance(item, AnnotationView)]
-        
-        # 如果点击位置有AnnotationView，则添加图层菜单
-        if annotation_views_at_pos:
-            # 选中zValue最大的AnnotationView
-            top_annotation = max(annotation_views_at_pos, key=lambda item: item.zValue())
-            top_annotation.set_selected(True)
-            
-            # 创建图层子菜单
-            layers_menu = context_menu.addMenu("图层")
-            
-            # 按zValue排序，从高到低显示
-            sorted_annotations = sorted(annotation_views_at_pos, 
-                                     key=lambda item: item.zValue(), reverse=True)
-            
-            # 为每个AnnotationView添加菜单项
-            for annotation in sorted_annotations:
-                action = QAction(annotation.category.class_name, self)
-                action.triggered.connect(
-                    lambda checked, ann=annotation: self.bring_annotation_to_top(ann)
-                )
-                layers_menu.addAction(action)
-            
-            # 添加分隔线
-            context_menu.addSeparator()
-
         # 检查是否有选中的标注项
         selected_items = [item for item in self.scene.items()
                           if isinstance(item, AnnotationView) and item.is_selected()]
@@ -1223,6 +1194,32 @@ class ImageCanvas(QGraphicsView):
         clear_all_action = QAction("全部清空", self)
         clear_all_action.triggered.connect(self.clear_all_annotations)
         context_menu.addAction(clear_all_action)
+        
+        # 查找点击位置下的所有AnnotationView对象
+        items_at_pos = self.scene.items(scene_pos)
+        annotation_views_at_pos = [item for item in items_at_pos 
+                                  if isinstance(item, AnnotationView)]
+        
+        # 如果点击位置有AnnotationView，则添加图层菜单项
+        if annotation_views_at_pos:
+            # 添加分隔线
+            context_menu.addSeparator()
+            
+            # 选中zValue最大的AnnotationView
+            top_annotation = max(annotation_views_at_pos, key=lambda item: item.zValue())
+            top_annotation.set_selected(True)
+            
+            # 按zValue排序，从高到低显示
+            sorted_annotations = sorted(annotation_views_at_pos, 
+                                     key=lambda item: item.zValue(), reverse=True)
+            
+            # 为每个AnnotationView添加菜单项到一级菜单
+            for annotation in sorted_annotations:
+                action = QAction(annotation.category.class_name, self)
+                action.triggered.connect(
+                    lambda checked, ann=annotation: self.bring_annotation_to_top(ann)
+                )
+                context_menu.addAction(action)
 
         # 在鼠标位置显示菜单
         context_menu.exec_(self.mapToGlobal(position))
