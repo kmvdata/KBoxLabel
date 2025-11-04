@@ -166,7 +166,7 @@ class ImageCanvas(QGraphicsView):
         """取消所有标注的选中状态"""
         for item in self.scene.items():
             if isinstance(item, AnnotationView):
-                item.set_selected(False)
+                item.set_selected_flag_internal(False)
 
     def load_image(self, image_path: Path):
         """加载指定路径的图片，并显示到画布上"""
@@ -426,7 +426,7 @@ class ImageCanvas(QGraphicsView):
                 for item in self.scene.items():
                     # 1. 若为自定义的AnnotationView，调用其重写的set_selected方法
                     if isinstance(item, AnnotationView):
-                        item.set_selected(False)
+                        item.set_selected_flag_internal(False)
                     # 2. 若为Qt原生项，调用标准setSelected方法
                     else:
                         item.setSelected(False)
@@ -1180,10 +1180,7 @@ class ImageCanvas(QGraphicsView):
         
         # 取消所有标注的选中状态
         for item in annotation_items:
-            item.set_selected(False)
-            # 如果使用了自定义选中方法，也需要调用
-            if hasattr(item, 'set_selected'):
-                item.set_selected(False)
+            item.set_selected_flag_internal(False)
         
         # 选中被置顶的项
         annotation_view.set_selected(True)
@@ -1213,11 +1210,7 @@ class ImageCanvas(QGraphicsView):
             
         # 取消所有标注的选中状态
         for item in annotation_items:
-            item.set_selected(False)
-            # 如果使用了自定义选中方法，也需要调用
-            if hasattr(item, 'set_selected'):
-                item.set_selected(False)
-
+            item.set_selected_flag_internal(False)
 
     def clear_all_annotations(self):
         """清空所有标注并删除对应的.kolo文件"""
