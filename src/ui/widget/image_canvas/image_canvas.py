@@ -128,10 +128,6 @@ class ImageCanvas(QGraphicsView):
         # 连接场景的选择变化信号
         self.scene.selectionChanged.connect(self.on_selection_changed)
 
-        # 连接列表的选择变化到画布
-        if self.annotation_list:
-            self.annotation_list.annotation_selected.connect(self.on_list_annotation_selected)
-
         # 添加上下文菜单策略
         self.setContextMenuPolicy(Qt.CustomContextMenu)
         self.customContextMenuRequested.connect(self.show_context_menu)
@@ -1100,21 +1096,6 @@ class ImageCanvas(QGraphicsView):
 
         # 选中列表中对应的项
         self.annotation_list.select_category_by_name(category.class_name)
-
-    def on_list_annotation_selected(self, category: AnnotationCategory):
-        """处理列表中选中类别变化的事件"""
-        # 防止在选择过程中触发过多事件
-        self.scene.blockSignals(True)
-        try:
-            # 清除当前选择
-            self.scene.clearSelection()
-
-            # 选中所有同类别标注
-            for item in self.scene.items():
-                if isinstance(item, AnnotationView) and item.category.class_id == category.class_id:
-                    item.set_selected(True)
-        finally:
-            self.scene.blockSignals(False)
 
     def show_context_menu(self, position):
         """显示上下文菜单"""
