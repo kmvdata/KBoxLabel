@@ -8,7 +8,7 @@ from typing import Optional
 from PyQt5.QtCore import Qt, QRectF, QPointF, QEvent, QSize, pyqtSignal
 from PyQt5.QtGui import QPixmap, QPen, QColor, QPainter, QBrush, QKeySequence, QFontMetrics, QIcon
 from PyQt5.QtWidgets import (QGraphicsView, QGraphicsScene, QGraphicsPixmapItem, QAction,
-                             QToolBar, QSizePolicy, QMenu, QFileDialog, QMessageBox, QToolButton)
+                             QToolBar, QSizePolicy, QMenu, QFileDialog, QMessageBox, QToolButton, QGraphicsItem)
 
 from src.common.god.korm_base import KOrmBase
 from src.core.utils.string_util import StringUtil
@@ -310,6 +310,9 @@ class ImageCanvas(QGraphicsView):
             # 创建并添加AnnotationView
             item = AnnotationView(x1, y1, rect_width, rect_height, category, self)
             self.scene.addItem(item)
+            item.setFlags(item.flags() & ~QGraphicsItem.ItemIsMovable)
+            item.selected = False
+            item.setSelected(False)
             return True
 
         except Exception as e:

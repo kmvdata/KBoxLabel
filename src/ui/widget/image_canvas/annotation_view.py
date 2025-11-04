@@ -598,7 +598,9 @@ class AnnotationView(QGraphicsRectItem):
                 if scene:
                     for item in scene.items():
                         if isinstance(item, AnnotationView) and item != self:
-                            item.set_selected(False)
+                            item.setFlags(item.flags() & ~QGraphicsItem.ItemIsMovable)
+                            item.selected = False
+                            item.setSelected(False)
                 
                 self.setFlags(self.flags() | QGraphicsItem.ItemIsMovable)
                 # 将选中的标注项提升到最顶层
