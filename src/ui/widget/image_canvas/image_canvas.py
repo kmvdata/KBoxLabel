@@ -1109,7 +1109,7 @@ class ImageCanvas(QGraphicsView):
             # 选中所有同类别标注
             for item in self.scene.items():
                 if isinstance(item, AnnotationView) and item.category.class_id == category.class_id:
-                    item.setSelected(True)
+                    item.set_selected(True)
         finally:
             self.scene.blockSignals(False)
 
