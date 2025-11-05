@@ -690,3 +690,13 @@ class AnnotationView(QGraphicsRectItem):
         
         # 选中当前项
         self.set_selected(True)
+
+    def send_to_back(self):
+        """将当前标注项置于最底层"""
+        # 从annotation_items中移除当前项
+        self.setZValue(0)
+
+        self.reset_z_values()
+
+        # 弃选当前项
+        self.set_selected_flag_internal(False)

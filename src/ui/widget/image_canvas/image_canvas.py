@@ -1174,17 +1174,7 @@ class ImageCanvas(QGraphicsView):
         # 把选中的item值设置为最小值
         for item in annotation_items:
             if item.isSelected():
-                item.setZValue(0)
-
-        # 按当前ZValue排序（从小到大）
-        annotation_items.sort(key=lambda item: item.zValue())
-
-        # 重新设置ZValue，从10开始，间隔为10
-        for i, item in enumerate(annotation_items, 1):
-            item.setZValue(i * 10)
-
-        # 取消所有标注的选中状态
-        self.unselect_all_annotations()
+                item.send_to_back()
 
     def clear_all_annotations(self):
         """清空所有标注并删除对应的.kolo文件"""
