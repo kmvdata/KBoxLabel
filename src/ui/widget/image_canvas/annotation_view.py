@@ -672,3 +672,21 @@ class AnnotationView(QGraphicsRectItem):
         # 重新设置ZValue，从10开始，间隔为10
         for i, item in enumerate(annotation_items, 1):
             item.setZValue(i * 10)
+        
+    def bring_to_top(self):
+        """将当前标注项置于最顶层"""
+        scene = self.scene()
+        if not scene:
+            return
+            
+        # 获取所有AnnotationView项
+        annotation_items = [item for item in scene.items() 
+                           if isinstance(item, AnnotationView)]
+        
+        # 从annotation_items中移除当前项
+        self.setZValue(len(annotation_items) * 20)
+
+        self.reset_z_values()
+        
+        # 选中当前项
+        self.set_selected(True)

@@ -1155,42 +1155,12 @@ class ImageCanvas(QGraphicsView):
             for annotation in sorted_annotations:
                 action = QAction(annotation.category.class_name, self)
                 action.triggered.connect(
-                    lambda checked, ann=annotation: self.bring_annotation_to_top(ann)
+                    lambda checked, ann=annotation: ann.bring_to_top()
                 )
                 context_menu.addAction(action)
 
         # 在鼠标位置显示菜单
         context_menu.exec_(self.mapToGlobal(position))
-
-    def bring_annotation_to_top(self, annotation_view):
-        """将指定的AnnotationView置于顶层，并重新排列其他项的zValue"""
-        # 获取所有AnnotationView项
-        annotation_items = [item for item in self.scene.items() 
-                           if isinstance(item, AnnotationView)]
-        
-        if not annotation_items:
-            return
-            
-        # 从annotation_items中移除要置顶的项
-        if annotation_view in annotation_items:
-            annotation_items.remove(annotation_view)
-        
-        # 按当前ZValue排序（从小到大）
-        annotation_items.sort(key=lambda item: item.zValue())
-        
-        # 重新设置ZValue，从10开始，间隔为10
-        for i, item in enumerate(annotation_items, 1):
-            item.setZValue(i * 10)
-        
-        # 将选中项的ZValue设置为最高
-        max_z_value = (len(annotation_items) + 1) * 10 if annotation_items else 10
-        annotation_view.setZValue(max_z_value)
-        
-        # 取消所有标注的选中状态
-        self.unselect_all_annotations()
-        
-        # 选中被置顶的项
-        annotation_view.set_selected(True)
 
     def send_selected_to_back(self):
         """将选中的标注项放置到最底层"""
