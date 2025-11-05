@@ -589,6 +589,8 @@ class AnnotationView(QGraphicsRectItem):
             self.setFocus(Qt.OtherFocusReason)
         else:
             self.setFlags(self.flags() & ~QGraphicsItem.ItemIsMovable)  # type: ignore
+            # 取消键盘焦点
+            self.clearFocus()
         self.setSelected(selected)
 
     def set_selected(self, selected: bool) -> None:
