@@ -3,7 +3,7 @@ from pathlib import Path
 
 from PyQt5.QtWidgets import QApplication
 
-from src.ui.main_window import MainWindow
+from src.ui.application_manager import ApplicationManager
 
 
 def main():
@@ -22,8 +22,8 @@ def main():
     # 可选：设置域名称（用于设置存储）
     app.setOrganizationDomain("kmvdata.com")
 
-    # 创建主窗口（会自动创建并显示欢迎界面）
-    main_window = MainWindow()
+    # 创建应用管理器（会自动创建并显示欢迎界面）
+    app_manager = ApplicationManager.get_instance()
 
     sys.exit(app.exec_())
 
