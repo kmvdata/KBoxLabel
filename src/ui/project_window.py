@@ -177,9 +177,9 @@ class ProjectWindow(QMainWindow):
             self.setLayout(layout)
 
             # 连接信号
-            btn_open.clicked.connect(self.open_project)
-            btn_new.clicked.connect(self.new_project)
-            button_box.rejected.connect(self.reject)
+            btn_open.clicked.connect(self.open_project)  # type: ignore
+            btn_new.clicked.connect(self.new_project)    # type: ignore
+            button_box.rejected.connect(self.reject)     # type: ignore
 
         def open_project(self):
             """处理打开现有工程"""
