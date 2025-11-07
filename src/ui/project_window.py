@@ -147,7 +147,7 @@ class ProjectWindow(QMainWindow):
                 # 选中第一个元素 - 使用QItemSelectionModel而非Qt
                 self.image_list.selectionModel().select(
                     index,
-                    QItemSelectionModel.ClearAndSelect
+                    QItemSelectionModel.SelectionFlag.ClearAndSelect
                 )
 
 
