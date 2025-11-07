@@ -1,9 +1,13 @@
-import base64
 import logging
 from pathlib import Path
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
 from PIL import Image  # 用于获取图像尺寸
+
+from src.models.sql.kolo_item import KoloItem
+
+if TYPE_CHECKING:
+    from src.models.dto.ref_project_info import RefProjectInfo
 
 
 class YOLOExecutor:
@@ -11,10 +15,11 @@ class YOLOExecutor:
     
     yolo_model_path_key = "yolo_model_path"  # 类属性，固定值为"yolo_model_path"
 
-    def __init__(self):
+    def __init__(self, parent: 'RefProjectInfo' = None):
         self.yolo_model = None  # 存储加载好的YOLO模型
         self.model_name = None  # 存储模型名称
         self.yolo_model_path: Optional[Path] = None  # 实例属性，存储加载的模型路径
+        self.parent: Optional['RefProjectInfo'] = parent  # RefProjectInfo类型的父对象
 
     def is_model_loaded(self) -> bool:
         """
@@ -68,17 +73,17 @@ class YOLOExecutor:
         self.model_name = None  # 存储模型名称
         self.yolo_model_path = None  # 实例属性，存储加载的模型路径
 
-    def process_detection_results(self, results, img_width, img_height) -> list:
+    def process_detection_results(self, results, img_width, img_height, image_name=None) -> list[KoloItem]:
         """
         新增方法：处理检测结果并格式化为指定格式
         参数:
             results: YOLO模型返回的检测结果
             img_width: 图像宽度
             img_height: 图像高度
+            image_name: 图像名称（可选），用于创建KoloItem对象
         返回:
-            格式化的检测结果列表
+            格式化的检测结果列表，类型为list[KoloItem]
         """
-        import base64
         detection_results = []
         for result in results:
             for box in result.boxes:
@@ -88,22 +93,41 @@ class YOLOExecutor:
 
                 # 获取类别名称并进行base64编码
                 class_name = self.yolo_model.names[class_id]
-                class_name_b64 = base64.b64encode(class_name.encode('utf-8')).decode('utf-8')
-
+                
                 # 获取边界框坐标并转换为归一化坐标
                 x1, y1, x2, y2 = box.xyxy[0].tolist()
                 x_center = (x1 + x2) / 2 / img_width
                 y_center = (y1 + y2) / 2 / img_height
                 width = (x2 - x1) / img_width
                 height = (y2 - y1) / img_height
-
+                
+                # 创建KoloItem对象
+                kolo_item = KoloItem()
+                kolo_item.kid = KoloItem.gen_kid()
+                kolo_item.image_name = image_name if image_name else ''
+                kolo_item.class_name = class_name
+                kolo_item.x_center = f"{x_center:.9f}"
+                kolo_item.y_center = f"{y_center:.9f}"
+                kolo_item.width = f"{width:.9f}"
+                kolo_item.height = f"{height:.9f}"
+                
                 # 添加到结果列表
-                detection_results.append(
-                    f"{class_name_b64} {x_center:.9f} {y_center:.9f} {width:.9f} {height:.9f}"
-                )
+                detection_results.append(kolo_item)
         return detection_results
 
-    def exec_yolo(self, img_path: Path):
+    def load_kolo_item_from_db(self, img_path: Path) -> list[KoloItem]:
+        try:
+            # 创建数据库会话
+            with self.parent.sqlite_db.db_session() as session:
+                # 从数据库读取image_name为img_path.name的行
+                kolo_items = session.query(KoloItem).filter(KoloItem.image_name == img_path.name).all()
+                logging.debug(f"从数据库加载到 {len(kolo_items)} 个Kolo项目")
+                return kolo_items
+        except Exception as e:
+            logging.error(f"从数据库加载Kolo项目时出错: {str(e)}")
+            return []
+
+    def exec_yolo(self, img_path: Path)-> list[KoloItem]:
         """使用yolo识别目标，从.kolo文件读取现有数据，合并结果"""
         # 保留原有参数检查逻辑
         if not self.is_model_loaded():
@@ -127,61 +151,14 @@ class YOLOExecutor:
         detection_results = self.process_detection_results(
             self.yolo_model(str(img_path)),
             img_width,
-            img_height
+            img_height,
+            img_path.name
         )
         logging.debug(f"YOLO检测到 {len(detection_results)} 个目标")
 
-        # 读取同名.kolo文件并合并符合格式的内容
-        kolo_path = img_path.with_suffix('.kolo')
-        logging.debug(f"尝试读取.kolo文件: {kolo_path}")
-
-        if kolo_path.exists():
-            try:
-                with open(kolo_path, 'r', encoding='utf-8') as f:  # 支持带BOM的UTF-8文件
-                    kolo_lines = f.readlines()
-
-                logging.debug(f"成功读取.kolo文件，共 {len(kolo_lines)} 行")
-                added_count = 0  # 统计成功添加的行数
-
-                # 验证每行格式并合并
-                for line_num, line in enumerate(kolo_lines, 1):
-                    original_line = line
-                    line = line.strip()
-
-                    if not line:  # 跳过空行
-                        continue
-
-                    # 检查格式是否匹配（5个部分，与detection_results格式一致）
-                    parts = line.split()
-                    if len(parts) != 5:
-                        logging.warning(f".kolo文件第{line_num}行格式错误（部分数量不对）: {original_line[:50]}...")
-                        continue
-
-                    # 验证坐标部分是否为浮点数
-                    try:
-                        # 只验证后四个坐标部分
-                        float(parts[1])  # x_center
-                        float(parts[2])  # y_center
-                        float(parts[3])  # width
-                        float(parts[4])  # height
-
-                        # 格式验证通过，添加到结果中
-                        detection_results.append(line)
-                        added_count += 1
-                    except ValueError:
-                        logging.warning(f".kolo文件第{line_num}行坐标格式错误: {original_line[:50]}...")
-                        continue
-
-                logging.debug(f"从.kolo文件成功添加 {added_count} 个标注")
-
-            except Exception as e:
-                # 记录错误并提示用户
-                error_msg = f"读取或处理.kolo文件时出错: {str(e)}"
-                logging.error(error_msg)
-                # 这里可以根据需要决定是否抛出异常中断执行
-                # raise Exception(error_msg)
-        else:
-            logging.debug(f".kolo文件不存在: {kolo_path}")
+        # 从数据库加载项目并添加到检测结果中
+        kolo_items_in_db = self.load_kolo_item_from_db(img_path)
+        detection_results.extend(kolo_items_in_db)
 
         # 合并相似结果并返回
         merged_results = self.merge_similar_detections(detection_results)
@@ -189,46 +166,42 @@ class YOLOExecutor:
         return merged_results
 
     @staticmethod
-    def merge_similar_detections(detection_results, threshold=0.05):
+    def merge_similar_detections(detection_results: list[KoloItem], threshold=0.05):
         """
         合并类别相同且位置相近的检测结果，保留第一个出现的条目
 
         参数:
-            detection_results: 原始检测结果列表，每个元素为process_detection_results返回的字符串
+            detection_results: 原始检测结果列表，每个元素为KoloItem对象
             threshold: 位置相近的阈值，坐标差异小于此值视为相近，默认0.01（归一化坐标下）
 
         返回:
-            合并后的检测结果列表
+            合并后的检测结果列表，每个元素为KoloItem对象
         """
-        import base64
         from collections import defaultdict
-        import binascii  # 直接导入binascii模块
-
+        
         print(f'传入：{len(detection_results)}')
 
         # 解析检测结果并按类别分组
-        grouped_results = defaultdict(list)  # key: 类别名称, value: [(x_center, y_center, width, height, 原始字符串), ...]
+        grouped_results = defaultdict(list)  # key: 类别名称, value: [(x_center, y_center, width, height, KoloItem对象), ...]
 
         for item in detection_results:
-            parts = item.split()
-            if len(parts) != 5:
+            if not isinstance(item, KoloItem):
                 # 格式不正确的条目直接保留
                 grouped_results["__invalid__"].append((None, None, None, None, item))
                 continue
 
-            class_b64, xc_str, yc_str, w_str, h_str = parts
             try:
-                # 解码类别名称
-                class_name = base64.b64decode(class_b64).decode('utf-8')
+                # 获取类别名称
+                class_name = item.class_name
                 # 转换坐标为浮点数
-                x_center = float(xc_str)
-                y_center = float(yc_str)
-                width = float(w_str)
-                height = float(h_str)
+                x_center = float(item.x_center)
+                y_center = float(item.y_center)
+                width = float(item.width)
+                height = float(item.height)
 
                 grouped_results[class_name].append((x_center, y_center, width, height, item))
-            except (binascii.Error, UnicodeDecodeError, ValueError):
-                # 直接使用binascii.Error，避免通过base64引用
+            except ValueError:
+                # 坐标格式错误
                 grouped_results["__invalid__"].append((None, None, None, None, item))
 
         # 对每个类别组进行相似合并
@@ -242,7 +215,7 @@ class YOLOExecutor:
             # 用于记录已保留的条目
             kept = []
             for item in items:
-                xc, yc, w, h, original_str = item
+                xc, yc, w, h, original_item = item
                 is_similar = False
 
                 # 与已保留的条目比较
@@ -262,7 +235,7 @@ class YOLOExecutor:
                 else:
                     kept.append(item)
 
-            # 将保留的条目按原始顺序添加到结果（取原始字符串）
+            # 将保留的条目按原始顺序添加到结果（取原始KoloItem对象）
             merged.extend([item[4] for item in kept])
         print(f'传出：{len(merged)}')
         return merged

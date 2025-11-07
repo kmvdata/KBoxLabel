@@ -1,22 +1,27 @@
-# main_window.py
+# project_window.py
 import json
 import os
+from datetime import datetime
 from pathlib import Path
 from typing import cast
 
-from PyQt5.QtCore import QThreadPool, Qt, QTimer, QItemSelectionModel
+from PyQt5.QtCore import QThreadPool, QTimer, QItemSelectionModel
+from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import QFileDialog
 from PyQt5.QtWidgets import (QMainWindow, QWidget, QHBoxLayout, QVBoxLayout,
-                             QSplitter, QLabel, QMessageBox, QDialog,
-                             QPushButton, QInputDialog, QFileDialog, QDialogButtonBox,
+                             QSplitter, QLabel, QDialog,
+                             QPushButton, QInputDialog, QDialogButtonBox,
                              )  # 新增导入
+from PyQt5.QtWidgets import QProgressDialog, QMessageBox
 
 from src.models.dto.ref_project_info import RefProjectInfo
+from src.models.sql.kolo_item import KoloItem
 from src.ui.widget.image_canvas.image_canvas import ImageCanvas
 from src.ui.widget.image_list import ImageListView
 from src.ui.widget.main_menu_bar import MainMenuBar
 
 
-class MainWindow(QMainWindow):
+class ProjectWindow(QMainWindow):
 
     def __init__(self, project_path: Path):
         super().__init__(parent=None)
@@ -115,13 +120,6 @@ class MainWindow(QMainWindow):
         # 初始设置窗口标题
         self.setWindowTitle(self.window_title)
 
-        # 连接选择信号
-        self.image_canvas.annotation_list.annotation_selected.connect(
-            lambda category:
-            print(f"hello world: 选择标注 {category.class_name}")
-            or
-            self.image_canvas.set_current_category(category)
-        )
         self.set_project_path(project_path)
         # 确保项目路径有效（强制用户设置）
         self.ensure_project_path()
@@ -142,11 +140,20 @@ class MainWindow(QMainWindow):
                 # 选中第一个元素 - 使用QItemSelectionModel而非Qt
                 self.image_list.selectionModel().select(
                     index,
-                    QItemSelectionModel.ClearAndSelect
+                    QItemSelectionModel.SelectionFlag.ClearAndSelect
                 )
 
+    def on_image_selected(self, file_path: str):
+        """实际处理选中图片的逻辑"""
+        print(f"✅ 图片选中: {file_path}")
+        try:
+            self.image_canvas.load_image(Path(file_path))
+        except (OSError, FileNotFoundError) as e:
+            print(f'加载图片异常：{e}')
+            self.image_list.load_images_from_path(self.project_info.path)
+
     class ProjectRequiredDialog(QDialog):
-        def __init__(self, main_window: 'MainWindow'):
+        def __init__(self, main_window: 'ProjectWindow'):
             super().__init__(main_window)
             self.main_window = main_window
             self.setWindowTitle("Project Required")
@@ -170,9 +177,9 @@ class MainWindow(QMainWindow):
             self.setLayout(layout)
 
             # 连接信号
-            btn_open.clicked.connect(self.open_project)
-            btn_new.clicked.connect(self.new_project)
-            button_box.rejected.connect(self.reject)
+            btn_open.clicked.connect(self.open_project)  # type: ignore
+            btn_new.clicked.connect(self.new_project)    # type: ignore
+            button_box.rejected.connect(self.reject)     # type: ignore
 
         def open_project(self):
             """处理打开现有工程"""
@@ -189,9 +196,9 @@ class MainWindow(QMainWindow):
                     raise FileNotFoundError("Directory does not exist")
 
                 # 通过主窗口方法设置路径（包含验证逻辑）
-                self.main_window.set_project_path(str(p))
+                self.main_window.set_project_path(p)
                 self.accept()  # 关闭对话框
-            except Exception as e:
+            except (OSError, FileNotFoundError) as e:
                 QMessageBox.critical(
                     self, "Error",
                     "Invalid path: Directory does not exist."
@@ -222,7 +229,7 @@ class MainWindow(QMainWindow):
                     self, "Error",
                     "Invalid path: Check directory name or permissions."
                 )
-            except Exception as e:
+            except (ValueError, TypeError) as e:
                 QMessageBox.critical(
                     self, "Error",
                     "Invalid path: Check directory name or permissions."
@@ -251,7 +258,6 @@ class MainWindow(QMainWindow):
         self.setMenuBar(self.menu_bar)
 
         # 连接菜单栏的信号到本地处理函数
-        self.menu_bar.projectPathChanged.connect(self.set_project_path)  # type: ignore
         self.menu_bar.importImagesRequested.connect(self.handle_import_images)  # type: ignore
         self.menu_bar.exportToYoloRequested.connect(self.export_project_to_yolo)  # type: ignore
         self.menu_bar.exportToCocoRequested.connect(self.export_project_to_coco)  # type: ignore
@@ -271,7 +277,12 @@ class MainWindow(QMainWindow):
             if not self.project_info.path.exists():
                 raise FileNotFoundError(f"项目目录不存在: {project_path}")
 
-            # todo: 判断self.project_info.sqlite_path位置是否存在，如果不存在，创建这个sqlite文件
+            # 判断self.project_info.sqlite_path位置是否存在，如果不存在，创建这个sqlite文件
+            if self.project_info.sqlite_path and not self.project_info.sqlite_path.exists():
+                # 确保目录存在
+                self.project_info.sqlite_path.parent.mkdir(parents=True, exist_ok=True)
+                # 创建空的sqlite文件
+                self.project_info.sqlite_path.touch()
 
             # 更新UI
             self.setWindowTitle(self.window_title)
@@ -280,7 +291,7 @@ class MainWindow(QMainWindow):
             # 加载项目图片
             self.handle_import_images()
             print(f"项目加载成功: {project_path}")
-        except Exception as e:
+        except (OSError, FileNotFoundError) as e:
             QMessageBox.warning(
                 self,
                 "打开项目失败",
@@ -308,15 +319,6 @@ class MainWindow(QMainWindow):
             print(f"路径访问错误: {str(e)}")
             return "工程加载失败"
 
-    def on_image_selected(self, file_path: str):
-        """实际处理选中图片的逻辑"""
-        print(f"✅ 图片选中: {file_path}")
-        try:
-            self.image_canvas.load_image(Path(file_path))
-        except Exception as e:
-            print(f'加载图片异常：{e}')
-            self.image_list.load_images_from_path(self.project_info.path)
-
     def on_image_selection_changed(self, selected, deselected):
         """处理图片列表选中项变化"""
         indexes = selected.indexes()
@@ -329,276 +331,255 @@ class MainWindow(QMainWindow):
 
     def export_project_to_yolo(self):
         """
-        读取工程下所有kolo文件，转换为YOLO格式，显示进度条和取消按钮
+        从数据库读取所有kolo_item对象，转换为YOLO格式，显示进度条和取消按钮
         """
-        from PyQt5.QtWidgets import QProgressDialog, QMessageBox
-        from PyQt5.QtCore import Qt
-
         # 检查项目路径是否存在
         if not self.project_info.path.exists():
             QMessageBox.warning(self, "导出失败", "项目路径不存在")
             return
 
-        # 查找所有kolo文件
-        kolo_files = list(self.project_info.path.glob("*.kolo"))
-
-        if not kolo_files:
-            QMessageBox.information(self, "导出完成", "未找到任何kolo文件")
-            return
-
-        # 创建进度对话框
-        progress_dialog = QProgressDialog("正在导出kolo文件...", "取消", 0, len(kolo_files), self)
-        progress_dialog.setWindowTitle("导出进度")
-        progress_dialog.setWindowModality(Qt.WindowModal)
-        progress_dialog.setMinimumDuration(0)
-        progress_dialog.setAutoClose(True)
-
-        # 处理每个kolo文件
-        for i, kolo_file in enumerate(kolo_files):
-            # 检查是否取消
-            if progress_dialog.wasCanceled():
-                QMessageBox.information(self, "导出中止", "用户取消了导出操作")
+        # 创建数据库会话
+        session = self.project_info.sqlite_db.db_session()
+        
+        try:
+            # 获取总记录数用于进度条
+            total_items = session.query(KoloItem).count()
+            
+            if total_items == 0:
+                QMessageBox.information(self, "导出完成", "未找到任何标注数据")
                 return
 
-            # 更新进度对话框
-            progress_dialog.setValue(i)
-            progress_dialog.setLabelText(f"正在导出: {kolo_file.name}")
+            # 创建进度对话框
+            progress_dialog = QProgressDialog("正在导出标注数据...", "取消", 0, total_items, self)
+            progress_dialog.setWindowTitle("导出进度")
+            progress_dialog.setWindowModality(Qt.WindowModal)
+            progress_dialog.setMinimumDuration(0)
+            progress_dialog.setAutoClose(True)
 
-            # 处理事件队列，确保UI更新
-            from PyQt5.QtWidgets import QApplication
-            QApplication.processEvents()
+            # 创建类别名称到ID的映射
+            class_name_to_id = {category.class_name: category.class_id for category in self.project_info.categories}
+            
+            # 按image_name分组查询，避免一次性加载所有数据到内存
+            image_names = session.query(KoloItem.image_name).distinct().all()
+            image_names = [name[0] for name in image_names]
+            
+            # 处理每个图片的标注数据
+            processed_count = 0
+            for i, image_name in enumerate(image_names):
+                # 检查是否取消
+                if progress_dialog.wasCanceled():
+                    QMessageBox.information(self, "导出中止", "用户取消了导出操作")
+                    return
 
-            # 转换当前kolo文件
-            try:
-                self.export_to_yolo(kolo_file)
-            except Exception as e:
-                print(f"导出文件 {kolo_file.name} 时出错: {str(e)}")
+                # 更新进度对话框
+                progress_dialog.setValue(processed_count)
+                progress_dialog.setLabelText(f"正在导出: {image_name}")
 
-        # 完成进度
-        progress_dialog.setValue(len(kolo_files))
-        QMessageBox.information(self, "导出完成", f"成功导出 {len(kolo_files)} 个文件")
+                # 处理事件队列，确保UI更新
+                from PyQt5.QtWidgets import QApplication
+                QApplication.processEvents()
 
-    def export_to_yolo(self, kolo_path: Path):
-        """
-        将kolo文件转换为同目录下同名的txt文件，保存为YOLO能训练的数据格式
-        """
-        # 检查kolo文件是否存在
-        if not kolo_path.exists():
-            print(f"Kolo文件不存在: {kolo_path}")
-            return
+                # 构造输出文件路径（同名的txt文件）
+                txt_path = self.project_info.path / f"{Path(image_name).stem}.txt"
+                
+                try:
+                    # 查询该图片的所有标注
+                    kolo_items = session.query(KoloItem).filter(KoloItem.image_name == image_name).all()
+                    
+                    # 写入YOLO格式的txt文件
+                    with open(txt_path, 'w', encoding='utf-8') as txt_file:
+                        for item in kolo_items:
+                            # 获取类别ID
+                            class_id = class_name_to_id.get(item.class_name, -1)
+                            if class_id == -1:
+                                print(f"警告: 未找到类别 '{item.class_name}' 的ID，跳过该标注")
+                                continue
 
-        # 构造输出文件路径（同目录下同名的txt文件）
-        txt_path = kolo_path.with_suffix('.txt')
+                            # 写入YOLO格式: class_id x_center y_center width height
+                            yolo_line = f"{class_id} {item.x_center} {item.y_center} {item.width} {item.height}\n"
+                            txt_file.write(yolo_line)
+                            
+                    processed_count += len(kolo_items)
+                    
+                except Exception as e:
+                    print(f"导出图片 {image_name} 的标注时出错: {str(e)}")
+                    # 继续处理其他图片而不是中断整个过程
 
-        # 创建类别名称到ID的映射
-        class_name_to_id = {category.class_name: category.class_id for category in self.project_info.categories}
+            # 完成进度
+            progress_dialog.setValue(total_items)
+            QMessageBox.information(self, "导出完成", f"成功导出 {len(image_names)} 个文件，共 {processed_count} 条标注")
 
-        try:
-            # 读取kolo文件
-            with open(kolo_path, 'r', encoding='utf-8') as kolo_file:
-                lines = kolo_file.readlines()
-
-            # 写入YOLO格式的txt文件
-            with open(txt_path, 'w', encoding='utf-8') as txt_file:
-                for line in lines:
-                    parts = line.strip().split()
-                    if len(parts) < 5:
-                        continue
-
-                    # 解析kolo格式的各个部分
-                    base64_class_name = parts[0]
-                    x_center = parts[1]
-                    y_center = parts[2]
-                    width = parts[3]
-                    height = parts[4]
-
-                    # 将Base64编码的类别名称解码为原始名称
-                    from src.core.utils.string_util import StringUtil
-                    class_name = StringUtil.base64_to_string(base64_class_name)
-
-                    # 获取类别ID
-                    class_id = class_name_to_id.get(class_name, -1)
-                    if class_id == -1:
-                        print(f"警告: 未找到类别 '{class_name}' 的ID，跳过该标注")
-                        continue
-
-                    # 写入YOLO格式: class_id x_center y_center width height
-                    yolo_line = f"{class_id} {x_center} {y_center} {width} {height}\n"
-                    txt_file.write(yolo_line)
-
-            print(f"成功导出YOLO格式文件: {txt_path}")
-
-        except Exception as e:
-            print(f"导出YOLO格式时出错: {str(e)}")
-            QMessageBox.warning(self, "导出失败", f"导出YOLO格式时出错: {str(e)}")
+        finally:
+            session.close()
 
     def export_project_to_coco(self):
         """
-        读取工程下所有kolo文件，转换为COCO格式，显示进度条和取消按钮
+        从数据库读取所有kolo_item对象，转换为COCO格式，显示进度条和取消按钮
         """
-        from PyQt5.QtWidgets import QProgressDialog, QMessageBox, QFileDialog
-        from PyQt5.QtCore import Qt
-        import json
-        from datetime import datetime
+
 
         # 检查项目路径是否存在
         if not self.project_info.path.exists():
             QMessageBox.warning(self, "导出失败", "项目路径不存在")
             return
 
-        # 查找所有kolo文件
-        kolo_files = list(self.project_info.path.glob("*.kolo"))
-
-        if not kolo_files:
-            QMessageBox.information(self, "导出完成", "未找到任何kolo文件")
-            return
-
-        # 选择输出目录
-        output_dir = QFileDialog.getExistingDirectory(self, "选择COCO数据导出目录", str(self.project_info.path))
-        if not output_dir:
-            return
-
-        output_path = Path(output_dir)
-
-        # 创建进度对话框
-        progress_dialog = QProgressDialog("正在导出kolo文件...", "取消", 0, len(kolo_files) + 1, self)
-        progress_dialog.setWindowTitle("导出进度")
-        progress_dialog.setWindowModality(Qt.WindowModal)
-        progress_dialog.setMinimumDuration(0)
-        progress_dialog.setAutoClose(True)
-
-        # 处理每个kolo文件
-        coco_data = {
-            "info": {
-                "year": datetime.now().year,
-                "version": "1.0",
-                "description": "KBoxLabel COCO format dataset",
-                "contributor": "KBoxLabel",
-                "url": "",
-                "date_created": datetime.now().strftime("%Y/%m/%d")
-            },
-            "licenses": [{
-                "id": 1,
-                "name": "Unknown",
-                "url": ""
-            }],
-            "images": [],
-            "annotations": [],
-            "categories": []
-        }
-
-        # 添加类别信息
-        for category in self.project_info.categories:
-            coco_data["categories"].append({
-                "id": category.class_id,
-                "name": category.class_name,
-                "supercategory": ""
-            })
-
-        # 创建类别名称到ID的映射
-        class_name_to_id = {category.class_name: category.class_id for category in self.project_info.categories}
-
-        annotation_id = 1
-
-        for i, kolo_file in enumerate(kolo_files):
-            # 检查是否取消
-            if progress_dialog.wasCanceled():
-                QMessageBox.information(self, "导出中止", "用户取消了导出操作")
+        # 创建数据库会话
+        session = self.project_info.sqlite_db.db_session()
+        
+        try:
+            # 获取总记录数用于进度条
+            total_items = session.query(KoloItem).count()
+            
+            if total_items == 0:
+                QMessageBox.information(self, "导出完成", "未找到任何标注数据")
                 return
 
-            # 更新进度对话框
-            progress_dialog.setValue(i)
-            progress_dialog.setLabelText(f"正在导出: {kolo_file.name}")
+            # 选择输出目录
+            output_dir = QFileDialog.getExistingDirectory(self, "选择COCO数据导出目录", str(self.project_info.path))
+            if not output_dir:
+                return
 
-            # 处理事件队列，确保UI更新
-            from PyQt5.QtWidgets import QApplication
-            QApplication.processEvents()
+            output_path = Path(output_dir)
 
-            # 获取图像文件名（假设与kolo文件同名）
-            image_file = kolo_file.with_suffix('.jpg')
-            if not image_file.exists():
-                image_file = kolo_file.with_suffix('.png')
-            if not image_file.exists():
-                image_file = kolo_file.with_suffix('.jpeg')
+            # 创建进度对话框
+            progress_dialog = QProgressDialog("正在导出标注数据...", "取消", 0, total_items + 1, self)
+            progress_dialog.setWindowTitle("导出进度")
+            progress_dialog.setWindowModality(Qt.WindowModal)
+            progress_dialog.setMinimumDuration(0)
+            progress_dialog.setAutoClose(True)
 
-            # 添加图像信息到COCO数据
-            image_id = i + 1
-            coco_data["images"].append({
-                "id": image_id,
-                "width": 0,  # 需要实际图像尺寸
-                "height": 0,  # 需要实际图像尺寸
-                "file_name": image_file.name,
-                "license": 1,
-                "flickr_url": "",
-                "coco_url": "",
-                "date_captured": ""
-            })
+            # 准备COCO数据结构
+            coco_data = {
+                "info": {
+                    "year": datetime.now().year,
+                    "version": "1.0",
+                    "description": "KBoxLabel COCO format dataset",
+                    "contributor": "KBoxLabel",
+                    "url": "",
+                    "date_created": datetime.now().strftime("%Y/%m/%d")
+                },
+                "licenses": [{
+                    "id": 1,
+                    "name": "Unknown",
+                    "url": ""
+                }],
+                "images": [],
+                "annotations": [],
+                "categories": []
+            }
 
-            # 转换当前kolo文件
+            # 添加类别信息
+            for category in self.project_info.categories:
+                coco_data["categories"].append({
+                    "id": category.class_id,
+                    "name": category.class_name,
+                    "supercategory": ""
+                })
+
+            # 创建类别名称到ID的映射
+            class_name_to_id = {category.class_name: category.class_id for category in self.project_info.categories}
+
+            # 按image_name分组查询，避免一次性加载所有数据到内存
+            image_names = session.query(KoloItem.image_name).distinct().all()
+            image_names = [name[0] for name in image_names]
+            
+            # 创建image_name到id的映射
+            image_name_to_id = {}
+            for i, image_name in enumerate(image_names):
+                image_name_to_id[image_name] = i + 1
+                # 添加图像信息到COCO数据
+                coco_data["images"].append({
+                    "id": i + 1,
+                    "width": 0,  # 需要实际图像尺寸
+                    "height": 0,  # 需要实际图像尺寸
+                    "file_name": image_name,
+                    "license": 1,
+                    "flickr_url": "",
+                    "coco_url": "",
+                    "date_captured": ""
+                })
+
+            annotation_id = 1
+            processed_count = 0
+
+            # 分批处理每个图片的标注数据，提高大数据量时的处理效率
+            for i, image_name in enumerate(image_names):
+                # 检查是否取消
+                if progress_dialog.wasCanceled():
+                    QMessageBox.information(self, "导出中止", "用户取消了导出操作")
+                    return
+
+                # 更新进度对话框
+                progress_dialog.setValue(processed_count)
+                progress_dialog.setLabelText(f"正在导出: {image_name}")
+
+                # 处理事件队列，确保UI更新
+                from PyQt5.QtWidgets import QApplication
+                QApplication.processEvents()
+
+                try:
+                    # 分批查询该图片的所有标注，避免一次性加载过多数据
+                    batch_size = 1000
+                    offset = 0
+                    while True:
+                        kolo_items = session.query(KoloItem).filter(
+                            KoloItem.image_name == image_name
+                        ).offset(offset).limit(batch_size).all()
+                        
+                        if not kolo_items:
+                            break
+                        
+                        # 处理每批数据
+                        for item in kolo_items:
+                            # 获取类别ID
+                            class_id = class_name_to_id.get(item.class_name, -1)
+                            if class_id == -1:
+                                print(f"警告: 未找到类别 '{item.class_name}' 的ID，跳过该标注")
+                                continue
+
+                            # 转换为COCO格式的边界框 [x, y, width, height]
+                            # x, y 是边界框左上角坐标
+                            x = float(item.x_center) - float(item.width) / 2
+                            y = float(item.y_center) - float(item.height) / 2
+
+                            # 添加注解信息
+                            coco_data["annotations"].append({
+                                "id": annotation_id,
+                                "image_id": image_name_to_id[image_name],
+                                "category_id": class_id,
+                                "bbox": [x, y, float(item.width), float(item.height)],
+                                "area": float(item.width) * float(item.height),
+                                "segmentation": [],
+                                "iscrowd": 0
+                            })
+
+                            annotation_id += 1
+                            processed_count += 1
+                            
+                        offset += batch_size
+                        
+                except Exception as e:
+                    print(f"导出图片 {image_name} 的标注时出错: {str(e)}")
+                    # 继续处理其他图片而不是中断整个过程
+
+            # 完成进度
+            progress_dialog.setValue(total_items)
+            progress_dialog.setLabelText("正在保存COCO文件...")
+
+            # 写入COCO格式的JSON文件
+            coco_json_path = output_path / "annotations.json"
             try:
-                # 读取kolo文件
-                with open(kolo_file, 'r', encoding='utf-8') as f:
-                    lines = f.readlines()
+                with open(coco_json_path, 'w', encoding='utf-8') as f:
+                    json.dump(coco_data, f, indent=2, ensure_ascii=False)
+            except (OSError, FileNotFoundError) as e:
+                QMessageBox.warning(self, "导出失败", f"保存COCO文件时出错: {str(e)}")
+                return
 
-                # 处理每一行
-                for line in lines:
-                    parts = line.strip().split()
-                    if len(parts) < 5:
-                        continue
+            progress_dialog.setValue(total_items + 1)
+            QMessageBox.information(self, "导出完成", f"成功导出COCO格式数据到: {output_path}，共处理 {processed_count} 条标注")
 
-                    # 解析kolo格式的各个部分
-                    base64_class_name = parts[0]
-                    x_center = float(parts[1])
-                    y_center = float(parts[2])
-                    width = float(parts[3])
-                    height = float(parts[4])
-
-                    # 将Base64编码的类别名称解码为原始名称
-                    from src.core.utils.string_util import StringUtil
-                    class_name = StringUtil.base64_to_string(base64_class_name)
-
-                    # 获取类别ID
-                    class_id = class_name_to_id.get(class_name, -1)
-                    if class_id == -1:
-                        print(f"警告: 未找到类别 '{class_name}' 的ID，跳过该标注")
-                        continue
-
-                    # 转换为COCO格式的边界框 [x, y, width, height]
-                    # x, y 是边界框左上角坐标
-                    x = x_center - width / 2
-                    y = y_center - height / 2
-
-                    # 添加注解信息
-                    coco_data["annotations"].append({
-                        "id": annotation_id,
-                        "image_id": image_id,
-                        "category_id": class_id,
-                        "bbox": [x, y, width, height],
-                        "area": width * height,
-                        "segmentation": [],
-                        "iscrowd": 0
-                    })
-
-                    annotation_id += 1
-
-            except Exception as e:
-                print(f"导出文件 {kolo_file.name} 时出错: {str(e)}")
-
-        # 完成进度
-        progress_dialog.setValue(len(kolo_files))
-        progress_dialog.setLabelText("正在保存COCO文件...")
-
-        # 保存COCO格式的JSON文件
-        coco_json_path = output_path / "annotations.json"
-        try:
-            with open(coco_json_path, 'w', encoding='utf-8') as f:
-                json.dump(coco_data, f, indent=2, ensure_ascii=False)
-        except Exception as e:
-            QMessageBox.warning(self, "导出失败", f"保存COCO文件时出错: {str(e)}")
-            return
-
-        progress_dialog.setValue(len(kolo_files) + 1)
-        QMessageBox.information(self, "导出完成", f"成功导出COCO格式数据到: {output_path}")
+        finally:
+            session.close()
 
     def export_to_coco(self, kolo_path: Path):
         """
@@ -703,7 +684,7 @@ class MainWindow(QMainWindow):
 
             print(f"成功导出COCO格式文件: {json_path}")
 
-        except Exception as e:
+        except (OSError, FileNotFoundError, ValueError, TypeError) as e:
             print(f"导出COCO格式时出错: {str(e)}")
             from PyQt5.QtWidgets import QMessageBox
             QMessageBox.warning(self, "导出失败", f"导出COCO格式时出错: {str(e)}")
@@ -752,3 +733,13 @@ class MainWindow(QMainWindow):
             count = self.image_list.model.rowCount()
             self.statusBar().showMessage(f"已加载 {count} 张图片", 3000)
             self.set_left_status(f"已加载 {count} 张图片")
+            
+            # 自动跳转到最后一个有标注的图片
+            QTimer.singleShot(100, self.image_list.auto_jump_to_last_annotated_image)
+            
+    def closeEvent(self, event):
+        """
+        重写窗口关闭事件
+        """
+        # 从父类调用closeEvent确保正常关闭
+        super().closeEvent(event)

@@ -1,0 +1,8 @@
+pyqt5~=5.15.9
+ultralytics~=8.3.204
+pillow~=11.3.0
+sqlalchemy~=2.0.43
+i18n~=0.2
+pyyaml~=6.0.3
+pydantic~=2.11.7
+setuptools~=78.1.1

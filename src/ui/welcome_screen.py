@@ -30,6 +30,7 @@ class WelcomeScreen(QMainWindow):
         self.list_recent = None
         self.lbl_recent = None
         self.btn_new = None
+        self.btn_open_selected = None  # 添加打开选中项目的按钮
         self.setWindowTitle("Project Manager - Welcome")
         self.setFixedSize(800, 600)  # 固定窗口尺寸
 
@@ -91,11 +92,25 @@ class WelcomeScreen(QMainWindow):
         self.list_recent.setFixedHeight(300)
         self.list_recent.setEditTriggers(QAbstractItemView.NoEditTriggers)  # 禁止编辑
         self.list_recent.itemClicked.connect(self.handle_recent_project_click)
+        # 连接双击信号
+        self.list_recent.itemDoubleClicked.connect(self.handle_recent_project_double_click)
 
         # 填充最近项目列表
         self.populate_recent_projects()
 
         # ===== 底部区域 =====
+        # 创建底部按钮布局
+        bottom_layout = QHBoxLayout()
+        bottom_layout.addStretch()
+        
+        # 添加打开选中项目的按钮
+        self.btn_open_selected = QPushButton("打开")
+        self.btn_open_selected.setEnabled(False)  # 默认禁用
+        self.btn_open_selected.setFixedWidth(100)
+        self.btn_open_selected.setFixedHeight(35)
+        self.btn_open_selected.clicked.connect(self.open_selected_project)
+        bottom_layout.addWidget(self.btn_open_selected)
+        
         # 状态栏
         self.status_bar = QStatusBar()
         self.status_bar.showMessage("Version 1.0.0", 5000)
@@ -106,11 +121,14 @@ class WelcomeScreen(QMainWindow):
         main_layout.addLayout(top_layout)
         main_layout.addWidget(self.lbl_recent)
         main_layout.addWidget(self.list_recent)
+        main_layout.addLayout(bottom_layout)  # 添加底部按钮布局
         main_layout.addStretch()  # 中间留白
 
         # 连接信号
         self.btn_new.clicked.connect(self.create_new_project)
         self.btn_open.clicked.connect(self.open_existing_project)
+        # 连接列表选择变化信号
+        self.list_recent.itemSelectionChanged.connect(self.on_item_selection_changed)
 
     def apply_stylesheet(self) -> None:
         """应用样式表，设置界面外观"""
@@ -134,18 +152,23 @@ class WelcomeScreen(QMainWindow):
             QPushButton#btn_new:pressed {
                 background-color: #005a9e;
             }
-            QPushButton#btn_open {
+            QPushButton#btn_open, QPushButton#btn_open_selected {
                 background-color: #f3f3f3;
                 color: #333;
                 border: 1px solid #d0d0d0;
             }
-            QPushButton#btn_open:hover {
+            QPushButton#btn_open:hover, QPushButton#btn_open_selected:hover {
                 background-color: #e6e6e6;
                 border-color: #b8b8b8;
             }
-            QPushButton#btn_open:pressed {
+            QPushButton#btn_open:pressed, QPushButton#btn_open_selected:pressed {
                 background-color: #d9d9d9;
                 border-color: #a0a0a0;
+            }
+            QPushButton#btn_open_selected:disabled {
+                background-color: #f3f3f3;
+                color: #999;
+                border: 1px solid #ddd;
             }
             QLabel {
                 color: #333;
@@ -171,6 +194,7 @@ class WelcomeScreen(QMainWindow):
         # 为按钮设置对象名称以便样式表识别
         self.btn_new.setObjectName("btn_new")
         self.btn_open.setObjectName("btn_open")
+        self.btn_open_selected.setObjectName("btn_open_selected")
 
     def load_recent_projects(self) -> None:
         """从Settings加载最近项目列表"""
@@ -265,7 +289,7 @@ class WelcomeScreen(QMainWindow):
             self.add_recent_project(directory)
             self.open_project(directory)
 
-        except Exception as e:
+        except (OSError, PermissionError) as e:
             QMessageBox.critical(
                 self,
                 "目录不可用",
@@ -291,6 +315,37 @@ class WelcomeScreen(QMainWindow):
 
     def handle_recent_project_click(self, item: QListWidgetItem) -> None:
         """处理最近项目列表单击事件"""
+        # 单击只选中项目，不打开
+        pass
+
+    def handle_recent_project_double_click(self, item: QListWidgetItem) -> None:
+        """处理最近项目列表双击事件"""
+        # 如果显示"暂无最近打开的项目"，不执行操作
+        if item.text() == "暂无最近打开的项目":
+            return
+
+        # 获取对应项目路径
+        index = self.list_recent.row(item)
+        if index < len(self.recent_projects):
+            project_path = self.recent_projects[index]
+            self.open_project(project_path)
+
+    def on_item_selection_changed(self) -> None:
+        """处理列表项选择变化事件"""
+        # 检查是否有选中的项目
+        selected_items = self.list_recent.selectedItems()
+        if selected_items and selected_items[0].text() != "暂无最近打开的项目":
+            self.btn_open_selected.setEnabled(True)
+        else:
+            self.btn_open_selected.setEnabled(False)
+
+    def open_selected_project(self) -> None:
+        """打开选中的项目"""
+        selected_items = self.list_recent.selectedItems()
+        if not selected_items:
+            return
+            
+        item = selected_items[0]
         # 如果显示"暂无最近打开的项目"，不执行操作
         if item.text() == "暂无最近打开的项目":
             return
@@ -331,5 +386,3 @@ class WelcomeScreen(QMainWindow):
 
         # 关闭欢迎界面
         self.close()
-
-

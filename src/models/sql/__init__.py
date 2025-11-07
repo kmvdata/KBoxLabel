@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from sqlalchemy import engine_from_config
+from sqlalchemy import engine_from_config, text
 
 from src.common.god.logger import logger
 from src.models.sql.annotation_category import AnnotationCategory
@@ -32,12 +32,39 @@ def gen_sql_tables(db_path: Path):
         db_engine = engine_from_config(db_config, prefix="sqlalchemy.")
 
         # 检查并创建表和索引。添加新的类型后，要在这里添加新表
-        # 使用checkfirst=True确保只有在表不存在时才创建
+        # 使用checkfirst=False确保每次都重新创建表结构（如果表结构有变化）
+        # 但在生产环境中，应该使用数据库迁移工具来处理表结构变更
         AnnotationCategory.metadata.create_all(db_engine, checkfirst=True)  # type: ignore
         KoloItem.metadata.create_all(db_engine, checkfirst=True)  # type: ignore
         KVConfig.metadata.create_all(db_engine, checkfirst=True)  # type: ignore
+
+        # 检查并添加缺失的列（针对已有数据库的升级情况）
+        _upgrade_annotation_category_table(db_engine)
 
     except (NameError, ModuleNotFoundError) as e:
         logger.error(e)
         # 数据库加载失败，继续上抛异常
         raise
+
+
+def _upgrade_annotation_category_table(db_engine):
+    """
+    升级annotation_category表结构，添加缺失的列
+    """
+    # 检查并添加color_r, color_g, color_b列
+    with db_engine.connect() as conn:
+        # 获取表的当前列信息
+        result = conn.execute(text("PRAGMA table_info(annotation_category)"))
+        columns = [row[1] for row in result.fetchall()]
+        
+        # 检查并添加缺失的列
+        if 'color_r' not in columns:
+            conn.execute(text("ALTER TABLE annotation_category ADD COLUMN color_r INTEGER NOT NULL DEFAULT 0"))
+            
+        if 'color_g' not in columns:
+            conn.execute(text("ALTER TABLE annotation_category ADD COLUMN color_g INTEGER NOT NULL DEFAULT 0"))
+            
+        if 'color_b' not in columns:
+            conn.execute(text("ALTER TABLE annotation_category ADD COLUMN color_b INTEGER NOT NULL DEFAULT 0"))
+            
+        conn.commit()

@@ -4,13 +4,15 @@ import os
 import shutil
 from pathlib import Path
 
-from PyQt5.QtCore import pyqtSignal, QSettings, Qt
+from PyQt5.QtCore import pyqtSignal, Qt
 from PyQt5.QtWidgets import QMenuBar, QAction, QMenu, QFileDialog, QMessageBox, QProgressDialog
+
+# 解决循环导入问题：延迟导入 ApplicationManager
+# from src.ui.application_manager import ApplicationManager
 
 
 class MainMenuBar(QMenuBar):
     # 定义菜单动作的信号 - 确保使用正确的信号名称
-    projectPathChanged: pyqtSignal = pyqtSignal(str)  # 项目路径改变信号
     importImagesRequested: pyqtSignal = pyqtSignal()
     exportToYoloRequested: pyqtSignal = pyqtSignal()
     exportToCocoRequested: pyqtSignal = pyqtSignal()
@@ -25,7 +27,8 @@ class MainMenuBar(QMenuBar):
         self.recent_projects = []  # 存储最近打开的项目路径
 
         # 初始化应用设置
-        self.settings = QSettings("YourCompany", "YourApp")
+        from src.core.ksettings import KSettings
+        self.settings = KSettings()
 
         # 从设置中加载最近项目列表
         self.load_recent_projects()
@@ -106,7 +109,9 @@ class MainMenuBar(QMenuBar):
             self.add_to_recent_projects(str(path))
 
             # 发出项目路径更改信号
-            self.projectPathChanged.emit(str(path))  # ig
+            # 解决循环导入问题：延迟导入 ApplicationManager
+            from src.ui.application_manager import ApplicationManager
+            ApplicationManager.open_project(str(path))
 
         except Exception as e:
             QMessageBox.critical(
@@ -114,8 +119,6 @@ class MainMenuBar(QMenuBar):
                 "项目创建失败",
                 f"无法访问目录: {str(e)}"
             )
-            # 确保发送信号清除项目路径
-            self.projectPathChanged.emit("")  # type: ignore
 
     def load_recent_projects(self):
         """从设置文件加载最近打开的项目"""
@@ -177,13 +180,13 @@ class MainMenuBar(QMenuBar):
             # 创建带路径的动作
             action = QAction(self.truncate_path(path), self)
             action.setData(path)  # 存储完整路径
-            action.triggered.connect(self.handle_open_recent_project)
+            action.triggered.connect(self.handle_open_recent_project) # type: ignore
             self.recent_projects_menu.addAction(action)
 
         # 添加清除历史选项
         self.recent_projects_menu.addSeparator()
         clear_action = QAction("清除历史记录", self)
-        clear_action.triggered.connect(self.clear_recent_projects)
+        clear_action.triggered.connect(self.clear_recent_projects)  # type: ignore
         self.recent_projects_menu.addAction(clear_action)
 
     @staticmethod

@@ -1,19 +1,18 @@
 # image_canvas.py
-import json
 import sys
+from decimal import Decimal
 from pathlib import Path
 from typing import Optional
 
-from PyQt5.QtCore import Qt, QRectF, QPointF, QEvent, QSize, pyqtSignal
+from PyQt5.QtCore import Qt, QRectF, QPointF, QEvent, QSize
 from PyQt5.QtGui import QPixmap, QPen, QColor, QPainter, QBrush, QKeySequence, QFontMetrics, QIcon
 from PyQt5.QtWidgets import (QGraphicsView, QGraphicsScene, QGraphicsPixmapItem, QAction,
-                             QToolBar, QSizePolicy, QMenu, QFileDialog, QMessageBox, QToolButton)
+                             QToolBar, QSizePolicy, QMenu, QFileDialog, QMessageBox, QToolButton, QGraphicsItem)
 
 from src.common.god.korm_base import KOrmBase
-from src.core.utils.string_util import StringUtil
 from src.models.dto.annotation_category import AnnotationCategory
 from src.models.dto.ref_project_info import RefProjectInfo
-from src.models.sql import KoloItem, KVConfig
+from src.models.sql import KoloItem
 from src.ui.widget.image_canvas.annotation_list import AnnotationList
 from src.ui.widget.image_canvas.annotation_view import AnnotationView
 
@@ -23,7 +22,6 @@ class ImageCanvas(QGraphicsView):
     MIN_SCALE = 0.3  # 最小缩放比例（30%）
     MAX_SCALE = 2.0  # 最大缩放比例（200%）
     ZOOM_STEP = 0.1  # 每次缩放步长（原始大小的10%）
-    annotation_selected = pyqtSignal(AnnotationCategory)  # 选中标注时发射信号
 
     def __init__(self, project_info: RefProjectInfo):
         super().__init__()
@@ -93,7 +91,6 @@ class ImageCanvas(QGraphicsView):
         self.drawing = False
         self.start_point = QPointF(0, 0)
         self.current_rect_item = None
-        self.current_category: Optional[AnnotationCategory] = None
 
         # 临时绘制状态
         self.temp_start_point = None
@@ -127,10 +124,6 @@ class ImageCanvas(QGraphicsView):
         # 连接场景的选择变化信号
         self.scene.selectionChanged.connect(self.on_selection_changed)
 
-        # 连接列表的选择变化到画布
-        if self.annotation_list:
-            self.annotation_list.annotation_selected.connect(self.on_list_annotation_selected)
-
         # 添加上下文菜单策略
         self.setContextMenuPolicy(Qt.CustomContextMenu)
         self.customContextMenuRequested.connect(self.show_context_menu)
@@ -146,7 +139,6 @@ class ImageCanvas(QGraphicsView):
         self.current_image_path = None
         self.resetTransform()
         self.current_scale = 1.0
-        self.update_delete_button_state()
 
     def clear_annotation_views(self):
         """清理场景中所有的AnnotationView标注"""
@@ -161,19 +153,18 @@ class ImageCanvas(QGraphicsView):
             for item in annotation_items:
                 self.scene.removeItem(item)
 
-            # 更新删除按钮状态
-            self.update_delete_button_state()
-
             print(f"已清理 {len(annotation_items)} 个标注项")
+            self.save_annotations()
             return len(annotation_items)
         finally:
             self.scene.blockSignals(False)
 
     def unselect_all_annotations(self):
         """取消所有标注的选中状态"""
+        self.scene.clearSelection()  # 先清除Qt原生项的默认选择状态
         for item in self.scene.items():
             if isinstance(item, AnnotationView):
-                item.set_selected(False)
+                item.set_selected_flag_internal(False)
 
     def load_image(self, image_path: Path):
         """加载指定路径的图片，并显示到画布上"""
@@ -200,19 +191,14 @@ class ImageCanvas(QGraphicsView):
         self.current_scale = self.transform().m11()
 
         # 加载对应的txt标注文件
-        self._load_kolo_file(image_path, pixmap.width(), pixmap.height())
+        self.load_annotations_on_image(image_path, pixmap.width(), pixmap.height())
 
-        # 加载图片后更新删除按钮状态
-        self.update_delete_button_state()
-
-        # 根据规范，加载图片后需要取消所有标注的选中状态
-        self.unselect_all_annotations()
 
     @property
     def categories(self) -> list[AnnotationCategory]:
         return self.project_info.categories
 
-    def _load_kolo_file(self, image_path: Path, img_width: int, img_height: int):
+    def load_annotations_on_image(self, image_path: Path, img_width: int, img_height: int):
         """从SQLite数据库加载与图片同名的kolo_item记录"""
         # 获取图片文件名作为查询key
         image_name = image_path.name
@@ -249,10 +235,10 @@ class ImageCanvas(QGraphicsView):
                     print(f"信息: 数据库中类别 '{class_name}' 未定义，已创建新类别（ID={new_category.class_id}）")
 
                 # 从KoloItem获取归一化坐标
-                x_center = float(kolo_item.x_center)
-                y_center = float(kolo_item.y_center)
-                width = float(kolo_item.width)
-                height = float(kolo_item.height)
+                x_center = Decimal(kolo_item.x_center)
+                y_center = Decimal(kolo_item.y_center)
+                width = Decimal(kolo_item.width)
+                height = Decimal(kolo_item.height)
 
                 # 转换为绝对坐标
                 x1 = (x_center - width / 2) * img_width
@@ -267,30 +253,21 @@ class ImageCanvas(QGraphicsView):
         except Exception as e:
             print(f"从数据库加载标注信息错误: {e}")
 
-        # 根据规范，加载完标注后需要取消所有标注的选中状态
-        self.unselect_all_annotations()
+        # 打印所有标注坐标
+        self.print_all_annotation_coordinates()
 
-    def load_kolo_line(self, detection: str):
-        """加载单行kolo格式数据并在画布上添加对应的标注"""
+    def load_annotation_view_from_kilo_item(self, kolo_item: KoloItem):
+        """根据KoloItem对象在画布上添加对应的标注"""
         if not self.current_image_path or self.image_item is None:
             return False  # 没有加载图片，无法添加标注
 
         try:
-            # 分割检测结果字符串
-            parts = detection.strip().split()
-            if len(parts) != 5:
-                print(f"无效的kolo格式: {detection}")
-                return False
-
-            # 解析各个部分
-            class_name_b64 = parts[0]
-            x_center = float(parts[1])
-            y_center = float(parts[2])
-            width = float(parts[3])
-            height = float(parts[4])
-
-            # 解码类名
-            class_name = StringUtil.base64_to_string(class_name_b64)
+            # 从KoloItem对象获取数据
+            class_name = kolo_item.class_name
+            x_center = Decimal(kolo_item.x_center)
+            y_center = Decimal(kolo_item.y_center)
+            width = Decimal(kolo_item.width)
+            height = Decimal(kolo_item.height)
 
             # 获取图像尺寸
             img_width = self.image_item.pixmap().width()
@@ -322,15 +299,21 @@ class ImageCanvas(QGraphicsView):
             # 创建并添加AnnotationView
             item = AnnotationView(x1, y1, rect_width, rect_height, category, self)
             self.scene.addItem(item)
+            item.setFlags(item.flags() & ~QGraphicsItem.ItemIsMovable)
+            item.selected = False
+            item.setSelected(False)
             return True
 
         except Exception as e:
             print(f"加载kolo行时出错: {e}")
             return False
 
-    def set_current_category(self, category: AnnotationCategory):
-        """设置当前要绘制的标注类别"""
-        self.current_category = category
+    @property
+    def current_category(self) -> Optional[AnnotationCategory]:
+        """获取当前要绘制的标注类别，从annotation list中获取当前选中item对应的category，如果没有选中任何item，则返回none"""
+        if self.annotation_list:
+            return self.annotation_list.get_selected_category()
+        return None
 
     def wheelEvent(self, event):
         """处理鼠标滚轮事件，支持CTRL+滚轮进行缩放"""
@@ -433,48 +416,25 @@ class ImageCanvas(QGraphicsView):
                     isinstance(clicked_item.parentItem(), AnnotationView)
             )
 
-            # 点击空白区域时清除选择
-            if not is_annotation:
-                self.scene.clearSelection()  # 先清除Qt原生项的默认选择状态
-                for item in self.scene.items():
-                    # 1. 若为自定义的AnnotationView，调用其重写的set_selected方法
-                    if isinstance(item, AnnotationView):
-                        item.set_selected(False)
-                    # 2. 若为Qt原生项，调用标准setSelected方法
-                    else:
-                        item.setSelected(False)
+            # 当设置了当前类别时开始绘制新标注
+            if not is_annotation and self.current_category is not None:
+                self.start_point = self.mapToScene(event.pos())
+                self.drawing = True
 
-                # 更新删除按钮状态
-                self.update_delete_button_state()
-
-                # 当设置了当前类别时开始绘制新标注
-                if self.current_category is not None:
-                    self.start_point = self.mapToScene(event.pos())
-                    self.drawing = True
-
-                    # 创建临时矩形框
-                    self.temp_rect_item = self.scene.addRect(
-                        QRectF(self.start_point, self.start_point),
-                        QPen(Qt.red, 2, Qt.DashLine)
-                    )
-                    self.temp_rect_item.setZValue(10)  # 确保在最上层显示
-                    return  # 拦截事件，避免默认处理
+                # 创建临时矩形框
+                self.temp_rect_item = self.scene.addRect(
+                    QRectF(self.start_point, self.start_point),
+                    QPen(Qt.red, 2, Qt.DashLine)
+                )
+                self.temp_rect_item.setZValue(10)  # 确保在最上层显示
+                return  # 拦截事件，避免默认处理
 
         super().mousePressEvent(event)  # 继续默认事件处理
 
-    def mouseMoveEvent(self, event):
-        """处理鼠标移动事件"""
-        # 更新临时矩形框
-        if self.drawing and self.temp_rect_item is not None:
-            current_point = self.mapToScene(event.pos())
-            rect = QRectF(self.start_point, current_point).normalized()
-            self.temp_rect_item.setRect(rect)
-            return  # 拦截事件，避免默认处理
-
-        super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event):
         """处理鼠标释放事件，无论操作是什么都保存标注"""
+        created_new_annotation = False
         if self.drawing and event.button() == Qt.LeftButton:
             self.drawing = False
             current_point = self.mapToScene(event.pos())
@@ -502,8 +462,26 @@ class ImageCanvas(QGraphicsView):
                 self.scene.addItem(item)
                 self.save_annotations()
 
-                # 新创建的标注未被选中，更新删除按钮状态
-                self.update_delete_button_state()
+                # 自动选中新创建的标注
+                item.select_annotation_view()
+                created_new_annotation = True
+
+        # 如果没有创建新的标注，则清除选择
+        if not created_new_annotation:
+            # 检查是否点击在现有标注或其锚点上
+            clicked_item = self.itemAt(event.pos())
+            is_annotation = isinstance(clicked_item, AnnotationView) or (
+                    clicked_item and clicked_item.parentItem() and
+                    isinstance(clicked_item.parentItem(), AnnotationView)
+            )
+            
+            # 点击空白区域时清除选择
+            if not is_annotation:
+                self.unselect_all_annotations()
+                        
+                # 取消annotation_list中的选中状态
+                if self.annotation_list and self.annotation_list.selectionModel():
+                    self.annotation_list.selectionModel().clearSelection()
 
         # 每次鼠标释放都保存标注
         if self.set_needs_save_annotations:
@@ -511,14 +489,59 @@ class ImageCanvas(QGraphicsView):
 
         super().mouseReleaseEvent(event)
 
+
+    def mouseDoubleClickEvent(self, event):
+        """处理鼠标双击事件"""
+        if event.button() == Qt.LeftButton:
+            # 获取双击位置的项
+            clicked_item = self.itemAt(event.pos())
+            
+            # 检查是否是AnnotationView且当前已选中
+            if isinstance(clicked_item, AnnotationView) and clicked_item.isSelected():
+                # 调用send_selected_to_back方法
+                self.send_selected_to_back()
+                
+                # 重新选择双击位置的项
+                scene_pos = self.mapToScene(event.pos())
+                items_at_pos = self.scene.items(scene_pos)
+                
+                # 查找AnnotationView项并选中第一个
+                for item in items_at_pos:
+                    if isinstance(item, AnnotationView):
+                        item.select_annotation_view()
+                        break
+
+                return
+                
+        super().mouseDoubleClickEvent(event)
+
+    def mouseMoveEvent(self, event):
+        """处理鼠标移动事件"""
+        # 更新临时矩形框
+        if self.drawing and self.temp_rect_item is not None:
+            current_point = self.mapToScene(event.pos())
+            rect = QRectF(self.start_point, current_point).normalized()
+            self.temp_rect_item.setRect(rect)
+            return  # 拦截事件，避免默认处理
+
+        super().mouseMoveEvent(event)
+
+
     def delete_selected_items(self):
         """删除所有选中的标注项"""
         # 防止在删除过程中触发过多事件
         self.scene.blockSignals(True)
 
         try:
-            selected_items = [item for item in self.scene.selectedItems()
-                              if isinstance(item, AnnotationView)]
+            # 获取通过Qt标准选择机制选中的项
+            qt_selected_items = self.scene.selectedItems()
+            
+            # 获取选中的项
+            custom_selected_items = [item for item in self.scene.items()
+                                     if isinstance(item, AnnotationView) and item.isSelected()]
+            
+            # 合并两种方式选中的项并去重
+            selected_items = list(set(qt_selected_items + custom_selected_items))
 
             if not selected_items:
                 return
@@ -531,8 +554,6 @@ class ImageCanvas(QGraphicsView):
                 self.save_annotations()
             print(f"已删除 {len(selected_items)} 个标注项")
 
-            # 删除后更新删除按钮状态
-            self.update_delete_button_state()
         finally:
             self.scene.blockSignals(False)
             self.save_annotations()
@@ -544,7 +565,6 @@ class ImageCanvas(QGraphicsView):
 
         self.set_needs_save_annotations = False
 
-        txt_path = self.current_image_path.with_suffix('.kolo')
         img_width = self.image_item.pixmap().width()
         img_height = self.image_item.pixmap().height()
 
@@ -561,39 +581,31 @@ class ImageCanvas(QGraphicsView):
             # 创建kolo_item_list用于存储KoloItem对象
             kolo_item_list = []
 
-            with open(txt_path, 'w') as f:
-                for item in annotations:
-                    # 获取当前在场景中的绝对位置和大小（修复：使用sceneBoundingRect获取最新位置）
-                    rect = item.sceneBoundingRect()
-                    x = rect.x()
-                    y = rect.y()
-                    width = rect.width()
-                    height = rect.height()
+            for item in annotations:
+                # 获取当前在场景中的绝对位置和大小（修复：使用sceneBoundingRect获取最新位置）
+                rect = item.sceneBoundingRect()
+                x = rect.x()
+                y = rect.y()
+                width = rect.width()
+                height = rect.height()
 
-                    # 计算归一化坐标
-                    x_center = (x + width / 2) / img_width
-                    y_center = (y + height / 2) / img_height
-                    norm_width = width / img_width
-                    norm_height = height / img_height
+                # 计算归一化坐标
+                x_center = (x + width / 2) / img_width
+                y_center = (y + height / 2) / img_height
+                norm_width = width / img_width
+                norm_height = height / img_height
 
-                    # 对类名进行base64编码
-                    class_name_b64 = StringUtil.string_to_base64(item.category.class_name)
-
-                    # 写入文件，保留9位小数
-                    # f.write(f"{class_name_b64} {x_center:.9f} {y_center:.9f} {norm_width:.9f} {norm_height:.9f}\n")
-
-                    # 创建KoloItem对象并添加到列表中
-                    # 从当前图片路径获取图片名称
-                    image_name = self.current_image_path.name
-                    kolo_item_list.append(KoloItem(
-                        kid=KOrmBase.snowflake.gen_kid(),
-                        image_name=image_name,
-                        class_name=item.category.class_name,
-                        x_center=x_center,
-                        y_center=y_center,
-                        width=norm_width,
-                        height=norm_height
-                    ))
+                # 从当前图片路径获取图片名称
+                image_name = self.current_image_path.name
+                kolo_item_list.append(KoloItem(
+                    kid=KOrmBase.snowflake.gen_kid(),
+                    image_name=image_name,
+                    class_name=item.category.class_name,
+                    x_center=x_center,
+                    y_center=y_center,
+                    width=norm_width,
+                    height=norm_height
+                ))
 
             # 在事务中删除所有image_name的kolo_item, 然后插入新的kolo_item_list中的对象
             def transaction_func(session):
@@ -606,8 +618,9 @@ class ImageCanvas(QGraphicsView):
 
             # 执行事务
             self.project_info.sqlite_db.execute_in_transaction(transaction_func)
-
-            print(f"保存标注文件成功: {txt_path}")
+            # 打印所有标注坐标
+            self.print_all_annotation_coordinates()
+            
             return True
         except Exception as e:
             print(f"保存标注文件时出错: {e}")
@@ -656,18 +669,6 @@ class ImageCanvas(QGraphicsView):
             fit_height_action.setToolTip("Fit image height to window")
             fit_height_action.triggered.connect(self.fit_to_height)
             toolbar.addAction(fit_height_action)
-
-            # 添加分隔线
-            toolbar.addSeparator()
-
-            # Delete Button
-            self.delete_toolbar_action = QAction("Delete", self)
-            self.delete_toolbar_action.setIcon(self._get_icon("edit-delete", "X"))
-            self.delete_toolbar_action.setToolTip("Delete selected annotations")
-            self.delete_toolbar_action.triggered.connect(self.delete_selected_items)
-            # 初始状态禁用
-            self.delete_toolbar_action.setEnabled(False)
-            toolbar.addAction(self.delete_toolbar_action)
 
             # 添加分隔线
             toolbar.addSeparator()
@@ -840,10 +841,13 @@ class ImageCanvas(QGraphicsView):
             model_name = self.project_info.model_name
             if detection_results:
                 logging.info("YOLO detection results:")
-                for line in detection_results:
-                    print(line)
-                    logging.info(line)
-                    self.load_kolo_line(line)  # 复用加载到画布的方法
+                for kolo_item in detection_results:
+                    print(kolo_item)
+                    logging.info(kolo_item)
+                    self.load_annotation_view_from_kilo_item(kolo_item)  # 复用加载到画布的方法
+                
+                # 保存自动生成的标注结果
+                self.save_annotations()
             else:
                 logging.info("No objects detected by YOLO model")
                 QMessageBox.information(
@@ -860,26 +864,6 @@ class ImageCanvas(QGraphicsView):
             error_msg = f"Error executing YOLO model: {str(e)}"
             logging.error(error_msg)
             QMessageBox.critical(self, "Execution Error", error_msg)
-
-    def update_delete_button_state(self):
-        """更新删除按钮的状态：当有选中的标注项时启用，否则禁用"""
-        # 防止递归调用
-        if self._updating_delete_state:
-            return
-
-        self._updating_delete_state = True
-        try:
-            if self.delete_toolbar_action:
-                # 直接迭代所有AnnotationView检查是否有选中项，避免触发额外事件
-                has_selected = False
-                for item in self.scene.items():
-                    if isinstance(item, AnnotationView) and item.isSelected():
-                        has_selected = True
-                        break
-
-                self.delete_toolbar_action.setEnabled(has_selected)
-        finally:
-            self._updating_delete_state = False
 
     @staticmethod
     def _get_icon(theme_name, fallback_text):
@@ -943,17 +927,6 @@ class ImageCanvas(QGraphicsView):
         fit_height_action.setToolTip("Fit image height to window")
         fit_height_action.triggered.connect(self.fit_to_height)
         toolbar.addAction(fit_height_action)
-
-        # 添加分隔线
-        toolbar.addSeparator()
-
-        # Delete Button
-        self.delete_toolbar_action = QAction("Del", self)
-        self.delete_toolbar_action.setToolTip("Delete selected annotations")
-        self.delete_toolbar_action.triggered.connect(self.delete_selected_items)
-        # 初始状态禁用
-        self.delete_toolbar_action.setEnabled(False)
-        toolbar.addAction(self.delete_toolbar_action)
 
         # 添加分隔线
         toolbar.addSeparator()
@@ -1107,9 +1080,6 @@ class ImageCanvas(QGraphicsView):
         selected_items = [item for item in self.scene.items()
                           if isinstance(item, AnnotationView) and item.isSelected()]
 
-        # 更新删除按钮状态
-        self.update_delete_button_state()
-
         if not selected_items:
             return
 
@@ -1129,40 +1099,81 @@ class ImageCanvas(QGraphicsView):
             )
 
         # 发射信号通知选中的标注类别
-        self.annotation_selected.emit(category)
+        # self.annotation_selected.emit(category)
 
         # 选中列表中对应的项
         self.annotation_list.select_category_by_name(category.class_name)
 
-    def on_list_annotation_selected(self, category: AnnotationCategory):
-        """处理列表中选中类别变化的事件"""
-        # 防止在选择过程中触发过多事件
-        self.scene.blockSignals(True)
-        try:
-            # 清除当前选择
-            self.scene.clearSelection()
-
-            # 选中所有同类别标注
-            for item in self.scene.items():
-                if isinstance(item, AnnotationView) and item.category.class_id == category.class_id:
-                    item.setSelected(True)
-
-            # 更新删除按钮状态
-            self.update_delete_button_state()
-        finally:
-            self.scene.blockSignals(False)
-
     def show_context_menu(self, position):
         """显示上下文菜单"""
         context_menu = QMenu(self)
+        scene_pos = self.mapToScene(position)
+
+        # 检查是否有选中的标注项
+        selected_items = [item for item in self.scene.items()
+                          if isinstance(item, AnnotationView) and item.isSelected()]
+        
+        # 如果有选中的标注项，添加"放置最底层"选项
+        if selected_items:
+            send_to_back_action = QAction("放置最底层", self)
+            send_to_back_action.triggered.connect(self.send_selected_to_back)
+            context_menu.addAction(send_to_back_action)
+            
+            # 添加删除选项
+            delete_action = QAction("删除", self)
+            delete_action.triggered.connect(self.delete_selected_items)
+            context_menu.addAction(delete_action)
+            
+            # 添加分隔线
+            context_menu.addSeparator()
 
         # 添加"全部清空"选项
         clear_all_action = QAction("全部清空", self)
         clear_all_action.triggered.connect(self.clear_all_annotations)
         context_menu.addAction(clear_all_action)
+        
+        # 查找点击位置下的所有AnnotationView对象
+        items_at_pos = self.scene.items(scene_pos)
+        annotation_views_at_pos = [item for item in items_at_pos 
+                                  if isinstance(item, AnnotationView)]
+        
+        # 如果点击位置有AnnotationView，则添加图层菜单项
+        if annotation_views_at_pos:
+            # 添加分隔线
+            context_menu.addSeparator()
+            
+            # 选中zValue最大的AnnotationView
+            top_annotation = max(annotation_views_at_pos, key=lambda item: item.zValue())
+            top_annotation.select_annotation_view()
+
+            # 按zValue排序，从高到低显示
+            sorted_annotations = sorted(annotation_views_at_pos, 
+                                     key=lambda item: item.zValue(), reverse=True)
+            
+            # 为每个AnnotationView添加菜单项到一级菜单
+            for annotation in sorted_annotations:
+                action = QAction(annotation.category.class_name, self)
+                action.triggered.connect(
+                    lambda checked, ann=annotation: ann.bring_to_top()
+                )
+                context_menu.addAction(action)
 
         # 在鼠标位置显示菜单
         context_menu.exec_(self.mapToGlobal(position))
+
+    def send_selected_to_back(self):
+        """将选中的标注项放置到最底层"""
+        # 获取所有AnnotationView项
+        annotation_items = [item for item in self.scene.items() 
+                           if isinstance(item, AnnotationView)]
+
+        if not annotation_items:
+            return
+
+        # 把选中的item值设置为最小值
+        for item in annotation_items:
+            if item.isSelected():
+                item.send_to_back()
 
     def clear_all_annotations(self):
         """清空所有标注并删除对应的.kolo文件"""
@@ -1213,3 +1224,43 @@ class ImageCanvas(QGraphicsView):
             print("缓存的YOLO模型加载成功")
         else:
             print(f"缓存的YOLO模型加载失败: {error_message}")
+
+    def print_all_annotation_coordinates(self):
+        """打印当前画布上所有标注视图的坐标值"""
+        if not self.current_image_path or self.image_item is None:
+            print("没有加载图像")
+            return
+
+        # 获取图像尺寸
+        img_width = self.image_item.pixmap().width()
+        img_height = self.image_item.pixmap().height()
+
+        print(f"图像尺寸: {img_width} x {img_height}")
+        print("标注坐标信息 (x_center, y_center, width, height):")
+
+        # 收集所有AnnotationView并按class_id排序
+        annotations = []
+        for item in self.scene.items():
+            if isinstance(item, AnnotationView):
+                annotations.append(item)
+
+        # 按class_name排序
+        annotations.sort(key=lambda _item: _item.category.class_name)
+
+        for i, item in enumerate(annotations):
+            # 获取当前在场景中的绝对位置和大小
+            rect_to_log = item.sceneBoundingRect()
+            x = rect_to_log.x()
+            y = rect_to_log.y()
+            width = rect_to_log.width()
+            height = rect_to_log.height()
+
+            # 计算归一化坐标
+            x_center = (x + width / 2) / img_width
+            y_center = (y + height / 2) / img_height
+            norm_width = width / img_width
+            norm_height = height / img_height
+
+            print(f"  {i+1}. {item.category.class_name}: "
+                  f"x_center={x_center:.19f}, y_center={y_center:.19f}, "
+                  f"width={norm_width:.19f}, height={norm_height:.19f}")

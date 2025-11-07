@@ -10,7 +10,8 @@ KBoxLabel is a PyQt5-based image annotation tool designed for object detection t
 - **Auto Annotation**: Integrated with YOLOv8 model for automatic annotation capabilities
 - **Cross-platform**: Supports Windows, macOS, and Linux systems
 - **Keyboard Shortcuts**: Provides rich keyboard shortcuts to improve annotation efficiency
-- **Gesture Support**: Supports trackpad gestures such as pinch-to-zoom
+- **Database Storage**: Fully adopts SQLite3 database for storing project configurations and annotation data, replacing the original .kolo files
+- **Multi-Project Support**: Supports simultaneously opening and managing multiple project windows
 
 ## Interface Preview
 
@@ -34,7 +35,7 @@ cd KBoxLabel
 2. Create a virtual environment (recommended):
 ```bash
 # Using conda to create virtual environment
-conda create -n kboxlabel python=3.10
+conda create -n kboxlabel python=3.11
 conda activate kboxlabel
 ```
 
@@ -64,7 +65,7 @@ python src/main.py
    - Select the category to annotate
    - Hold down the left mouse button and drag on the image to create a rectangle
    - Adjust the rectangle position and size by dragging the borders or corners
-5. **Save Annotations**: Annotations are automatically saved in .kolo format
+5. **Save Annotations**: Annotations are automatically saved to SQLite database
 
 ### Keyboard Shortcuts
 
@@ -81,18 +82,24 @@ python src/main.py
 - **Resize Annotations**: Drag the control points on edges or corners after selecting an annotation
 - **Category Switching**: Select the current annotation category through the right category list
 
+### Project Management
+
+- **Multi-Project Support**: Can simultaneously open multiple project windows for work
+- **Recent Projects**: The application remembers recently opened projects for quick access
+- **Project Data Storage**: All project data (including annotation information, category configurations, etc.) is stored in SQLite database
+
 ### Import/Export
 
 #### COCO Format
 
 1. Select "Export" -> "Export to COCO" from the menu bar
 2. Choose the export directory
-3. The system will automatically convert all .kolo files to COCO format
+3. The system will automatically convert all annotation data to COCO format
 
 #### YOLO Format
 
 1. Select "Export" -> "Export to YOLO" from the menu bar
-2. The system will automatically convert all .kolo files to YOLO format
+2. The system will automatically convert all annotation data to YOLO format
 
 ## Auto Annotation
 
@@ -102,17 +109,17 @@ KBoxLabel integrates the YOLOv8 model to support automatic annotation:
 2. Select your YOLOv8 model file (.pt format)
 3. Click the "Run" button to execute automatic annotation
 
-## File Formats
+## Data Storage
 
-### .kolo Format
+### SQLite Database
 
-.kolo is KBoxLabel's native annotation format, with each line representing an annotation object:
+KBoxLabel now fully uses SQLite database to store all project data, including:
 
-```
-[Base64-encoded Category Name] [Center X] [Center Y] [Width] [Height]
-```
+- Annotation information (kolo_item table)
+- Annotation categories (annotation_category table)
+- Project configurations (kv_config table)
 
-Coordinates and dimensions are normalized values (between 0-1) relative to the image size.
+The database files are stored in the `.kboxlabel` folder within the project directory.
 
 ### Supported Image Formats
 

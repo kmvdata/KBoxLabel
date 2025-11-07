@@ -1,9 +1,10 @@
 # annotation_view.py
 import json
 import time  # 导入time模块用于睡眠
+from decimal import Decimal
 from typing import Tuple, Optional
 
-from PyQt5.QtCore import Qt, QRectF
+from PyQt5.QtCore import Qt, QRectF, QTimer
 from PyQt5.QtGui import QPen, QPainter, QBrush, QColor
 from PyQt5.QtWidgets import QGraphicsRectItem, QGraphicsItem, QStyle
 
@@ -14,10 +15,13 @@ from src.models.dto.annotation_category import AnnotationCategory
 class AnnotationView(QGraphicsRectItem):
     """表示一个可交互的标注项，使用双线绘制以确保在任何背景下可见"""
 
-    HANDLE_SIZE = 9  # 控制点大小
-    HANDLE_MARGIN = 0  # 控制点边距
-    OUTER_LINE_WIDTH = 1  # 外侧线宽
-    INNER_LINE_WIDTH = 3  # 内侧线宽
+    HANDLE_SIZE = Decimal('9')  # 控制点大小
+    HANDLE_MARGIN = Decimal('0')  # 控制点边距
+    OUTER_LINE_WIDTH = Decimal('1')  # 外侧线宽
+    INNER_LINE_WIDTH = Decimal('3')  # 内侧线宽
+    
+    # 锚点显示延迟（毫秒）
+    HANDLE_VISIBILITY_DELAY = 500
 
     # 控制点类型
     NO_HANDLE = 0
@@ -30,12 +34,11 @@ class AnnotationView(QGraphicsRectItem):
     BOTTOM_LEFT = 7
     LEFT_MIDDLE = 8
 
-    def __init__(self, x: float, y: float, width: float, height: float, category: AnnotationCategory, parent: any):
-        super().__init__(x, y, width, height)
+    def __init__(self, x: Decimal, y: Decimal, width: Decimal, height: Decimal, category: AnnotationCategory, parent: any):
+        super().__init__(float(x), float(y), float(width), float(height))
         self.opposite_color = None
         self.current_color = None
         self.category = None
-        self.selected: bool = False
         self.set_category(category)
         self.setAcceptDrops(True)  # 启用拖放接受
 
@@ -61,6 +64,15 @@ class AnnotationView(QGraphicsRectItem):
         if isinstance(parent, ImageCanvas):
             self.image_canvas = parent
 
+        # 添加用于控制锚点显示的定时器
+        self.hide_handles_timer = QTimer()
+        self.hide_handles_timer.setSingleShot(True)
+        self.hide_handles_timer.timeout.connect(self._show_handles_after_delay)
+        self.handles_visible = True  # 默认显示锚点
+        
+        # 标记操作类型
+        self.mouse_operation_in_progress = False
+
     @staticmethod
     def get_opposite_color(color: QColor) -> QColor:
         """获取与给定颜色完全相反的颜色"""
@@ -81,7 +93,7 @@ class AnnotationView(QGraphicsRectItem):
     def get_outer_rect(self) -> QRectF:
         """计算外侧线条的矩形（比内侧适当扩大）"""
         # 外侧线条向外扩展的距离，基于外侧线宽计算
-        expand = self.OUTER_LINE_WIDTH / 2
+        expand = float(self.OUTER_LINE_WIDTH / 2)
         inner_rect = self.rect()
         # 向外扩展矩形
         return QRectF(
@@ -94,19 +106,19 @@ class AnnotationView(QGraphicsRectItem):
     def boundingRect(self):
         """返回包含所有线条和控制点的边界矩形"""
         # 计算需要包含外侧线条的额外空间
-        line_expand = self.OUTER_LINE_WIDTH / 2
+        line_expand = float(self.OUTER_LINE_WIDTH / 2)
         rect = self.rect().adjusted(-line_expand, -line_expand, line_expand, line_expand)
 
-        if self.is_selected():
+        if self.isSelected() and self.handles_visible:
             # 计算需要扩展的边距 (控制点半径 + 边距)
-            extra = self.HANDLE_SIZE / 2 + self.HANDLE_MARGIN
+            extra = float(self.HANDLE_SIZE / 2 + self.HANDLE_MARGIN)
             return rect.adjusted(-extra, -extra, extra, extra)
         return rect
 
     def update_handles(self):
         """更新控制点位置"""
-        s = self.HANDLE_SIZE
-        m = self.HANDLE_MARGIN
+        s = float(self.HANDLE_SIZE)
+        m = float(self.HANDLE_MARGIN)
         rect = self.rect()
         x, y, w, h = rect.x(), rect.y(), rect.width(), rect.height()
 
@@ -138,23 +150,36 @@ class AnnotationView(QGraphicsRectItem):
         # 保存画家状态
         painter.save()
 
-        # 1. 绘制内侧线条（当前颜色，原始坐标）
-        inner_pen = QPen(self.current_color, self.INNER_LINE_WIDTH)
+        # 1. 绘制内侧矩形（当前颜色，原始坐标）
+        # 创建带透明度的颜色
+        transparent_color = QColor(self.current_color)
+        transparent_color.setAlphaF(0.35)
+        
+        # 先绘制填充区域
+        fill_brush = QBrush(transparent_color)
+        painter.setBrush(fill_brush)
+        painter.setPen(QPen(Qt.NoPen))  # 不绘制边框
+        painter.drawRect(self.rect())
+        
+        # 再绘制内侧边框线
+        inner_pen = QPen(transparent_color, float(self.INNER_LINE_WIDTH))
         inner_pen.setStyle(Qt.SolidLine)
         inner_pen.setCapStyle(Qt.SquareCap)
         inner_pen.setJoinStyle(Qt.MiterJoin)
         inner_pen.setCosmetic(True)
         painter.setPen(inner_pen)
+        painter.setBrush(QBrush())  # 清除画刷
         painter.drawRect(self.rect())
 
         # 2. 绘制外侧线条（反色，扩大后的坐标）
         outer_rect = self.get_outer_rect()
-        outer_pen = QPen(self.opposite_color, self.OUTER_LINE_WIDTH)
+        outer_pen = QPen(self.opposite_color, float(self.OUTER_LINE_WIDTH))
         outer_pen.setStyle(Qt.SolidLine)
         outer_pen.setCapStyle(Qt.SquareCap)
         outer_pen.setJoinStyle(Qt.MiterJoin)
         outer_pen.setCosmetic(True)
         painter.setPen(outer_pen)
+        painter.setBrush(QBrush())  # 确保不填充
         painter.drawRect(outer_rect)
 
         # 恢复画家状态
@@ -163,8 +188,8 @@ class AnnotationView(QGraphicsRectItem):
         # 恢复原始状态
         option.state = original_state
 
-        # 如果选中，绘制控制点
-        if self.is_selected():
+        # 如果选中且锚点可见，绘制控制点
+        if self.isSelected() and self.handles_visible:
             painter.setRenderHint(QPainter.Antialiasing, True)
             painter.setPen(QPen(Qt.black, 1, Qt.SolidLine))
             painter.setBrush(QBrush(Qt.white))
@@ -174,7 +199,7 @@ class AnnotationView(QGraphicsRectItem):
 
     def hoverMoveEvent(self, event):
         """处理鼠标悬停事件，动态改变光标形状"""
-        if not self.is_selected():
+        if not self.isSelected():
             self.setCursor(Qt.ArrowCursor)
             return
 
@@ -185,17 +210,17 @@ class AnnotationView(QGraphicsRectItem):
         # 设置控制点光标
         if handle != self.NO_HANDLE:
             if handle in [self.TOP_MIDDLE, self.BOTTOM_MIDDLE]:
-                self.setCursor(Qt.SizeVerCursor)
+                self.setCursor(Qt.SizeVerCursor)  # type: ignore
             elif handle in [self.LEFT_MIDDLE, self.RIGHT_MIDDLE]:
-                self.setCursor(Qt.SizeHorCursor)
+                self.setCursor(Qt.SizeHorCursor)  # type: ignore
             elif handle in [self.TOP_LEFT, self.BOTTOM_RIGHT]:
-                self.setCursor(Qt.SizeFDiagCursor)
+                self.setCursor(Qt.SizeFDiagCursor)  # type: ignore
             elif handle in [self.TOP_RIGHT, self.BOTTOM_LEFT]:
-                self.setCursor(Qt.SizeBDiagCursor)
+                self.setCursor(Qt.SizeBDiagCursor)  # type: ignore
         elif rect.contains(pos):
-            self.setCursor(Qt.SizeAllCursor)  # 可移动光标
+            self.setCursor(Qt.SizeAllCursor)  # type: ignore
         else:
-            self.setCursor(Qt.ArrowCursor)
+            self.setCursor(Qt.ArrowCursor)   # type: ignore
 
     def hoverLeaveEvent(self, event):
         """鼠标离开时恢复默认光标"""
@@ -209,94 +234,187 @@ class AnnotationView(QGraphicsRectItem):
             self.handle_selected = True
             self.mouse_press_pos = event.pos()
             self.mouse_press_rect = self.rect()
+            # 标记为鼠标操作
+            self.mouse_operation_in_progress = True
+            # 隐藏锚点
+            self._hide_handles_temporarily()
             event.accept()
             return  # 不触发选择逻辑
 
-        # 强制单选：选中当前项前清除所有AnnotationView项的选择
-        scene = self.scene()
-        if scene:
-            # 获取场景中所有AnnotationView类型的项并取消选择
-            for item in scene.items():
-                if isinstance(item, AnnotationView) and item != self:
-                    item.set_selected(False)
-
-        self.set_selected(True)  # 选中当前项
-        self.setFocus(Qt.MouseFocusReason)  # 设置焦点以接收键盘事件
+        # 检查是否按住Shift键
+        if event.modifiers() & Qt.ShiftModifier:
+            self.clicked_with_shift()
+        else:
+            self.select_annotation_view()  # 选中当前项
+            self.setFocus(Qt.MouseFocusReason)  # 设置焦点以接收键盘事件
+        # 标记为鼠标操作
+        self.mouse_operation_in_progress = True
         # 只更新当前项，其他项会在set_selected中更新
         self.update()
         print(f'set_selected: {self.category} - {self.get_outer_rect()}')
         super().mousePressEvent(event)  # 继续默认事件处理
 
-        # 添加100ms睡眠
-        time.sleep(0.1)
+        # 添加10ms睡眠
+        time.sleep(0.01)
 
     def keyPressEvent(self, event):
         """处理键盘按键事件"""
         # 只有在选中状态下才响应方向键
-        if self.is_selected():
-            move_distance = 1.0  # 移动距离为1像素
-            resize_distance = 1.0  # 调整大小距离为1像素
+        if self.isSelected():
+            move_distance = Decimal('1.0')  # 移动距离为1像素
+            resize_distance = Decimal('1.0')  # 调整大小距离为1像素
             rect = self.rect()
             
+            # 检查是否按住Ctrl+Shift键 (在macOS上是Meta+Shift)
+            modifiers = event.modifiers()
+            ctrl_shift_pressed = (modifiers & Qt.ControlModifier and modifiers & Qt.ShiftModifier) or \
+                                (modifiers & Qt.MetaModifier and modifiers & Qt.ShiftModifier)
+                                
+            if ctrl_shift_pressed:
+                # 按住Ctrl+Shift时，方向键用于收缩标注框（保持一边固定，另一边向内移动）
+                if event.key() == Qt.Key_Left:
+                    # Ctrl+Shift+左箭头：保持左边固定，右边向左移动，使标注框宽度减小
+                    if rect.width() > float(resize_distance):
+                        new_rect = QRectF(rect.x(), rect.y(), rect.width() - float(resize_distance), rect.height())
+                        self.setRect(new_rect)
+                        self.update_handles()
+                        self.set_needs_save_annotation()
+                        # 标记为键盘操作
+                        self.mouse_operation_in_progress = False
+                        # 隐藏锚点
+                        self._hide_handles_temporarily()
+                    event.accept()
+                    return
+                elif event.key() == Qt.Key_Right:
+                    # Ctrl+Shift+右箭头：保持右边固定，左边向右移动，使标注框宽度减小
+                    if rect.width() > float(resize_distance):
+                        new_rect = QRectF(rect.x() + float(resize_distance), rect.y(), rect.width() - float(resize_distance), rect.height())
+                        self.setRect(new_rect)
+                        self.update_handles()
+                        self.set_needs_save_annotation()
+                        # 标记为键盘操作
+                        self.mouse_operation_in_progress = False
+                        # 隐藏锚点
+                        self._hide_handles_temporarily()
+                    event.accept()
+                    return
+                elif event.key() == Qt.Key_Up:
+                    # Ctrl+Shift+上箭头：保持上边固定，下边向上移动，使标注框高度减小
+                    if rect.height() > float(resize_distance):
+                        new_rect = QRectF(rect.x(), rect.y(), rect.width(), rect.height() - float(resize_distance))
+                        self.setRect(new_rect)
+                        self.update_handles()
+                        self.set_needs_save_annotation()
+                        # 标记为键盘操作
+                        self.mouse_operation_in_progress = False
+                        # 隐藏锚点
+                        self._hide_handles_temporarily()
+                    event.accept()
+                    return
+                elif event.key() == Qt.Key_Down:
+                    # Ctrl+Shift+下箭头：保持下边固定，上边向下移动，使标注框高度减小
+                    if rect.height() > float(resize_distance):
+                        new_rect = QRectF(rect.x(), rect.y() + float(resize_distance), rect.width(), rect.height() - float(resize_distance))
+                        self.setRect(new_rect)
+                        self.update_handles()
+                        self.set_needs_save_annotation()
+                        # 标记为键盘操作
+                        self.mouse_operation_in_progress = False
+                        # 隐藏锚点
+                        self._hide_handles_temporarily()
+                    event.accept()
+                    return
             # 检查是否按住Shift键
-            if event.modifiers() & Qt.ShiftModifier:
+            elif event.modifiers() & Qt.ShiftModifier:
                 # 按住Shift时，方向键用于扩大/缩小标注框
                 if event.key() == Qt.Key_Left:
                     # 向左扩展：右边保持不动，向左扩展（x减小，宽度增加）
-                    new_rect = QRectF(rect.x() - resize_distance, rect.y(), rect.width() + resize_distance, rect.height())
+                    new_rect = QRectF(rect.x() - float(resize_distance), rect.y(), rect.width() + float(resize_distance), rect.height())
                     self.setRect(new_rect)
                     self.update_handles()
                     self.set_needs_save_annotation()
+                    # 标记为键盘操作
+                    self.mouse_operation_in_progress = False
+                    # 隐藏锚点
+                    self._hide_handles_temporarily()
                     event.accept()
                     return
                 elif event.key() == Qt.Key_Right:
                     # 向右扩展：左边保持不动，向右扩展（宽度增加）
-                    new_rect = QRectF(rect.x(), rect.y(), rect.width() + resize_distance, rect.height())
+                    new_rect = QRectF(rect.x(), rect.y(), rect.width() + float(resize_distance), rect.height())
                     self.setRect(new_rect)
                     self.update_handles()
                     self.set_needs_save_annotation()
+                    # 标记为键盘操作
+                    self.mouse_operation_in_progress = False
+                    # 隐藏锚点
+                    self._hide_handles_temporarily()
                     event.accept()
                     return
                 elif event.key() == Qt.Key_Up:
                     # 向上扩展：下边保持不动，向上扩展（y减小，高度增加）
-                    new_rect = QRectF(rect.x(), rect.y() - resize_distance, rect.width(), rect.height() + resize_distance)
+                    new_rect = QRectF(rect.x(), rect.y() - float(resize_distance), rect.width(), rect.height() + float(resize_distance))
                     self.setRect(new_rect)
                     self.update_handles()
                     self.set_needs_save_annotation()
+                    # 标记为键盘操作
+                    self.mouse_operation_in_progress = False
+                    # 隐藏锚点
+                    self._hide_handles_temporarily()
                     event.accept()
                     return
                 elif event.key() == Qt.Key_Down:
                     # 向下扩展：上边保持不动，向下扩展（高度增加）
-                    new_rect = QRectF(rect.x(), rect.y(), rect.width(), rect.height() + resize_distance)
+                    new_rect = QRectF(rect.x(), rect.y(), rect.width(), rect.height() + float(resize_distance))
                     self.setRect(new_rect)
                     self.update_handles()
                     self.set_needs_save_annotation()
+                    # 标记为键盘操作
+                    self.mouse_operation_in_progress = False
+                    # 隐藏锚点
+                    self._hide_handles_temporarily()
                     event.accept()
                     return
             else:
                 # 根据按键方向移动标注框
                 if event.key() == Qt.Key_Left:
-                    self.setRect(rect.translated(-move_distance, 0))
+                    self.setRect(rect.translated(-float(move_distance), 0))
                     self.update_handles()
                     self.set_needs_save_annotation()
+                    # 标记为键盘操作
+                    self.mouse_operation_in_progress = False
+                    # 隐藏锚点
+                    self._hide_handles_temporarily()
                     event.accept()
                     return
                 elif event.key() == Qt.Key_Right:
-                    self.setRect(rect.translated(move_distance, 0))
+                    self.setRect(rect.translated(float(move_distance), 0))
                     self.update_handles()
                     self.set_needs_save_annotation()
+                    # 标记为键盘操作
+                    self.mouse_operation_in_progress = False
+                    # 隐藏锚点
+                    self._hide_handles_temporarily()
                     event.accept()
                     return
                 elif event.key() == Qt.Key_Up:
-                    self.setRect(rect.translated(0, -move_distance))
+                    self.setRect(rect.translated(0, -float(move_distance)))
                     self.update_handles()
                     self.set_needs_save_annotation()
+                    # 标记为键盘操作
+                    self.mouse_operation_in_progress = False
+                    # 隐藏锚点
+                    self._hide_handles_temporarily()
                     event.accept()
                     return
                 elif event.key() == Qt.Key_Down:
-                    self.setRect(rect.translated(0, move_distance))
+                    self.setRect(rect.translated(0, float(move_distance)))
                     self.update_handles()
                     self.set_needs_save_annotation()
+                    # 标记为键盘操作
+                    self.mouse_operation_in_progress = False
+                    # 隐藏锚点
+                    self._hide_handles_temporarily()
                     event.accept()
                     return
         
@@ -309,6 +427,8 @@ class AnnotationView(QGraphicsRectItem):
             self.interactive_resize(event.pos())
             # 如果发生形状改变，image_canvas就需保存新的配置
             self.set_needs_save_annotation()
+            # 鼠标拖拽过程中持续隐藏锚点
+            self._keep_handles_hidden()
             return
 
         # 记录移动前的位置
@@ -320,12 +440,16 @@ class AnnotationView(QGraphicsRectItem):
         if old_pos != new_pos:
             # 如果位置改变，标记需要保存
             self.set_needs_save_annotation()
+            # 鼠标拖拽过程中持续隐藏锚点
+            self._keep_handles_hidden()
 
     def mouseReleaseEvent(self, event):
         """鼠标释放事件处理"""
         self.handle_selected = False
         self.current_handle = self.NO_HANDLE
         super().mouseReleaseEvent(event)
+        # 鼠标释放后根据操作类型决定显示锚点的时机
+        self._schedule_show_handles()
 
     def interactive_resize(self, mouse_pos):
         """交互式调整大小（修复对角线控制点固定问题）"""
@@ -401,24 +525,24 @@ class AnnotationView(QGraphicsRectItem):
         self.update_handles()
         self.update()  # 调整大小后强制重绘
 
-    def to_yolo_format(self, img_width: int, img_height: int) -> Tuple[int, float, float, float, float]:
-        """转换为YOLO格式"""
+    def _calculate_normalized_coordinates(self, img_width: int, img_height: int) -> Tuple[Decimal, Decimal, Decimal, Decimal]:
+        """计算归一化坐标"""
         rect = self.rect()
-        x_center = (rect.left() + rect.right()) / 2 / img_width
-        y_center = (rect.top() + rect.bottom()) / 2 / img_height
-        width = rect.width() / img_width
-        height = rect.height() / img_height
-
+        x_center = Decimal((rect.left() + rect.right()) / 2 / img_width)
+        y_center = Decimal((rect.top() + rect.bottom()) / 2 / img_height)
+        width = Decimal(rect.width() / img_width)
+        height = Decimal(rect.height() / img_height)
+        
+        return x_center, y_center, width, height
+    
+    def to_yolo_format(self, img_width: int, img_height: int) -> Tuple[int, Decimal, Decimal, Decimal, Decimal]:
+        """转换为YOLO格式"""
+        x_center, y_center, width, height = self._calculate_normalized_coordinates(img_width, img_height)
         return self.category.class_id, x_center, y_center, width, height
 
-    def to_kolo_format(self, img_width: int, img_height: int) -> Tuple[str, float, float, float, float]:
+    def to_kolo_format(self, img_width: int, img_height: int) -> Tuple[str, Decimal, Decimal, Decimal, Decimal]:
         """转换为KOLO格式"""
-        rect = self.rect()
-        x_center = (rect.left() + rect.right()) / 2 / img_width
-        y_center = (rect.top() + rect.bottom()) / 2 / img_height
-        width = rect.width() / img_width
-        height = rect.height() / img_height
-
+        x_center, y_center, width, height = self._calculate_normalized_coordinates(img_width, img_height)
         return StringUtil.string_to_base64(self.category.class_name), x_center, y_center, width, height
 
     # 添加拖放事件处理
@@ -458,20 +582,123 @@ class AnnotationView(QGraphicsRectItem):
         if self.image_canvas is not None:
             self.image_canvas.save_annotations()
 
-    def set_selected(self, selected: bool) -> None:
-        """重写选中状态设置方法，确保状态变化时触发重绘"""
-        if self.selected != selected:
-            self.selected = selected
-            # 只有在选中时才启用移动功能
-            if selected:
-                self.setFlags(self.flags() | QGraphicsItem.ItemIsMovable)
-            else:
-                self.setFlags(self.flags() & ~QGraphicsItem.ItemIsMovable)
-            self.update()
+    def set_selected_flag_internal(self, selected: bool):
+        if selected:
+            self.setFlags(self.flags() | QGraphicsItem.ItemIsMovable)  # type: ignore
+            # 确保新创建的标注获得键盘焦点，以便能响应键盘事件
+            self.setFocus(Qt.OtherFocusReason)
+        else:
+            self.setFlags(self.flags() & ~QGraphicsItem.ItemIsMovable)  # type: ignore
+            # 取消键盘焦点
+            self.clearFocus()
+        self.setSelected(selected)
 
-    def is_selected(self):
-        return self.selected
+    def select_annotation_view(self, selected: bool = True) -> None:
+        """重写选中状态设置方法，确保状态变化时触发重绘"""
+        if self.isSelected() == selected:
+            return
+            # 只有在选中时才启用移动功能
+        if selected:
+            # 强制取消其他AnnotationView的选中状态
+            scene = self.scene()
+            if scene:
+                for item in scene.items():
+                    if isinstance(item, AnnotationView) and item != self and hasattr(item, 'set_selected_flag_internal'):
+                        item.set_selected_flag_internal(False)
+                self.setZValue(len(scene.items()) * 10)
+        self.set_selected_flag_internal(selected)
+        self.reset_z_values()
+        self.update()
+
+    def clicked_with_shift(self):
+        self.set_selected_flag_internal(not self.isSelected())
+        self.update()
 
     def set_needs_save_annotation(self):
         if self.image_canvas is not None:
             setattr(self.image_canvas, 'set_needs_save_annotations', True)
+
+    def _hide_handles_temporarily(self):
+        """临时隐藏锚点"""
+        self.handles_visible = False
+        self.hide_handles_timer.stop()
+        self.hide_handles_timer.start(self.HANDLE_VISIBILITY_DELAY)  # 使用可配置的延迟时间
+        self.update()
+
+    def _keep_handles_hidden(self):
+        """在鼠标拖拽过程中持续隐藏锚点"""
+        self.handles_visible = False
+        self.hide_handles_timer.stop()
+        # 不启动定时器，保持隐藏状态
+        self.update()
+
+    def _schedule_show_handles(self):
+        """根据操作类型安排显示锚点"""
+        # 如果是鼠标操作，立即显示锚点
+        if self.mouse_operation_in_progress:
+            self._show_handles_immediately()
+        else:
+            # 如果是键盘操作，延迟显示锚点
+            self.hide_handles_timer.start(self.HANDLE_VISIBILITY_DELAY)
+        # 重置操作类型标记
+        self.mouse_operation_in_progress = False
+        
+    def _show_handles_immediately(self):
+        """立即显示锚点"""
+        self.hide_handles_timer.stop()
+        self.handles_visible = True
+        self.update()
+        
+    def _show_handles_after_delay(self):
+        """延迟后显示锚点"""
+        self.handles_visible = True
+        self.update()
+        
+    def set_handle_visibility_delay(self, delay_ms: int):
+        """设置锚点显示延迟时间（毫秒）"""
+        self.HANDLE_VISIBILITY_DELAY = delay_ms
+    
+    def reset_z_values(self):
+        """重置所有AnnotationView的Z值，首先按照当前顺序排序，然后最底层的Z值设置为10，并以10为间隔依次递增"""
+        scene = self.scene()
+        if not scene:
+            return
+        
+        # 获取所有AnnotationView项
+        annotation_items = [item for item in scene.items() 
+                           if isinstance(item, AnnotationView)]
+        
+        # 按当前ZValue排序（从小到大）
+        annotation_items.sort(key=lambda item: item.zValue())
+        
+        # 重新设置ZValue，从10开始，间隔为10
+        for i, item in enumerate(annotation_items, 1):
+            item.setZValue(i * 10)
+        
+    def bring_to_top(self):
+        """将当前标注项置于最顶层"""
+        scene = self.scene()
+        if not scene:
+            return
+            
+        # 获取所有AnnotationView项
+        annotation_items = [item for item in scene.items() 
+                           if isinstance(item, AnnotationView)]
+        
+        # 从annotation_items中移除当前项
+        self.setZValue(len(annotation_items) * 20)
+
+        self.reset_z_values()
+        
+        # 选中当前项
+        self.select_annotation_view()
+
+    def send_to_back(self):
+        """将当前标注项置于最底层"""
+        # 从annotation_items中移除当前项
+        self.setZValue(0)
+
+        self.reset_z_values()
+
+        # 弃选当前项
+        self.set_selected_flag_internal(False)
