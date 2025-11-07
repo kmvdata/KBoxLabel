@@ -525,24 +525,24 @@ class AnnotationView(QGraphicsRectItem):
         self.update_handles()
         self.update()  # 调整大小后强制重绘
 
-    def to_yolo_format(self, img_width: int, img_height: int) -> Tuple[int, Decimal, Decimal, Decimal, Decimal]:
-        """转换为YOLO格式"""
+    def _calculate_normalized_coordinates(self, img_width: int, img_height: int) -> Tuple[Decimal, Decimal, Decimal, Decimal]:
+        """计算归一化坐标"""
         rect = self.rect()
         x_center = Decimal((rect.left() + rect.right()) / 2 / img_width)
         y_center = Decimal((rect.top() + rect.bottom()) / 2 / img_height)
         width = Decimal(rect.width() / img_width)
         height = Decimal(rect.height() / img_height)
-
+        
+        return x_center, y_center, width, height
+    
+    def to_yolo_format(self, img_width: int, img_height: int) -> Tuple[int, Decimal, Decimal, Decimal, Decimal]:
+        """转换为YOLO格式"""
+        x_center, y_center, width, height = self._calculate_normalized_coordinates(img_width, img_height)
         return self.category.class_id, x_center, y_center, width, height
 
     def to_kolo_format(self, img_width: int, img_height: int) -> Tuple[str, Decimal, Decimal, Decimal, Decimal]:
         """转换为KOLO格式"""
-        rect = self.rect()
-        x_center = Decimal((rect.left() + rect.right()) / 2 / img_width)
-        y_center = Decimal((rect.top() + rect.bottom()) / 2 / img_height)
-        width = Decimal(rect.width() / img_width)
-        height = Decimal(rect.height() / img_height)
-
+        x_center, y_center, width, height = self._calculate_normalized_coordinates(img_width, img_height)
         return StringUtil.string_to_base64(self.category.class_name), x_center, y_center, width, height
 
     # 添加拖放事件处理
