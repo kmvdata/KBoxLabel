@@ -311,9 +311,11 @@ class ImageCanvas(QGraphicsView):
             return False
 
     @property
-    def current_category(self) -> Optional[AnnotationCategory] :
-        """获取当前要绘制的标注类别"""
-        return self._current_category
+    def current_category(self) -> Optional[AnnotationCategory]:
+        """获取当前要绘制的标注类别，从annotation list中获取当前选中item对应的category，如果没有选中任何item，则返回none"""
+        if self.annotation_list:
+            return self.annotation_list.get_selected_category()
+        return None
 
     def set_current_category(self, category: AnnotationCategory):
         """设置当前要绘制的标注类别"""
