@@ -1,5 +1,4 @@
 # image_canvas.py
-import json
 import sys
 from decimal import Decimal
 from pathlib import Path
@@ -11,10 +10,9 @@ from PyQt5.QtWidgets import (QGraphicsView, QGraphicsScene, QGraphicsPixmapItem,
                              QToolBar, QSizePolicy, QMenu, QFileDialog, QMessageBox, QToolButton, QGraphicsItem)
 
 from src.common.god.korm_base import KOrmBase
-from src.core.utils.string_util import StringUtil
 from src.models.dto.annotation_category import AnnotationCategory
 from src.models.dto.ref_project_info import RefProjectInfo
-from src.models.sql import KoloItem, KVConfig
+from src.models.sql import KoloItem
 from src.ui.widget.image_canvas.annotation_list import AnnotationList
 from src.ui.widget.image_canvas.annotation_view import AnnotationView
 
@@ -94,7 +92,7 @@ class ImageCanvas(QGraphicsView):
         self.drawing = False
         self.start_point = QPointF(0, 0)
         self.current_rect_item = None
-        self.current_category: Optional[AnnotationCategory] = None
+        self._current_category: Optional[AnnotationCategory] = None
 
         # 临时绘制状态
         self.temp_start_point = None
@@ -312,9 +310,14 @@ class ImageCanvas(QGraphicsView):
             print(f"加载kolo行时出错: {e}")
             return False
 
+    @property
+    def current_category(self) -> Optional[AnnotationCategory] :
+        """获取当前要绘制的标注类别"""
+        return self._current_category
+
     def set_current_category(self, category: AnnotationCategory):
         """设置当前要绘制的标注类别"""
-        self.current_category = category
+        self._current_category = category
 
     def wheelEvent(self, event):
         """处理鼠标滚轮事件，支持CTRL+滚轮进行缩放"""
