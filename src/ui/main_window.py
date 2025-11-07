@@ -1,23 +1,22 @@
 # main_window.py
 from pathlib import Path
 from typing import List
-from PyQt5.QtWidgets import QMainWindow, QApplication
-from PyQt5.QtCore import pyqtSignal
+
+from PyQt5.QtCore import QObject
+from PyQt5.QtWidgets import QApplication
 
 from src.ui.project_window import ProjectWindow
 from src.ui.welcome_screen import WelcomeScreen
 
 
-class MainWindow(QMainWindow):
+class MainWindow(QObject):
     """
     主窗口类，作为隐藏的主控制器管理多个项目窗口
     """
     
     def __init__(self):
         super().__init__()
-        # 隐藏主窗口
-        self.hide()
-        
+
         # 存储打开的项目窗口列表
         self.project_windows: List[ProjectWindow] = []
         
