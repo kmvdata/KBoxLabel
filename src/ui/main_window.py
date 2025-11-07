@@ -1,4 +1,5 @@
 # main_window.py
+from pathlib import Path
 from typing import List
 from PyQt5.QtWidgets import QMainWindow, QApplication
 from PyQt5.QtCore import pyqtSignal
@@ -34,7 +35,7 @@ class MainWindow(QMainWindow):
             project_path: 项目路径
         """
         # 创建新的项目窗口
-        project_window = ProjectWindow(project_path)
+        project_window = ProjectWindow(Path(project_path))
         
         # 添加到项目窗口列表
         self.project_windows.append(project_window)
