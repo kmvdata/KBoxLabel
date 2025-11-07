@@ -329,7 +329,5 @@ class WelcomeScreen(QMainWindow):
         # 触发项目打开信号（由MainWindow连接处理）
         self.projectOpened.emit(project_path)
 
-        # 关闭欢迎界面
-        self.close()
-
-
+        # 不再关闭欢迎界面，允许打开多个项目
+        # self.close()

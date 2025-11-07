@@ -740,3 +740,10 @@ class ProjectWindow(QMainWindow):
             
             # 自动跳转到最后一个有标注的图片
             QTimer.singleShot(100, self.image_list.auto_jump_to_last_annotated_image)
+            
+    def closeEvent(self, event):
+        """
+        重写窗口关闭事件
+        """
+        # 从父类调用closeEvent确保正常关闭
+        super().closeEvent(event)

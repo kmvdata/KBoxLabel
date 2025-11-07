@@ -17,8 +17,8 @@ from src.common.god.ksnowflake import KSnowflake
 class RefProjectInfo:
     """可变容器，用于同步 project_path 的变化，包含YOLO模型配置缓存功能"""
 
-    def __init__(self, path: Path):
-        self.path = path  # 可变属性
+    def __init__(self, path: Path|str):
+        self.path: Path = Path(path)  # 可变属性
         self.yolo_executor = YOLOExecutor(self)  # 将自身作为parent传递给YOLOExecutor
         self.categories: list[AnnotationCategory] = []
 

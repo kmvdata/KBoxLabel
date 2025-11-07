@@ -3,8 +3,7 @@ from pathlib import Path
 
 from PyQt5.QtWidgets import QApplication
 
-from src.ui.project_window import ProjectWindow
-from src.ui.welcome_screen import WelcomeScreen
+from src.ui.main_window import MainWindow
 
 
 def main():
@@ -23,19 +22,8 @@ def main():
     # 可选：设置域名称（用于设置存储）
     app.setOrganizationDomain("kmvdata.com")
 
-    # 连接项目打开信号到处理函数
-    def handle_project_opened(project_path: str):
-        print(f"项目已打开: {project_path}")
-        project_window = ProjectWindow(Path(project_path))
-        project_window.show()
-
-    # 创建欢迎界面
-    welcome = WelcomeScreen()
-
-    welcome.projectOpened.connect(handle_project_opened)
-
-    # 显示欢迎界面
-    welcome.show()
+    # 创建主窗口（会自动创建并显示欢迎界面）
+    main_window = MainWindow()
 
     sys.exit(app.exec_())
 
