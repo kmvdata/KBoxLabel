@@ -289,7 +289,7 @@ class WelcomeScreen(QMainWindow):
             self.add_recent_project(directory)
             self.open_project(directory)
 
-        except Exception as e:
+        except (OSError, PermissionError) as e:
             QMessageBox.critical(
                 self,
                 "目录不可用",

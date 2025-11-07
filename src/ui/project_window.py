@@ -143,6 +143,14 @@ class ProjectWindow(QMainWindow):
                     QItemSelectionModel.SelectionFlag.ClearAndSelect
                 )
 
+    def on_image_selected(self, file_path: str):
+        """实际处理选中图片的逻辑"""
+        print(f"✅ 图片选中: {file_path}")
+        try:
+            self.image_canvas.load_image(Path(file_path))
+        except (OSError, FileNotFoundError) as e:
+            print(f'加载图片异常：{e}')
+            self.image_list.load_images_from_path(self.project_info.path)
 
     class ProjectRequiredDialog(QDialog):
         def __init__(self, main_window: 'ProjectWindow'):
@@ -188,9 +196,9 @@ class ProjectWindow(QMainWindow):
                     raise FileNotFoundError("Directory does not exist")
 
                 # 通过主窗口方法设置路径（包含验证逻辑）
-                self.main_window.set_project_path(str(p))
+                self.main_window.set_project_path(p)
                 self.accept()  # 关闭对话框
-            except Exception as e:
+            except (OSError, FileNotFoundError) as e:
                 QMessageBox.critical(
                     self, "Error",
                     "Invalid path: Directory does not exist."
@@ -221,7 +229,7 @@ class ProjectWindow(QMainWindow):
                     self, "Error",
                     "Invalid path: Check directory name or permissions."
                 )
-            except Exception as e:
+            except (ValueError, TypeError) as e:
                 QMessageBox.critical(
                     self, "Error",
                     "Invalid path: Check directory name or permissions."
@@ -279,7 +287,7 @@ class ProjectWindow(QMainWindow):
             # 加载项目图片
             self.handle_import_images()
             print(f"项目加载成功: {project_path}")
-        except Exception as e:
+        except (OSError, FileNotFoundError) as e:
             QMessageBox.warning(
                 self,
                 "打开项目失败",
@@ -306,15 +314,6 @@ class ProjectWindow(QMainWindow):
         except OSError as e:
             print(f"路径访问错误: {str(e)}")
             return "工程加载失败"
-
-    def on_image_selected(self, file_path: str):
-        """实际处理选中图片的逻辑"""
-        print(f"✅ 图片选中: {file_path}")
-        try:
-            self.image_canvas.load_image(Path(file_path))
-        except Exception as e:
-            print(f'加载图片异常：{e}')
-            self.image_list.load_images_from_path(self.project_info.path)
 
     def on_image_selection_changed(self, selected, deselected):
         """处理图片列表选中项变化"""
@@ -563,12 +562,12 @@ class ProjectWindow(QMainWindow):
             progress_dialog.setValue(total_items)
             progress_dialog.setLabelText("正在保存COCO文件...")
 
-            # 保存COCO格式的JSON文件
+            # 写入COCO格式的JSON文件
             coco_json_path = output_path / "annotations.json"
             try:
                 with open(coco_json_path, 'w', encoding='utf-8') as f:
                     json.dump(coco_data, f, indent=2, ensure_ascii=False)
-            except Exception as e:
+            except (OSError, FileNotFoundError) as e:
                 QMessageBox.warning(self, "导出失败", f"保存COCO文件时出错: {str(e)}")
                 return
 
@@ -681,7 +680,7 @@ class ProjectWindow(QMainWindow):
 
             print(f"成功导出COCO格式文件: {json_path}")
 
-        except Exception as e:
+        except (OSError, FileNotFoundError, ValueError, TypeError) as e:
             print(f"导出COCO格式时出错: {str(e)}")
             from PyQt5.QtWidgets import QMessageBox
             QMessageBox.warning(self, "导出失败", f"导出COCO格式时出错: {str(e)}")
