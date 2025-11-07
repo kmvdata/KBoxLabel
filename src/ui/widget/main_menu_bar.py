@@ -4,7 +4,7 @@ import os
 import shutil
 from pathlib import Path
 
-from PyQt5.QtCore import pyqtSignal, QSettings, Qt
+from PyQt5.QtCore import pyqtSignal, Qt
 from PyQt5.QtWidgets import QMenuBar, QAction, QMenu, QFileDialog, QMessageBox, QProgressDialog
 
 # 解决循环导入问题：延迟导入 ApplicationManager
@@ -27,7 +27,8 @@ class MainMenuBar(QMenuBar):
         self.recent_projects = []  # 存储最近打开的项目路径
 
         # 初始化应用设置
-        self.settings = QSettings("YourCompany", "YourApp")
+        from src.core.ksettings import KSettings
+        self.settings = KSettings()
 
         # 从设置中加载最近项目列表
         self.load_recent_projects()
