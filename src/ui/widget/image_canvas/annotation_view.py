@@ -245,7 +245,7 @@ class AnnotationView(QGraphicsRectItem):
         if event.modifiers() & Qt.ShiftModifier:
             self.clicked_with_shift()
         else:
-            self.set_selected(True)  # 选中当前项
+            self.select_annotation_view()  # 选中当前项
             self.setFocus(Qt.MouseFocusReason)  # 设置焦点以接收键盘事件
         # 标记为鼠标操作
         self.mouse_operation_in_progress = True
@@ -593,7 +593,7 @@ class AnnotationView(QGraphicsRectItem):
             self.clearFocus()
         self.setSelected(selected)
 
-    def set_selected(self, selected: bool) -> None:
+    def select_annotation_view(self, selected: bool = True) -> None:
         """重写选中状态设置方法，确保状态变化时触发重绘"""
         if self.isSelected() == selected:
             return
@@ -691,7 +691,7 @@ class AnnotationView(QGraphicsRectItem):
         self.reset_z_values()
         
         # 选中当前项
-        self.set_selected(True)
+        self.select_annotation_view()
 
     def send_to_back(self):
         """将当前标注项置于最底层"""

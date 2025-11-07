@@ -464,7 +464,7 @@ class ImageCanvas(QGraphicsView):
                 self.save_annotations()
 
                 # 自动选中新创建的标注
-                item.set_selected(True)
+                item.select_annotation_view()
                 created_new_annotation = True
 
         # 如果没有创建新的标注，则清除选择
@@ -509,7 +509,7 @@ class ImageCanvas(QGraphicsView):
                 # 查找AnnotationView项并选中第一个
                 for item in items_at_pos:
                     if isinstance(item, AnnotationView):
-                        item.set_selected(True)
+                        item.select_annotation_view()
                         break
 
                 return
@@ -1145,7 +1145,7 @@ class ImageCanvas(QGraphicsView):
             
             # 选中zValue最大的AnnotationView
             top_annotation = max(annotation_views_at_pos, key=lambda item: item.zValue())
-            top_annotation.set_selected(True)
+            top_annotation.select_annotation_view()
 
             # 按zValue排序，从高到低显示
             sorted_annotations = sorted(annotation_views_at_pos, 
