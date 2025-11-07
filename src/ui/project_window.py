@@ -1,4 +1,4 @@
-# main_window.py
+# project_window.py
 import json
 import os
 from datetime import datetime
@@ -21,7 +21,7 @@ from src.ui.widget.image_list import ImageListView
 from src.ui.widget.main_menu_bar import MainMenuBar
 
 
-class MainWindow(QMainWindow):
+class ProjectWindow(QMainWindow):
 
     def __init__(self, project_path: Path):
         super().__init__(parent=None)
@@ -152,7 +152,7 @@ class MainWindow(QMainWindow):
 
 
     class ProjectRequiredDialog(QDialog):
-        def __init__(self, main_window: 'MainWindow'):
+        def __init__(self, main_window: 'ProjectWindow'):
             super().__init__(main_window)
             self.main_window = main_window
             self.setWindowTitle("Project Required")
