@@ -277,7 +277,12 @@ class ProjectWindow(QMainWindow):
             if not self.project_info.path.exists():
                 raise FileNotFoundError(f"项目目录不存在: {project_path}")
 
-            # todo: 判断self.project_info.sqlite_path位置是否存在，如果不存在，创建这个sqlite文件
+            # 判断self.project_info.sqlite_path位置是否存在，如果不存在，创建这个sqlite文件
+            if self.project_info.sqlite_path and not self.project_info.sqlite_path.exists():
+                # 确保目录存在
+                self.project_info.sqlite_path.parent.mkdir(parents=True, exist_ok=True)
+                # 创建空的sqlite文件
+                self.project_info.sqlite_path.touch()
 
             # 更新UI
             self.setWindowTitle(self.window_title)
