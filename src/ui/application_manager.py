@@ -127,18 +127,3 @@ class ApplicationManager(QObject):
         # 如果没有打开的项目窗口且欢迎界面也关闭了，则退出应用
         if len(self.project_windows) == 0 and (not self.welcome_screen):
             QApplication.quit()
-            
-    def closeEvent(self, event):
-        """
-        主窗口关闭事件处理
-        """
-        print("closeEvent 被调用")
-        # 关闭所有项目窗口
-        for window in self.project_windows[:]:  # 使用副本避免在迭代时修改列表
-            window.close()
-            
-        # 关闭欢迎界面
-        if self.welcome_screen:
-            self.welcome_screen.close()
-            
-        event.accept()
