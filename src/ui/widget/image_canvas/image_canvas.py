@@ -4,7 +4,7 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Optional
 
-from PyQt5.QtCore import Qt, QRectF, QPointF, QEvent, QSize, pyqtSignal
+from PyQt5.QtCore import Qt, QRectF, QPointF, QEvent, QSize
 from PyQt5.QtGui import QPixmap, QPen, QColor, QPainter, QBrush, QKeySequence, QFontMetrics, QIcon
 from PyQt5.QtWidgets import (QGraphicsView, QGraphicsScene, QGraphicsPixmapItem, QAction,
                              QToolBar, QSizePolicy, QMenu, QFileDialog, QMessageBox, QToolButton, QGraphicsItem)
@@ -22,7 +22,6 @@ class ImageCanvas(QGraphicsView):
     MIN_SCALE = 0.3  # 最小缩放比例（30%）
     MAX_SCALE = 2.0  # 最大缩放比例（200%）
     ZOOM_STEP = 0.1  # 每次缩放步长（原始大小的10%）
-    annotation_selected = pyqtSignal(AnnotationCategory)  # 选中标注时发射信号
 
     def __init__(self, project_info: RefProjectInfo):
         super().__init__()
@@ -92,7 +91,6 @@ class ImageCanvas(QGraphicsView):
         self.drawing = False
         self.start_point = QPointF(0, 0)
         self.current_rect_item = None
-        self._current_category: Optional[AnnotationCategory] = None
 
         # 临时绘制状态
         self.temp_start_point = None
@@ -316,10 +314,6 @@ class ImageCanvas(QGraphicsView):
         if self.annotation_list:
             return self.annotation_list.get_selected_category()
         return None
-
-    def set_current_category(self, category: AnnotationCategory):
-        """设置当前要绘制的标注类别"""
-        self._current_category = category
 
     def wheelEvent(self, event):
         """处理鼠标滚轮事件，支持CTRL+滚轮进行缩放"""
@@ -1105,7 +1099,7 @@ class ImageCanvas(QGraphicsView):
             )
 
         # 发射信号通知选中的标注类别
-        self.annotation_selected.emit(category)
+        # self.annotation_selected.emit(category)
 
         # 选中列表中对应的项
         self.annotation_list.select_category_by_name(category.class_name)

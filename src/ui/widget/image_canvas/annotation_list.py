@@ -246,9 +246,6 @@ class AnnotationListModel(QStandardItemModel):
 
 
 class AnnotationList(QListView):
-    """带序号的YOLO标注类别列表组件"""
-    annotation_selected = pyqtSignal(AnnotationCategory)
-
     # 可配置的工具栏高度变量（默认56px）
     TOOLBAR_HEIGHT = 56
 
@@ -436,8 +433,8 @@ class AnnotationList(QListView):
     def _handle_selection_change(self, selected, deselected):
         if selected.indexes():
             source_index = self.proxy_model.mapToSource(selected.indexes()[0])
-            if 0 <= source_index.row() < len(self.project_info.categories):
-                self.annotation_selected.emit(self.project_info.categories[source_index.row()])  # type: ignore
+            # if 0 <= source_index.row() < len(self.project_info.categories):
+            #     self.annotation_selected.emit(self.project_info.categories[source_index.row()])  # type: ignore
 
     def _handle_model_data_changed(self, top_left, bottom_right, roles=None):
         """处理模型数据变化，同步更新self.project_info.categories"""

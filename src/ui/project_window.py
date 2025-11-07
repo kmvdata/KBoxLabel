@@ -120,13 +120,6 @@ class ProjectWindow(QMainWindow):
         # 初始设置窗口标题
         self.setWindowTitle(self.window_title)
 
-        # 连接选择信号
-        self.image_canvas.annotation_list.annotation_selected.connect(
-            lambda category:
-            print(f"hello world: 选择标注 {category.class_name}")
-            or
-            self.image_canvas.set_current_category(category)
-        )
         self.set_project_path(project_path)
         # 确保项目路径有效（强制用户设置）
         self.ensure_project_path()
