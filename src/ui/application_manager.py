@@ -37,7 +37,7 @@ class ApplicationManager(QObject):
         
         # 创建并显示欢迎界面
         self.welcome_screen = WelcomeScreen()
-        self.welcome_screen.projectOpened.connect(self.open_project)
+        self.welcome_screen.projectOpened.connect(self._open_project)
         self.welcome_screen.destroyed.connect(self.on_welcome_screen_destroyed)
         self.welcome_screen.show()
         
@@ -57,7 +57,7 @@ class ApplicationManager(QObject):
         return cls._instance
         
     @classmethod
-    def open_project_path(cls, project_path: str):
+    def open_project(cls, project_path: str):
         """
         类方法：打开项目路径
         
@@ -65,7 +65,7 @@ class ApplicationManager(QObject):
             project_path: 项目路径
         """
         instance = cls.get_instance()
-        instance.open_project(project_path)
+        instance._open_project(project_path)
         
     @classmethod
     def get_project_windows(cls) -> List[ProjectWindow]:
@@ -89,7 +89,7 @@ class ApplicationManager(QObject):
         instance = cls.get_instance()
         return len(instance.project_windows) > 0
         
-    def open_project(self, project_path: str):
+    def _open_project(self, project_path: str):
         """
         打开新项目窗口
         

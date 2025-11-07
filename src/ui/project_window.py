@@ -258,7 +258,6 @@ class ProjectWindow(QMainWindow):
         self.setMenuBar(self.menu_bar)
 
         # 连接菜单栏的信号到本地处理函数
-        self.menu_bar.projectPathChanged.connect(self.set_project_path)  # type: ignore
         self.menu_bar.importImagesRequested.connect(self.handle_import_images)  # type: ignore
         self.menu_bar.exportToYoloRequested.connect(self.export_project_to_yolo)  # type: ignore
         self.menu_bar.exportToCocoRequested.connect(self.export_project_to_coco)  # type: ignore
