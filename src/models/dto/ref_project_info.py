@@ -57,12 +57,6 @@ class RefProjectInfo:
     def is_model_loaded(self):
         return self.yolo_executor.is_model_loaded()
 
-    @property
-    def sqlite_path(self) -> Optional[Path]:
-        if self.path is None:
-            return None
-        return self.path / '__sql_config__.sql'
-
     def load_yolo_model(self, model_path: Optional[Path] = None) -> bool:
         """加载YOLO模型并在成功后缓存路径"""
         try:
@@ -138,8 +132,7 @@ class RefProjectInfo:
             session.close()
 
     def exec_yolo(self, img_path: Path)-> list[KoloItem]:
-        results = self.yolo_executor.exec_yolo(img_path)
-        return results
+        return self.yolo_executor.exec_yolo(img_path)
 
     @property
     def _config_dir(self):
@@ -212,6 +205,9 @@ class RefProjectInfo:
         finally:
             session.close()
             return categories
+
+    def load_kolo_item_from_db(self, img_path: Path) -> list[KoloItem]:
+        return self.yolo_executor.load_kolo_item_from_db(img_path)
 
     def find_annotation_by_name(self, name: str) -> Optional[AnnotationCategory]:
         """根据类别名称查找标注类别"""

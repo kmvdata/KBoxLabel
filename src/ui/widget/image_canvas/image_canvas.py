@@ -143,7 +143,7 @@ class ImageCanvas(QGraphicsView):
         self.resetTransform()
         self.current_scale = 1.0
 
-    def clear_annotation_views(self):
+    def clear_annotation_views(self, save_annotations=True):
         """清理场景中所有的AnnotationView标注"""
         # 防止在删除过程中触发过多事件
         self.scene.blockSignals(True)
@@ -157,7 +157,8 @@ class ImageCanvas(QGraphicsView):
                 self.scene.removeItem(item)
 
             print(f"已清理 {len(annotation_items)} 个标注项")
-            self.save_annotations()
+            if save_annotations:
+                self.save_annotations()
             return len(annotation_items)
         finally:
             self.scene.blockSignals(False)
@@ -211,13 +212,11 @@ class ImageCanvas(QGraphicsView):
 
         # 从数据库中查询所有匹配image_name的KoloItem对象
         try:
-            # 定义查询函数
-            def query_func(session):
-                from src.models.sql.kolo_item import KoloItem
-                return session.query(KoloItem).filter(KoloItem.image_name == image_name).all()
+
+            self.project_info.load_categories()
 
             # 执行查询
-            kolo_items = self.project_info.sqlite_db.execute_in_transaction(query_func)
+            kolo_items = self.project_info.load_kolo_item_from_db(image_path)
 
             # 处理查询结果
             for kolo_item in kolo_items:
@@ -698,7 +697,7 @@ class ImageCanvas(QGraphicsView):
             return
 
         try:
-            self.clear_annotation_views()
+            self.clear_annotation_views(save_annotations=False)
             # 调用YOLOExecutor的exec_yolo方法（复用已有实现）
             detection_results = self.project_info.exec_yolo(img_path=self.current_image_path)
 
@@ -707,7 +706,6 @@ class ImageCanvas(QGraphicsView):
             if detection_results:
                 logging.info("YOLO detection results:")
                 for kolo_item in detection_results:
-                    print(kolo_item)
                     logging.info(kolo_item)
                     self.load_annotation_view_from_kilo_item(kolo_item)  # 复用加载到画布的方法
                 
