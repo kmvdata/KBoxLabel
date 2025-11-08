@@ -127,6 +127,16 @@ class YOLOExecutor:
             logging.error(f"从数据库加载Kolo项目时出错: {str(e)}")
             return []
 
+    def delete_kolo_item_for_image(self, img_path: Path):
+        try:
+            # 创建数据库会话
+            with self.parent.sqlite_db.db_session() as session:
+                # 删除image_name为img_path.name的所有行
+                deleted_count = session.query(KoloItem).filter(KoloItem.image_name == img_path.name).delete()
+                logging.debug(f"从数据库删除了 {deleted_count} 个Kolo项目")
+        except Exception as e:
+            logging.error(f"从数据库删除Kolo项目时出错: {str(e)}")
+
     def exec_yolo(self, img_path: Path)-> list[KoloItem]:
         """使用yolo识别目标，从.kolo文件读取现有数据，合并结果"""
         # 保留原有参数检查逻辑

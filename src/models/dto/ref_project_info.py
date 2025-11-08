@@ -206,6 +206,9 @@ class RefProjectInfo:
     def load_kolo_item_from_db(self, img_path: Path) -> list[KoloItem]:
         return self.yolo_executor.load_kolo_item_from_db(img_path)
 
+    def delete_kolo_item_for_image(self, img_path: Path):
+        return self.yolo_executor.delete_kolo_item_for_image(img_path)
+
     def find_annotation_by_name(self, name: str) -> Optional[AnnotationCategory]:
         """根据类别名称查找标注类别"""
         for category in self.categories:
@@ -220,3 +223,4 @@ class RefProjectInfo:
             if category.class_id == class_id:
                 return category
         return None  # 未找到时返回None
+

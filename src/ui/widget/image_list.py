@@ -578,7 +578,7 @@ class ImageListView(QListView):
                 self,
                 "确认删除",
                 f"确定要删除 '{file_name}' 吗？\n此操作不可恢复！",
-                QMessageBox.Yes | QMessageBox.No
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
             )
         else:
             # 多个文件删除确认
@@ -586,7 +586,7 @@ class ImageListView(QListView):
                 self,
                 "确认删除",
                 f"确定要删除选中的 {len(files_to_delete)} 个文件吗？\n此操作不可恢复！",
-                QMessageBox.Yes | QMessageBox.No
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
             )
             
         if reply == QMessageBox.Yes:
