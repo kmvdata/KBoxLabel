@@ -31,8 +31,11 @@ class ImageCanvas(QGraphicsView):
         self.last_scale_factor = None
         self.gesture_start_scale = None
         self.base_scale = None
-        self.annotation_list = None
-        self.create_annotation_list()
+
+        # 初始化annotation list
+        self.annotation_list = AnnotationList(self.project_info)
+        self.annotation_list.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
+        self.annotation_list.load_categories()
 
         # 按钮引用
         self.delete_toolbar_action = None
@@ -60,12 +63,12 @@ class ImageCanvas(QGraphicsView):
         self.setBackgroundBrush(QBrush(checkerboard))
 
         # 设置视图属性
-        self.setAttribute(Qt.WA_TranslucentBackground, True)
-        self.setRenderHint(QPainter.Antialiasing)
-        self.setDragMode(QGraphicsView.RubberBandDrag)  # 启用框选模式
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        self.setRenderHint(QPainter.RenderHint.Antialiasing)
+        self.setDragMode(QGraphicsView.DragMode.RubberBandDrag) # 启用框选模式
         self.setInteractive(True)
-        self.setTransformationAnchor(QGraphicsView.AnchorUnderMouse)
-        self.setResizeAnchor(QGraphicsView.AnchorUnderMouse)
+        self.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
+        self.setResizeAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
         self.setMouseTracking(True)
         self.setInteractive(True)
 
@@ -76,7 +79,7 @@ class ImageCanvas(QGraphicsView):
         self.toolbar_height = 56  # 工具栏高度
 
         # 启用Pinch手势（用于触摸板捏合缩放）
-        self.grabGesture(Qt.PinchGesture)
+        self.grabGesture(Qt.GestureType.PinchGesture)
 
         # 图像和标注数据
         self.scene = QGraphicsScene(self)
@@ -477,7 +480,7 @@ class ImageCanvas(QGraphicsView):
             
             # 点击空白区域时清除选择
             if not is_annotation:
-                self.unselect_all_annotations()
+                # self.unselect_all_annotations()
                         
                 # 取消annotation_list中的选中状态
                 if self.annotation_list and self.annotation_list.selectionModel():
@@ -1064,15 +1067,6 @@ class ImageCanvas(QGraphicsView):
 
         # 确保图片居中显示
         self.centerOn(self.scene.sceneRect().center())
-
-    def create_annotation_list(self):
-        """创建AnnotationList对象，并绑定对应方法"""
-        # 创建自定义标注列表组件
-        self.annotation_list = AnnotationList(self.project_info)
-        self.annotation_list.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
-        self.annotation_list.load_categories_from_json()
-
-        return self.annotation_list
 
     def on_selection_changed(self):
         """处理场景中选择变化的事件"""

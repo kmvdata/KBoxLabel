@@ -215,12 +215,11 @@ class RefProjectInfo:
 
         # 开始会话
         session = self.sqlite_db.db_session()
+        # 转换为AnnotationCategory对象列表
+        categories: list = []
         try:
             # 查询所有类别
             sql_categories = session.query(SQLAnnotationCategory).all()
-
-            # 转换为AnnotationCategory对象列表
-            categories = []
             for sql_cat in sql_categories:
                 category = AnnotationCategory(
                     class_id=sql_cat.class_id,
@@ -228,10 +227,11 @@ class RefProjectInfo:
                 )
                 category.color = QColor(sql_cat.color_r, sql_cat.color_g, sql_cat.color_b)
                 categories.append(category)
-
-            return categories
+        except Exception as e:
+            print(f"加载类别列表失败: {str(e)}")
         finally:
             session.close()
+            return categories
 
     def find_annotation_by_name(self, name: str) -> Optional[AnnotationCategory]:
         """根据类别名称查找标注类别"""

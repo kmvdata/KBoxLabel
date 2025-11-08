@@ -647,7 +647,7 @@ class AnnotationList(QListView):
         """
         self.project_info.save_categories()
 
-    def load_categories_from_json(self):
+    def load_categories(self):
         """
         从数据库加载类别，与现有类别合并（仅当 class_id 和 class_name 都相同时视为重复）。
         重复项将重新生成颜色，最终列表按 class_id 排序。
