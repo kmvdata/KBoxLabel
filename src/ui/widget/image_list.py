@@ -543,38 +543,93 @@ class ImageListView(QListView):
                 QMessageBox.critical(self, "错误", f"重命名失败: {str(e)}")
 
     def delete_selected(self, index):
-        """删除单个文件"""
-        if not index.isValid():
+        """删除文件（支持多选删除）"""
+        # 获取所有选中的索引
+        selected_indexes = self.selectionModel().selectedIndexes()
+        
+        # 如果没有选中项，直接返回
+        if not selected_indexes:
             return
-
-        # 获取文件信息
-        file_path = self.model.image_paths[index.row()]
-        file_name = os.path.basename(file_path)
-
+            
+        # 如果只选中了一项且传入的index有效，则使用传入的index
+        # 否则使用所有选中的索引
+        if len(selected_indexes) == 1 and index.isValid():
+            indexes_to_delete = [index]
+        else:
+            indexes_to_delete = selected_indexes
+            
+        # 获取要删除的文件信息
+        files_to_delete = []
+        for idx in indexes_to_delete:
+            if idx.isValid():
+                file_path = self.model.image_paths[idx.row()]
+                file_name = os.path.basename(file_path)
+                files_to_delete.append((idx.row(), file_path, file_name))
+                
+        # 如果没有有效文件，直接返回
+        if not files_to_delete:
+            return
+            
         # 确认删除
-        reply = QMessageBox.question(
-            self,
-            "确认删除",
-            f"确定要删除 '{file_name}' 吗？\n此操作不可恢复！",
-            QMessageBox.Yes | QMessageBox.No
-        )
-
+        if len(files_to_delete) == 1:
+            # 单个文件删除确认
+            file_name = files_to_delete[0][2]
+            reply = QMessageBox.question(
+                self,
+                "确认删除",
+                f"确定要删除 '{file_name}' 吗？\n此操作不可恢复！",
+                QMessageBox.Yes | QMessageBox.No
+            )
+        else:
+            # 多个文件删除确认
+            reply = QMessageBox.question(
+                self,
+                "确认删除",
+                f"确定要删除选中的 {len(files_to_delete)} 个文件吗？\n此操作不可恢复！",
+                QMessageBox.Yes | QMessageBox.No
+            )
+            
         if reply == QMessageBox.Yes:
             try:
-                # 删除文件
-                os.remove(file_path)
-
-                # 从模型中移除
-                self.model.beginRemoveRows(QModelIndex(), index.row(), index.row())
-                del self.model.image_paths[index.row()]
-                self.model.endRemoveRows()
-
-                # 清理缩略图缓存
-                if file_path in self.model.thumbnail_cache:
-                    del self.model.thumbnail_cache[file_path]
+                # 按行号降序排列，从后往前删除，避免索引变化问题
+                files_to_delete.sort(key=lambda x: x[0], reverse=True)
+                
+                # 记录删除成功的文件和失败的文件
+                success_count = 0
+                failed_files = []
+                
+                for row, file_path, file_name in files_to_delete:
+                    try:
+                        # 删除文件
+                        os.remove(file_path)
+                        success_count += 1
+                    except Exception as e:
+                        failed_files.append((file_name, str(e)))
+                        
+                # 从模型中批量移除（需要处理索引变化）
+                for row, file_path, file_name in files_to_delete:
+                    # 从模型中移除
+                    self.model.beginRemoveRows(QModelIndex(), row, row)
+                    del self.model.image_paths[row]
+                    self.model.endRemoveRows()
+                    
+                    # 清理缩略图缓存
+                    if file_path in self.model.thumbnail_cache:
+                        del self.model.thumbnail_cache[file_path]
+                        
+                # 显示结果信息
+                if failed_files:
+                    error_msg = f"成功删除 {success_count} 个文件。\n\n以下文件删除失败：\n"
+                    for file_name, error in failed_files[:5]:  # 只显示前5个错误
+                        error_msg += f"{file_name}: {error}\n"
+                    if len(failed_files) > 5:
+                        error_msg += f"... 还有 {len(failed_files) - 5} 个文件删除失败\n"
+                    QMessageBox.warning(self, "删除完成", error_msg)
+                elif len(files_to_delete) > 1:
+                    QMessageBox.information(self, "删除完成", f"成功删除 {success_count} 个文件。")
 
             except Exception as e:
-                QMessageBox.critical(self, "错误", f"删除失败: {str(e)}")
+                QMessageBox.critical(self, "错误", f"删除过程中发生错误: {str(e)}")
 
     def open_in_explorer(self, index):
         """在系统文件管理器中打开文件所在目录并选中文件"""
