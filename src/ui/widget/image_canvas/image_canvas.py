@@ -604,121 +604,6 @@ class ImageCanvas(QGraphicsView):
             print(f"保存标注文件时出错: {e}")
             return False
 
-    def create_toolbar(self):
-        """创建并返回一个工具栏，包含缩放控制按钮、删除按钮和YOLO相关按钮"""
-        toolbar = QToolBar("Image Tools")
-        toolbar.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)
-        toolbar.setIconSize(QSize(24, 24))
-        toolbar.setFixedHeight(self.toolbar_height)  # 应用工具栏高度设置
-
-        # 尝试加载系统主题图标，如果失败则使用文本
-        try:
-            # Zoom In
-            zoom_in_action = QAction("Zoom In", self)
-            zoom_in_action.setIcon(self._get_icon("zoom-in", "+"))
-            zoom_in_action.setToolTip("Zoom In (10%)")
-            zoom_in_action.triggered.connect(self.zoom_in)  # type: ignore
-            toolbar.addAction(zoom_in_action)
-
-            # Zoom Out
-            zoom_out_action = QAction("Zoom Out", self)
-            zoom_out_action.setIcon(self._get_icon("zoom-out", "-"))
-            zoom_out_action.setToolTip("Zoom Out (10%)")
-            zoom_out_action.triggered.connect(self.zoom_out)  # type: ignore
-            toolbar.addAction(zoom_out_action)
-
-            # 1:1
-            reset_zoom_action = QAction("1:1", self)
-            reset_zoom_action.setIcon(self._get_icon("zoom-original", "1:1"))
-            reset_zoom_action.setToolTip("Reset Zoom to Original Size")
-            reset_zoom_action.triggered.connect(self.reset_zoom) # type: ignore
-            toolbar.addAction(reset_zoom_action)
-
-            # Fit Width
-            fit_width_action = QAction("Fit Width", self)
-            fit_width_action.setIcon(self._get_icon("zoom-fit-width", "Fit W"))
-            fit_width_action.setToolTip("Fit image width to window")
-            fit_width_action.triggered.connect(self.fit_to_width)  # type: ignore
-            toolbar.addAction(fit_width_action)
-
-            # Fit Height
-            fit_height_action = QAction("Fit Height", self)
-            fit_height_action.setIcon(self._get_icon("zoom-fit-height", "Fit H"))
-            fit_height_action.setToolTip("Fit image height to window")
-            fit_height_action.triggered.connect(self.fit_to_height)  # type: ignore
-            toolbar.addAction(fit_height_action)
-
-            # 添加分隔线
-            toolbar.addSeparator()
-
-            # YOLO Run Button - 使用QToolButton
-            self.run_tool_button = QToolButton()
-            self.run_tool_button.setText("Run")
-            self.run_tool_button.setIcon(self._get_icon("system-run", "▶"))
-            self.run_tool_button.setToolTip("Run YOLO model")
-            self.run_tool_button.setIconSize(QSize(24, 24))
-            self.run_tool_button.setFixedSize(50, 56)  # 与Config按钮尺寸一致
-            self.run_tool_button.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)  # 文本在图标下方
-            self.run_tool_button.setStyleSheet("""
-                QToolButton {
-                    text-align: center;
-                    padding-top: 2px;
-                    padding-bottom: 2px;
-                }
-                QToolButton::icon {
-                    subcontrol-position: top;
-                    subcontrol-origin: padding;
-                    margin-bottom: 4px;  /* 图标和文字之间的间距 */
-                }
-                QToolButton::text {
-                    padding: 0px;
-                }
-                QToolButton:disabled {
-                    color: #888888;
-                    icon-size: 24px;
-                }
-            """)
-            self.run_tool_button.clicked.connect(self.exec_yolo)  # type: ignore
-            # 根据是否有模型设置初始状态（通过project_info判断）
-            self.run_tool_button.setEnabled(bool(getattr(self.project_info, 'yolo_model_path', None)))
-            toolbar.addWidget(self.run_tool_button)
-
-            # 创建YOLO配置菜单
-            self.create_yolo_menu()
-
-            # YOLO Config Button - 使用QToolButton，与Run按钮风格一致
-            self.config_button = QToolButton()
-            self.config_button.setText("Config")
-            self.config_button.setIcon(self._get_icon("configure", "⋮"))
-            self.config_button.setToolTip("YOLO model configuration")
-            self.config_button.setIconSize(QSize(24, 24))
-            self.config_button.setFixedSize(50, 56)  # 与Run按钮尺寸一致
-            self.config_button.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)  # 文本在图标下方
-            self.config_button.setStyleSheet("""
-                QToolButton {
-                    text-align: center;
-                    padding-top: 2px;
-                    padding-bottom: 2px;
-                }
-                QToolButton::icon {
-                    subcontrol-position: top;
-                    subcontrol-origin: padding;
-                    margin-bottom: 4px;  /* 图标和文字之间的间距 */
-                }
-                QToolButton::text {
-                    padding: 0px;
-                }
-            """)  # 确保文字在图标正下方且垂直居中
-            self.config_button.clicked.connect(self.show_config_menu)  # type: ignore
-            toolbar.addWidget(self.config_button)
-
-        except Exception as e:
-            print(f"创建工具栏时出错: {e}")
-            # 创建纯文本工具栏作为备选方案
-            self._create_text_toolbar(toolbar)
-
-        return toolbar
-
     def create_yolo_menu(self):
         """创建YOLO配置菜单，包含run, edit, delete选项"""
         self.config_menu = QMenu(self)
@@ -873,6 +758,122 @@ class ImageCanvas(QGraphicsView):
             painter.end()
             return QIcon(pixmap)
         return icon
+
+
+    def create_toolbar(self):
+        """创建并返回一个工具栏，包含缩放控制按钮、删除按钮和YOLO相关按钮"""
+        toolbar = QToolBar("Image Tools")
+        toolbar.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)
+        toolbar.setIconSize(QSize(24, 24))
+        toolbar.setFixedHeight(self.toolbar_height)  # 应用工具栏高度设置
+
+        # 尝试加载系统主题图标，如果失败则使用文本
+        try:
+            # Zoom In
+            zoom_in_action = QAction("Zoom In", self)
+            zoom_in_action.setIcon(self._get_icon("zoom-in", "+"))
+            zoom_in_action.setToolTip("Zoom In (10%)")
+            zoom_in_action.triggered.connect(self.zoom_in)  # type: ignore
+            toolbar.addAction(zoom_in_action)
+
+            # Zoom Out
+            zoom_out_action = QAction("Zoom Out", self)
+            zoom_out_action.setIcon(self._get_icon("zoom-out", "-"))
+            zoom_out_action.setToolTip("Zoom Out (10%)")
+            zoom_out_action.triggered.connect(self.zoom_out)  # type: ignore
+            toolbar.addAction(zoom_out_action)
+
+            # 1:1
+            reset_zoom_action = QAction("1:1", self)
+            reset_zoom_action.setIcon(self._get_icon("zoom-original", "1:1"))
+            reset_zoom_action.setToolTip("Reset Zoom to Original Size")
+            reset_zoom_action.triggered.connect(self.reset_zoom) # type: ignore
+            toolbar.addAction(reset_zoom_action)
+
+            # Fit Width
+            fit_width_action = QAction("Fit Width", self)
+            fit_width_action.setIcon(self._get_icon("zoom-fit-width", "Fit W"))
+            fit_width_action.setToolTip("Fit image width to window")
+            fit_width_action.triggered.connect(self.fit_to_width)  # type: ignore
+            toolbar.addAction(fit_width_action)
+
+            # Fit Height
+            fit_height_action = QAction("Fit Height", self)
+            fit_height_action.setIcon(self._get_icon("zoom-fit-height", "Fit H"))
+            fit_height_action.setToolTip("Fit image height to window")
+            fit_height_action.triggered.connect(self.fit_to_height)  # type: ignore
+            toolbar.addAction(fit_height_action)
+
+            # 添加分隔线
+            toolbar.addSeparator()
+
+            # YOLO Run Button - 使用QToolButton
+            self.run_tool_button = QToolButton()
+            self.run_tool_button.setText("Run")
+            self.run_tool_button.setIcon(self._get_icon("system-run", "▶"))
+            self.run_tool_button.setToolTip("Run YOLO model")
+            self.run_tool_button.setIconSize(QSize(24, 24))
+            self.run_tool_button.setFixedSize(50, 56)  # 与Config按钮尺寸一致
+            self.run_tool_button.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)  # 文本在图标下方
+            self.run_tool_button.setStyleSheet("""
+                QToolButton {
+                    text-align: center;
+                    padding-top: 2px;
+                    padding-bottom: 2px;
+                }
+                QToolButton::icon {
+                    subcontrol-position: top;
+                    subcontrol-origin: padding;
+                    margin-bottom: 4px;  /* 图标和文字之间的间距 */
+                }
+                QToolButton::text {
+                    padding: 0px;
+                }
+                QToolButton:disabled {
+                    color: #888888;
+                    icon-size: 24px;
+                }
+            """)
+            self.run_tool_button.clicked.connect(self.exec_yolo)  # type: ignore
+            # 根据是否有模型设置初始状态（通过project_info判断）
+            self.run_tool_button.setEnabled(bool(getattr(self.project_info, 'yolo_model_path', None)))
+            toolbar.addWidget(self.run_tool_button)
+
+            # 创建YOLO配置菜单
+            self.create_yolo_menu()
+
+            # YOLO Config Button - 使用QToolButton，与Run按钮风格一致
+            self.config_button = QToolButton()
+            self.config_button.setText("Config")
+            self.config_button.setIcon(self._get_icon("configure", "⋮"))
+            self.config_button.setToolTip("YOLO model configuration")
+            self.config_button.setIconSize(QSize(24, 24))
+            self.config_button.setFixedSize(50, 56)  # 与Run按钮尺寸一致
+            self.config_button.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)  # 文本在图标下方
+            self.config_button.setStyleSheet("""
+                QToolButton {
+                    text-align: center;
+                    padding-top: 2px;
+                    padding-bottom: 2px;
+                }
+                QToolButton::icon {
+                    subcontrol-position: top;
+                    subcontrol-origin: padding;
+                    margin-bottom: 4px;  /* 图标和文字之间的间距 */
+                }
+                QToolButton::text {
+                    padding: 0px;
+                }
+            """)  # 确保文字在图标正下方且垂直居中
+            self.config_button.clicked.connect(self.show_config_menu)  # type: ignore
+            toolbar.addWidget(self.config_button)
+
+        except Exception as e:
+            print(f"创建工具栏时出错: {e}")
+            # 创建纯文本工具栏作为备选方案
+            self._create_text_toolbar(toolbar)
+
+        return toolbar
 
     def _create_text_toolbar(self, toolbar):
         """创建纯文本工具栏作为备选方案"""
