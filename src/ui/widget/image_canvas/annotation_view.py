@@ -600,15 +600,8 @@ class AnnotationView(QGraphicsRectItem):
             return
             # 只有在选中时才启用移动功能
         if selected:
-            # 强制取消其他AnnotationView的选中状态
-            scene = self.scene()
-            if scene:
-                for item in scene.items():
-                    if isinstance(item, AnnotationView) and item != self and hasattr(item, 'set_selected_flag_internal'):
-                        item.set_selected_flag_internal(False)
-                self.setZValue(len(scene.items()) * 10)
+            self.setZValue(1000)  # 将选中的项置于顶层
         self.set_selected_flag_internal(selected)
-        self.reset_z_values()
         self.update()
 
     def clicked_with_shift(self):

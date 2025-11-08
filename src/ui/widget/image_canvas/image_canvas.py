@@ -419,6 +419,9 @@ class ImageCanvas(QGraphicsView):
                     isinstance(clicked_item.parentItem(), AnnotationView)
             )
 
+            # 检查是否按住Shift键
+            shift_pressed = event.modifiers() & Qt.ShiftModifier
+
             # 当设置了当前类别时开始绘制新标注
             if not is_annotation and self.current_category is not None:
                 self.start_point = self.mapToScene(event.pos())
@@ -430,6 +433,14 @@ class ImageCanvas(QGraphicsView):
                     QPen(Qt.red, 2, Qt.DashLine)
                 )
                 self.temp_rect_item.setZValue(10)  # 确保在最上层显示
+                return  # 拦截事件，避免默认处理
+
+            # 如果点击在标注上且按住Shift键，切换该标注的选中状态
+            if is_annotation and shift_pressed:
+                if isinstance(clicked_item, AnnotationView):
+                    clicked_item.clicked_with_shift()
+                elif clicked_item.parentItem() and isinstance(clicked_item.parentItem(), AnnotationView):
+                    clicked_item.parentItem().clicked_with_shift()
                 return  # 拦截事件，避免默认处理
 
         super().mousePressEvent(event)  # 继续默认事件处理
@@ -469,7 +480,7 @@ class ImageCanvas(QGraphicsView):
                 item.select_annotation_view()
                 created_new_annotation = True
 
-        # 如果没有创建新的标注，则清除选择
+        # 如果没有创建新的标注，则处理选择逻辑
         if not created_new_annotation:
             # 检查是否点击在现有标注或其锚点上
             clicked_item = self.itemAt(event.pos())
@@ -478,10 +489,8 @@ class ImageCanvas(QGraphicsView):
                     isinstance(clicked_item.parentItem(), AnnotationView)
             )
             
-            # 点击空白区域时清除选择
-            if not is_annotation:
-                # self.unselect_all_annotations()
-                        
+            # 点击空白区域且未按住Shift键时清除选择
+            if not is_annotation and not (event.modifiers() & Qt.ShiftModifier):
                 # 取消annotation_list中的选中状态
                 if self.annotation_list and self.annotation_list.selectionModel():
                     self.annotation_list.selectionModel().clearSelection()
