@@ -387,6 +387,8 @@ class ImageCanvas(QGraphicsView):
 
             # 检查是否按住Shift键
             shift_pressed = event.modifiers() & Qt.ShiftModifier
+            if not shift_pressed:
+                self.unselect_all_annotations()
 
             # 当设置了当前类别时开始绘制新标注
             if not is_annotation and self.current_category is not None:
@@ -410,6 +412,8 @@ class ImageCanvas(QGraphicsView):
                     if hasattr(_parent_item, 'clicked_with_shift'):
                         _parent_item.clicked_with_shift()
                 return  # 拦截事件，避免默认处理
+
+
 
         super().mousePressEvent(event)  # 继续默认事件处理
 
