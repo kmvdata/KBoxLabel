@@ -274,14 +274,14 @@ class AnnotationList(QListView):
         self.setModel(self.proxy_model)
 
         # 设置视图行为 - 移除双击编辑触发
-        self.setEditTriggers(QAbstractItemView.EditKeyPressed)
-        self.setSelectionBehavior(QAbstractItemView.SelectItems)
-        self.setSelectionMode(QAbstractItemView.SingleSelection)
+        self.setEditTriggers(QAbstractItemView.EditTrigger.EditKeyPressed)
+        self.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectItems)
+        self.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.setDragEnabled(True)
-        self.setDragDropMode(QAbstractItemView.DragOnly)
-        self.setDefaultDropAction(Qt.CopyAction)
-        self.setFocusPolicy(Qt.StrongFocus)
-        self.setAttribute(Qt.WA_AlwaysShowToolTips)
+        self.setDragDropMode(QAbstractItemView.DragDropMode.DragOnly)
+        self.setDefaultDropAction(Qt.DropAction.CopyAction)
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.setAttribute(Qt.WidgetAttribute.WA_AlwaysShowToolTips)
 
         # 设置委托
         self.delegate = EditableAnnotationDelegate(row_height, self)
@@ -581,7 +581,7 @@ class AnnotationList(QListView):
         if index.isValid():
             self.right_click_index = index
             self.selectionModel().clearSelection()
-            self.selectionModel().select(index, QItemSelectionModel.ClearAndSelect)
+            self.selectionModel().select(index, QItemSelectionModel.SelectionFlag.ClearAndSelect)
         else:
             self.right_click_index = None
 
@@ -590,26 +590,26 @@ class AnnotationList(QListView):
 
         # 添加菜单项
         add_action = QAction("新增", self)
-        add_action.triggered.connect(self._context_add)
+        add_action.triggered.connect(self._context_add)  # type:ignore
 
         rename_action = QAction("重命名", self)
-        rename_action.triggered.connect(self._handle_rename)
+        rename_action.triggered.connect(self._handle_rename) # type: ignore
         rename_action.setEnabled(index.isValid())  # 只有选中项时可用
 
         modify_id_action = QAction("修改ID", self)
-        modify_id_action.triggered.connect(self._handle_modify_id)
+        modify_id_action.triggered.connect(self._handle_modify_id) # type:ignore
         modify_id_action.setEnabled(index.isValid())  # 只有选中项时可用
 
         delete_action = QAction("删除", self)
-        delete_action.triggered.connect(self._handle_delete)
+        delete_action.triggered.connect(self._handle_delete)  # type:ignore
         delete_action.setEnabled(index.isValid())  # 只有选中项时可用
 
         # 添加排序相关菜单项
         menu.addSeparator()
         sort_name_action = QAction("按名称排序", self)
-        sort_name_action.triggered.connect(self._sort_by_name)
+        sort_name_action.triggered.connect(self._sort_by_name)  # type:ignore
         sort_id_action = QAction("按ID排序", self)
-        sort_id_action.triggered.connect(self._sort_by_id)
+        sort_id_action.triggered.connect(self._sort_by_id)  # type:ignore
 
         menu.addAction(sort_name_action)
         menu.addAction(sort_id_action)
@@ -717,7 +717,7 @@ class AnnotationList(QListView):
                 proxy_index = self.proxy_model.mapFromSource(self.source_model.index(i, 0))
                 self.selectionModel().select(
                     proxy_index,
-                    QItemSelectionModel.ClearAndSelect
+                    QItemSelectionModel.SelectionFlag.ClearAndSelect
                 )
                 self.scrollTo(proxy_index)
                 return True
@@ -730,7 +730,7 @@ class AnnotationList(QListView):
                 proxy_index = self.proxy_model.mapFromSource(self.source_model.index(i, 0))
                 self.selectionModel().select(
                     proxy_index,
-                    QItemSelectionModel.ClearAndSelect
+                    QItemSelectionModel.SelectionFlag.ClearAndSelect
                 )
                 self.scrollTo(proxy_index)
                 return True
