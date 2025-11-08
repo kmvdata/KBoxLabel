@@ -43,7 +43,7 @@ class AnnotationView(QGraphicsRectItem):
         self.setAcceptDrops(True)  # 启用拖放接受
 
         # 初始状态下不设置ItemIsMovable标志，只在选中时设置
-        self.setFlags(QGraphicsItem.ItemIsSelectable | QGraphicsItem.ItemIsFocusable)
+        self.setFlags(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable | QGraphicsItem.GraphicsItemFlag.ItemIsFocusable)
         self.setAcceptHoverEvents(True)
 
         # 控制点
@@ -67,7 +67,7 @@ class AnnotationView(QGraphicsRectItem):
         # 添加用于控制锚点显示的定时器
         self.hide_handles_timer = QTimer()
         self.hide_handles_timer.setSingleShot(True)
-        self.hide_handles_timer.timeout.connect(self._show_handles_after_delay)
+        self.hide_handles_timer.timeout.connect(self._show_handles_after_delay) # type: ignore
         self.handles_visible = True  # 默认显示锚点
         
         # 标记操作类型
@@ -145,7 +145,7 @@ class AnnotationView(QGraphicsRectItem):
         # 保存原始状态并临时移除Selected状态
         original_state = option.state
         if option.state & QStyle.State_Selected:
-            option.state = option.state & ~QStyle.State_Selected
+            option.state = QStyle.StateFlag(option.state & ~QStyle.State_Selected)
 
         # 保存画家状态
         painter.save()
@@ -190,7 +190,8 @@ class AnnotationView(QGraphicsRectItem):
 
         # 如果选中且锚点可见，绘制控制点
         if self.isSelected() and self.handles_visible:
-            painter.setRenderHint(QPainter.Antialiasing, True)
+            # 启用抗锯齿
+            painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
             painter.setPen(QPen(Qt.black, 1, Qt.SolidLine))
             painter.setBrush(QBrush(Qt.white))
 
@@ -200,7 +201,7 @@ class AnnotationView(QGraphicsRectItem):
     def hoverMoveEvent(self, event):
         """处理鼠标悬停事件，动态改变光标形状"""
         if not self.isSelected():
-            self.setCursor(Qt.ArrowCursor)
+            self.setCursor(Qt.CursorShape.ArrowCursor)
             return
 
         handle = self.handle_at(event.pos())
@@ -210,21 +211,21 @@ class AnnotationView(QGraphicsRectItem):
         # 设置控制点光标
         if handle != self.NO_HANDLE:
             if handle in [self.TOP_MIDDLE, self.BOTTOM_MIDDLE]:
-                self.setCursor(Qt.SizeVerCursor)  # type: ignore
+                self.setCursor(Qt.CursorShape.SizeVerCursor)
             elif handle in [self.LEFT_MIDDLE, self.RIGHT_MIDDLE]:
-                self.setCursor(Qt.SizeHorCursor)  # type: ignore
+                self.setCursor(Qt.CursorShape.SizeHorCursor)
             elif handle in [self.TOP_LEFT, self.BOTTOM_RIGHT]:
-                self.setCursor(Qt.SizeFDiagCursor)  # type: ignore
+                self.setCursor(Qt.CursorShape.SizeFDiagCursor)
             elif handle in [self.TOP_RIGHT, self.BOTTOM_LEFT]:
-                self.setCursor(Qt.SizeBDiagCursor)  # type: ignore
+                self.setCursor(Qt.CursorShape.SizeBDiagCursor)
         elif rect.contains(pos):
-            self.setCursor(Qt.SizeAllCursor)  # type: ignore
+            self.setCursor(Qt.CursorShape.SizeAllCursor)
         else:
-            self.setCursor(Qt.ArrowCursor)   # type: ignore
+            self.setCursor(Qt.CursorShape.ArrowCursor)
 
     def hoverLeaveEvent(self, event):
         """鼠标离开时恢复默认光标"""
-        self.setCursor(Qt.ArrowCursor)
+        self.setCursor(Qt.CursorShape.ArrowCursor)
 
     def mousePressEvent(self, event):
         """鼠标按下事件处理"""
@@ -586,7 +587,7 @@ class AnnotationView(QGraphicsRectItem):
         if selected:
             self.setFlags(self.flags() | QGraphicsItem.ItemIsMovable)  # type: ignore
             # 确保新创建的标注获得键盘焦点，以便能响应键盘事件
-            self.setFocus(Qt.OtherFocusReason)
+            self.setFocus(Qt.FocusReason.OtherFocusReason)
         else:
             self.setFlags(self.flags() & ~QGraphicsItem.ItemIsMovable)  # type: ignore
             # 取消键盘焦点
