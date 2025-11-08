@@ -708,10 +708,10 @@ class ProjectWindow(QMainWindow):
         if self.left_status:
             self.left_status.setText(text)
 
-    def on_image_list_selection_changed(self, total_count, current_index):
+    def on_image_list_selection_changed(self, total_count, selected_count):
         """处理图片列表选择变化，更新状态栏"""
-        if current_index > 0:
-            status_text = f"共加载 {total_count} 张图片，当前选中第 {current_index} 张"
+        if selected_count > 0:
+            status_text = f"共加载 {total_count} 张图片，当前选中 {selected_count} 张"
         else:
             status_text = f"共加载 {total_count} 张图片，未选中任何图片"
         self.statusBar().showMessage(status_text)

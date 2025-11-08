@@ -4,11 +4,11 @@ import sys
 from pathlib import Path
 
 from PyQt5.QtCore import (Qt, QSize, QThreadPool, QRunnable, pyqtSignal,
-                          QAbstractListModel, QModelIndex, QObject, QThread)
-from PyQt5.QtGui import (QPixmap, QIcon, QImage, QPainter, QFontMetrics)
+                          QAbstractListModel, QModelIndex, QObject, QThread, QItemSelection, QItemSelectionModel)
+from PyQt5.QtGui import (QPixmap, QIcon, QImage, QPainter, QFontMetrics, QKeySequence)
 from PyQt5.QtWidgets import (QListView, QStyledItemDelegate, QStyle,
                              QMenu, QInputDialog, QMessageBox, QDialog, QVBoxLayout,
-                             QLabel, QPushButton, QProgressBar)
+                             QLabel, QPushButton, QProgressBar, QApplication)
 
 from src.models.dto.ref_project_info import RefProjectInfo
 
@@ -298,10 +298,11 @@ class ImageListView(QListView):
     def __init__(self, project_info: RefProjectInfo):
         super().__init__()
         self.project_info = project_info
-        self.setSelectionMode(QListView.SelectionMode.SingleSelection)
+        self.setSelectionMode(QListView.SelectionMode.ExtendedSelection)  # 改为扩展选择模式
         self.setVerticalScrollMode(QListView.ScrollMode.ScrollPerPixel)
         self.setResizeMode(QListView.ResizeMode.Adjust)
         self.setUniformItemSizes(True)  # 优化性能
+        self.last_selected_row = -1  # 记录上次选中的行
 
         # 创建模型和委托（使用默认行高56px）
         self.model = ImageListModel(self, row_height=56)
@@ -312,6 +313,7 @@ class ImageListView(QListView):
         # 连接信号
         self.doubleClicked.connect(self.handle_item_clicked)  # type: ignore
         self.selectionModel().selectionChanged.connect(self.on_selection_changed)  # type: ignore
+        self.clicked.connect(self.on_item_clicked)  # type: ignore
 
     def set_row_height(self, height):
         """统一设置行高（更新模型和委托）"""
@@ -326,21 +328,79 @@ class ImageListView(QListView):
         """从项目路径加载图片"""
         self.model.load_images_from_path(project_path)
 
+    def on_item_clicked(self, index):
+        """处理项点击事件，支持Shift键多选"""
+        if not index.isValid():
+            return
+            
+        # 获取当前选中的所有索引
+        selected_indexes = self.selectionModel().selectedIndexes()
+        if selected_indexes:
+            # 加载最新选中的图片
+            latest_selected_index = selected_indexes[-1]
+            file_path = self.model.data(latest_selected_index, Qt.UserRole)
+            if file_path:
+                self.sig_image_clicked.emit(file_path)  # type: ignore
+
+    def mousePressEvent(self, event):
+        """重写鼠标按下事件以处理Shift键多选"""
+        if event.button() == Qt.LeftButton:
+            index = self.indexAt(event.pos())
+            if index.isValid():
+                modifiers = QApplication.keyboardModifiers()
+                if modifiers == Qt.ShiftModifier and self.last_selected_row != -1:
+                    current_row = index.row()
+                    selection_model = self.selectionModel()
+                    selection_model.select(
+                        QItemSelection(self.model.index(min(self.last_selected_row, current_row), 0),
+                                      self.model.index(max(self.last_selected_row, current_row), 0)),
+                        QItemSelectionModel.SelectionFlag.SelectCurrent
+                    )
+                    # 更新最后选中的行
+                    self.last_selected_row = current_row
+                    
+                    # 加载最新选中的图片
+                    file_path = self.model.data(index, Qt.UserRole)
+                    if file_path:
+                        self.sig_image_clicked.emit(file_path)  # type: ignore
+                    
+                    return
+        
+        # 更新最后选中的行
+        index = self.indexAt(event.pos())
+        if index.isValid():
+            self.last_selected_row = index.row()
+            
+        super().mousePressEvent(event)
+
     def on_selection_changed(self, selected, deselected):
         """处理选择变化事件"""
         # 获取当前选中索引
-        indexes = selected.indexes()
-        current_index = indexes[0].row() + 1 if indexes else 0
+        indexes = self.selectionModel().selectedIndexes()
+        selected_count = len(indexes)
         
         # 获取总图片数
         total_count = self.model.rowCount()
         
         # 发送信号
-        self.sig_selection_changed.emit(total_count, current_index)
+        self.sig_selection_changed.emit(total_count, selected_count)
+        
+        # 如果有选中项，更新最后选中的行
+        if indexes:
+            self.last_selected_row = indexes[-1].row()
+            
+            # 加载最新选中的图片
+            latest_selected_index = indexes[-1]
+            file_path = self.model.data(latest_selected_index, Qt.UserRole)
+            if file_path:
+                self.sig_image_clicked.emit(file_path)  # type: ignore
 
     def handle_item_clicked(self, index):
         """处理项点击事件"""
         if index.isValid():
+            # 更新最后选中的行
+            self.last_selected_row = index.row()
+            
             file_path = self.model.data(index, Qt.UserRole)
             if file_path:
                 self.sig_image_clicked.emit(file_path)  # type: ignore
