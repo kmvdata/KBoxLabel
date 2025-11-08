@@ -1,17 +1,15 @@
-import json
 from pathlib import Path
 from typing import Optional, List
 
 from PyQt5.QtGui import QColor
 
+from src.common.god.ksnowflake import KSnowflake
 from src.common.god.sqlite_db import SqliteDB
-from src.core.ksettings import KSettings
 from src.core.yolo_executor import YOLOExecutor
 from src.models.dto.annotation_category import AnnotationCategory
 from src.models.sql import gen_sql_tables, KoloItem
 from src.models.sql.annotation_category import AnnotationCategory as SQLAnnotationCategory
 from src.models.sql.kv_config import KVConfig
-from src.common.god.ksnowflake import KSnowflake
 
 
 class RefProjectInfo:
