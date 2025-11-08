@@ -256,8 +256,6 @@ class ImageCanvas(QGraphicsView):
         except Exception as e:
             print(f"从数据库加载标注信息错误: {e}")
 
-        # 打印所有标注坐标
-        self.print_all_annotation_coordinates()
 
     def load_annotation_view_from_kilo_item(self, kolo_item: KoloItem):
         """根据KoloItem对象在画布上添加对应的标注"""
@@ -600,8 +598,6 @@ class ImageCanvas(QGraphicsView):
 
             # 执行事务
             self.project_info.sqlite_db.execute_in_transaction(transaction_func)
-            # 打印所有标注坐标
-            self.print_all_annotation_coordinates()
             
             return True
         except Exception as e:
@@ -1197,43 +1193,3 @@ class ImageCanvas(QGraphicsView):
             print("缓存的YOLO模型加载成功")
         else:
             print(f"缓存的YOLO模型加载失败: {error_message}")
-
-    def print_all_annotation_coordinates(self):
-        """打印当前画布上所有标注视图的坐标值"""
-        if not self.current_image_path or self.image_item is None:
-            print("没有加载图像")
-            return
-
-        # 获取图像尺寸
-        img_width = self.image_item.pixmap().width()
-        img_height = self.image_item.pixmap().height()
-
-        print(f"图像尺寸: {img_width} x {img_height}")
-        print("标注坐标信息 (x_center, y_center, width, height):")
-
-        # 收集所有AnnotationView并按class_id排序
-        annotations = []
-        for item in self.scene.items():
-            if isinstance(item, AnnotationView):
-                annotations.append(item)
-
-        # 按class_name排序
-        annotations.sort(key=lambda _item: _item.category.class_name)
-
-        for i, item in enumerate(annotations):
-            # 获取当前在场景中的绝对位置和大小
-            rect_to_log = item.sceneBoundingRect()
-            x = rect_to_log.x()
-            y = rect_to_log.y()
-            width = rect_to_log.width()
-            height = rect_to_log.height()
-
-            # 计算归一化坐标
-            x_center = (x + width / 2) / img_width
-            y_center = (y + height / 2) / img_height
-            norm_width = width / img_width
-            norm_height = height / img_height
-
-            print(f"  {i+1}. {item.category.class_name}: "
-                  f"x_center={x_center:.19f}, y_center={y_center:.19f}, "
-                  f"width={norm_width:.19f}, height={norm_height:.19f}")
