@@ -59,28 +59,34 @@ class RefProjectInfo:
 
     def load_yolo_model(self, model_path: Optional[Path] = None) -> bool:
         """加载YOLO模型并在成功后缓存路径"""
-        try:
-            # 如果没有提供model_path，则从数据库获取
-            if model_path is None:
-                # 创建数据库会话
-                session = self.sqlite_db.db_session()
-                try:
-                    # 查询数据库中的模型路径
-                    kv_record = session.query(KVConfig).filter(KVConfig.key == self._yolo_model_key).first()
-                    if kv_record and kv_record.value:
-                        model_path = Path(kv_record.value)
-                    else:
-                        return False  # 数据库中没有模型路径
-                finally:
-                    session.close()
+        # 如果没有提供model_path，则从数据库获取
+        is_succeed = False
+        if model_path is None:
+            # 创建数据库会话
+            session = self.sqlite_db.db_session()
+            try:
+                # 查询数据库中的模型路径
+                kv_record = session.query(KVConfig).filter(KVConfig.key == self._yolo_model_key).first()
+                if kv_record and kv_record.value:
+                    model_path = Path(kv_record.value)
+                else:
+                    is_succeed = False  # 数据库中没有模型路径
+            except Exception as e:
+                print(f"加载数据库中的YOLO模型路径失败: {str(e)}")
+                is_succeed = False
+            finally:
+                session.close()
+                return is_succeed
+        
+        if model_path is None:
+            return False
 
+        try:
             # 尝试加载模型
             self.yolo_executor.load_yolo(model_path)
             is_loaded = self.yolo_executor.is_model_loaded()
-
-            if model_path is None or not is_loaded:
-                return is_loaded
-
+            
+            # 更新数据库中的模型路径
             session = self.sqlite_db.db_session()
             try:
                 # 查询是否已有记录
@@ -107,10 +113,11 @@ class RefProjectInfo:
             except Exception as e:
                 session.rollback()
                 print(f"更新数据库中的YOLO模型路径失败: {str(e)}")
+                is_loaded = False
             finally:
                 session.close()
+                return is_loaded
 
-            return is_loaded
         except Exception as e:
             # 可以根据实际需求修改异常处理方式
             print(f"加载YOLO模型失败: {str(e)}")
