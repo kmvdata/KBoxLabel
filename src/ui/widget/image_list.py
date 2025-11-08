@@ -237,7 +237,7 @@ class ImageListItemDelegate(QStyledItemDelegate):
         # 计算文本显示区域
         text_width = text_rect.width() - 4
         metrics = painter.fontMetrics()
-        elided_text = metrics.elidedText(file_name, Qt.ElideRight, text_width)
+        elided_text = metrics.elidedText(file_name, Qt.TextElideMode.ElideRight, text_width)
 
         painter.drawText(text_rect, Qt.AlignLeft | Qt.AlignVCenter, elided_text)
 
@@ -277,12 +277,12 @@ class YoloWorker(QThread):
             else:
                 msg = "No objects found."
 
-            self.finished.emit(True, msg, self.file_path)
+            self.finished.emit(True, msg, self.file_path) # type: ignore
 
         except Exception as e:
             if not self.is_canceled:
                 error_msg = f"{str(e)}"
-                self.error.emit(error_msg, self.file_path)
+                self.error.emit(error_msg, self.file_path)  # type: ignore
 
     def cancel(self):
         """取消任务"""
@@ -298,9 +298,9 @@ class ImageListView(QListView):
     def __init__(self, project_info: RefProjectInfo):
         super().__init__()
         self.project_info = project_info
-        self.setSelectionMode(QListView.SingleSelection)
-        self.setVerticalScrollMode(QListView.ScrollPerPixel)
-        self.setResizeMode(QListView.Adjust)
+        self.setSelectionMode(QListView.SelectionMode.SingleSelection)
+        self.setVerticalScrollMode(QListView.ScrollMode.ScrollPerPixel)
+        self.setResizeMode(QListView.ResizeMode.Adjust)
         self.setUniformItemSizes(True)  # 优化性能
 
         # 创建模型和委托（使用默认行高56px）

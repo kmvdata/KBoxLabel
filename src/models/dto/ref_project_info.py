@@ -139,26 +139,6 @@ class RefProjectInfo:
 
     def exec_yolo(self, img_path: Path)-> list[KoloItem]:
         results = self.yolo_executor.exec_yolo(img_path)
-        # 生成与图片同名的.kolo文件路径
-        kolo_path = img_path.with_suffix('.kolo')
-
-        try:
-            # 写入检测结果到.kolo文件
-            with open(kolo_path, 'w', encoding='utf-8') as f:
-                for result in results:
-                    # 确保结果是字符串格式（根据实际结果类型调整）
-                    line = str(result) if isinstance(result, (list, tuple)) else result
-                    f.write(f"{line}\n")
-
-            # 记录成功日志
-            print(f"检测结果已成功保存到.kolo文件: {kolo_path}")
-
-        except Exception as e:
-            # 记录错误日志并抛出异常
-            error_msg = f"保存.kolo文件失败: {str(e)}"
-            print(error_msg)
-            raise Exception(error_msg)
-
         return results
 
     @property
