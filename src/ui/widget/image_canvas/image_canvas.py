@@ -413,8 +413,6 @@ class ImageCanvas(QGraphicsView):
                         _parent_item.clicked_with_shift()
                 return  # 拦截事件，避免默认处理
 
-
-
         super().mousePressEvent(event)  # 继续默认事件处理
 
 
