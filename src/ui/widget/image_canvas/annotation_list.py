@@ -2,7 +2,7 @@
 import json
 from typing import Tuple
 
-from PyQt5.QtCore import pyqtSignal, Qt, QSize, QRect, QItemSelectionModel, QMimeData, \
+from PyQt5.QtCore import Qt, QSize, QRect, QItemSelectionModel, QMimeData, \
     QSortFilterProxyModel
 from PyQt5.QtGui import QStandardItemModel, QStandardItem, QPen, QDrag
 from PyQt5.QtWidgets import QLineEdit, QSpinBox, QListView, QStyledItemDelegate, QAbstractItemView, \
@@ -183,7 +183,7 @@ class EditableAnnotationDelegate(AnnotationDelegate):
                     from PyQt5.QtWidgets import QMessageBox
                     view = self.parent()
                     if view is not None:
-                        QMessageBox.warning(view, "重命名失败", f"名称 '{category_name}' 已存在，请使用其他名称。")
+                        QMessageBox.warning(QWidget(view), "重命名失败", f"名称 '{category_name}' 已存在，请使用其他名称。")
                     # 名称重复，不保存更改
                     pass
 
@@ -428,7 +428,7 @@ class AnnotationList(QListView):
 
         if not self.selectionModel().isSelected(clicked_index):
             self.selectionModel().clearSelection()
-            self.selectionModel().select(clicked_index, QItemSelectionModel.ClearAndSelect)
+            self.selectionModel().select(clicked_index, QItemSelectionModel.SelectionFlag.ClearAndSelect)
 
     def _handle_selection_change(self, selected, deselected):
         if selected.indexes():
@@ -513,7 +513,7 @@ class AnnotationList(QListView):
         # 选中新项
         self.selectionModel().select(
             proxy_index,
-            QItemSelectionModel.ClearAndSelect
+            QItemSelectionModel.SelectionFlag.ClearAndSelect
         )
 
         self.save_categories()
@@ -712,21 +712,16 @@ class AnnotationList(QListView):
 
     def select_category_by_id(self, class_id: int):
         """根据类别ID选中对应的列表项"""
-        for i, category in enumerate(self.project_info.categories):
-            if category.class_id == class_id:
-                proxy_index = self.proxy_model.mapFromSource(self.source_model.index(i, 0))
-                self.selectionModel().select(
-                    proxy_index,
-                    QItemSelectionModel.SelectionFlag.ClearAndSelect
-                )
-                self.scrollTo(proxy_index)
-                return True
-        return False
+        return self._select_category_by_attr('class_id', class_id)
 
     def select_category_by_name(self, class_name: str):
         """根据类别名称选中对应的列表项"""
+        return self._select_category_by_attr('class_name', class_name)
+    
+    def _select_category_by_attr(self, attr_name: str, attr_value):
+        """根据指定属性名和值选中对应的列表项"""
         for i, category in enumerate(self.project_info.categories):
-            if category.class_name == class_name:
+            if getattr(category, attr_name) == attr_value:
                 proxy_index = self.proxy_model.mapFromSource(self.source_model.index(i, 0))
                 self.selectionModel().select(
                     proxy_index,
