@@ -246,7 +246,7 @@ class AnnotationView(QGraphicsRectItem):
             self.clicked_with_shift()
         else:
             self.select_annotation_view()  # 选中当前项
-            self.setFocus(Qt.MouseFocusReason)  # 设置焦点以接收键盘事件
+            self.setFocus(Qt.FocusReason.MouseFocusReason)  # 设置焦点以接收键盘事件
         # 标记为鼠标操作
         self.mouse_operation_in_progress = True
         # 只更新当前项，其他项会在set_selected中更新
