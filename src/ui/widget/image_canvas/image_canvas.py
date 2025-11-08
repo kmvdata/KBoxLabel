@@ -4,7 +4,7 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Optional
 
-from PyQt5.QtCore import Qt, QRectF, QPointF, QEvent, QSize
+from PyQt5.QtCore import Qt, QRectF, QPointF, QSize
 from PyQt5.QtGui import QPixmap, QPen, QColor, QPainter, QBrush, QKeySequence, QFontMetrics, QIcon
 from PyQt5.QtWidgets import (QGraphicsView, QGraphicsScene, QGraphicsPixmapItem, QAction,
                              QToolBar, QSizePolicy, QMenu, QFileDialog, QMessageBox, QToolButton, QGraphicsItem)
@@ -115,20 +115,20 @@ class ImageCanvas(QGraphicsView):
             ])
 
         self.delete_action.setShortcuts(delete_shortcuts)
-        self.delete_action.triggered.connect(self.delete_selected_items)
+        self.delete_action.triggered.connect(self.delete_selected_items) # type: ignore
         self.addAction(self.delete_action)
 
         # 保存快捷键
         self.save_action = QAction("Save Annotations", self)
         self.save_action.setShortcut(QKeySequence.Save)
-        self.save_action.triggered.connect(self.save_annotations)
+        self.save_action.triggered.connect(self.save_annotations)  # type: ignore
         self.addAction(self.save_action)
 
         # 连接场景的选择变化信号
-        self.scene.selectionChanged.connect(self.on_selection_changed)
+        self.scene.selectionChanged.connect(self.on_selection_changed) # type: ignore
 
         # 添加上下文菜单策略
-        self.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(self.show_context_menu)
 
         # 改为使用QTimer延迟调用
@@ -302,7 +302,7 @@ class ImageCanvas(QGraphicsView):
             # 创建并添加AnnotationView
             item = AnnotationView(x1, y1, rect_width, rect_height, category, self)
             self.scene.addItem(item)
-            item.setFlags(item.flags() & ~QGraphicsItem.ItemIsMovable)
+            item.setFlags(item.flags() & ~QGraphicsItem.GraphicsItemFlag.ItemIsMovable)
             item.selected = False
             item.setSelected(False)
             return True
@@ -377,38 +377,6 @@ class ImageCanvas(QGraphicsView):
             # 直接缩放
             self.scale(scale_factor, scale_factor)
 
-    def event(self, event: QEvent):
-        """处理事件，包括手势事件"""
-        if event.type() == QEvent.Gesture:
-            return self.gestureEvent(event)
-        return super().event(event)
-
-    def gestureEvent(self, event: QEvent):
-        """处理手势事件（触摸板捏合缩放）"""
-        pinch = event.gesture(Qt.PinchGesture)
-        if pinch:
-            if pinch.state() == Qt.GestureStarted:
-                # 记录初始状态
-                self.base_scale = self.current_scale
-                self.last_scale_factor = 1.0
-                self.gesture_start_scale = self.current_scale
-            elif pinch.state() == Qt.GestureUpdated:
-                # 计算增量缩放因子（相对于上一次更新）
-                current_scale_factor = pinch.scaleFactor()
-                scale_factor = current_scale_factor / self.last_scale_factor
-                self.last_scale_factor = current_scale_factor
-
-                # 获取手势中心点（转换为视图坐标）
-                center_point = pinch.centerPoint().toPoint()
-
-                # 执行缩放
-                self.zoom(scale_factor, center_point)
-            elif pinch.state() == Qt.GestureFinished:
-                # 重置手势状态
-                self.last_scale_factor = 1.0
-            return True
-        return False
-
     def mousePressEvent(self, event):
         self.viewport().update()
         if event.button() == Qt.LeftButton:
@@ -440,7 +408,9 @@ class ImageCanvas(QGraphicsView):
                 if isinstance(clicked_item, AnnotationView):
                     clicked_item.clicked_with_shift()
                 elif clicked_item.parentItem() and isinstance(clicked_item.parentItem(), AnnotationView):
-                    clicked_item.parentItem().clicked_with_shift()
+                    _parent_item = clicked_item.parentItem()
+                    if hasattr(_parent_item, 'clicked_with_shift'):
+                        _parent_item.clicked_with_shift()
                 return  # 拦截事件，避免默认处理
 
         super().mousePressEvent(event)  # 继续默认事件处理
@@ -469,7 +439,7 @@ class ImageCanvas(QGraphicsView):
             if rect.width() >= 10 and rect.height() >= 10:
                 # 创建新AnnotationView并设置当前类别
                 item = AnnotationView(
-                    rect.x(), rect.y(), rect.width(), rect.height(),
+                    Decimal(rect.x()), Decimal(rect.y()), Decimal(rect.width()), Decimal(rect.height()),
                     self.current_category,
                     self
                 )
@@ -651,35 +621,35 @@ class ImageCanvas(QGraphicsView):
             zoom_in_action = QAction("Zoom In", self)
             zoom_in_action.setIcon(self._get_icon("zoom-in", "+"))
             zoom_in_action.setToolTip("Zoom In (10%)")
-            zoom_in_action.triggered.connect(self.zoom_in)
+            zoom_in_action.triggered.connect(self.zoom_in)  # type: ignore
             toolbar.addAction(zoom_in_action)
 
             # Zoom Out
             zoom_out_action = QAction("Zoom Out", self)
             zoom_out_action.setIcon(self._get_icon("zoom-out", "-"))
             zoom_out_action.setToolTip("Zoom Out (10%)")
-            zoom_out_action.triggered.connect(self.zoom_out)
+            zoom_out_action.triggered.connect(self.zoom_out)  # type: ignore
             toolbar.addAction(zoom_out_action)
 
             # 1:1
             reset_zoom_action = QAction("1:1", self)
             reset_zoom_action.setIcon(self._get_icon("zoom-original", "1:1"))
             reset_zoom_action.setToolTip("Reset Zoom to Original Size")
-            reset_zoom_action.triggered.connect(self.reset_zoom)
+            reset_zoom_action.triggered.connect(self.reset_zoom) # type: ignore
             toolbar.addAction(reset_zoom_action)
 
             # Fit Width
             fit_width_action = QAction("Fit Width", self)
             fit_width_action.setIcon(self._get_icon("zoom-fit-width", "Fit W"))
             fit_width_action.setToolTip("Fit image width to window")
-            fit_width_action.triggered.connect(self.fit_to_width)
+            fit_width_action.triggered.connect(self.fit_to_width)  # type: ignore
             toolbar.addAction(fit_width_action)
 
             # Fit Height
             fit_height_action = QAction("Fit Height", self)
             fit_height_action.setIcon(self._get_icon("zoom-fit-height", "Fit H"))
             fit_height_action.setToolTip("Fit image height to window")
-            fit_height_action.triggered.connect(self.fit_to_height)
+            fit_height_action.triggered.connect(self.fit_to_height)  # type: ignore
             toolbar.addAction(fit_height_action)
 
             # 添加分隔线
@@ -712,7 +682,7 @@ class ImageCanvas(QGraphicsView):
                     icon-size: 24px;
                 }
             """)
-            self.run_tool_button.clicked.connect(self.exec_yolo)
+            self.run_tool_button.clicked.connect(self.exec_yolo)  # type: ignore
             # 根据是否有模型设置初始状态（通过project_info判断）
             self.run_tool_button.setEnabled(bool(getattr(self.project_info, 'yolo_model_path', None)))
             toolbar.addWidget(self.run_tool_button)
@@ -743,7 +713,7 @@ class ImageCanvas(QGraphicsView):
                     padding: 0px;
                 }
             """)  # 确保文字在图标正下方且垂直居中
-            self.config_button.clicked.connect(self.show_config_menu)
+            self.config_button.clicked.connect(self.show_config_menu)  # type: ignore
             toolbar.addWidget(self.config_button)
 
         except Exception as e:
@@ -759,19 +729,19 @@ class ImageCanvas(QGraphicsView):
 
         # 运行子菜单
         self.run_action = QAction("Run", self)
-        self.run_action.triggered.connect(self.exec_yolo)
+        self.run_action.triggered.connect(self.exec_yolo)  # type: ignore
         # 运行选项状态通过project_info判断
         self.run_action.setEnabled(self.project_info.is_model_loaded)
         self.config_menu.addAction(self.run_action)
 
         # 编辑子菜单
         edit_action = QAction("Edit", self)
-        edit_action.triggered.connect(self.select_yolo_model)
+        edit_action.triggered.connect(self.select_yolo_model)  # type: ignore
         self.config_menu.addAction(edit_action)
 
         # 删除子菜单
         delete_action = QAction("Delete", self)
-        delete_action.triggered.connect(self.delete_yolo_model)
+        delete_action.triggered.connect(self.delete_yolo_model)  # type: ignore
         # 删除选项只在有模型时可用（通过project_info判断）
         delete_action.setEnabled(self.project_info.is_model_loaded)
         self.config_menu.addAction(delete_action)
@@ -913,31 +883,31 @@ class ImageCanvas(QGraphicsView):
         # Zoom In
         zoom_in_action = QAction("+", self)
         zoom_in_action.setToolTip("Zoom In (10%)")
-        zoom_in_action.triggered.connect(self.zoom_in)
+        zoom_in_action.triggered.connect(self.zoom_in)  # type: ignore
         toolbar.addAction(zoom_in_action)
 
         # Zoom Out
         zoom_out_action = QAction("-", self)
         zoom_out_action.setToolTip("Zoom Out (10%)")
-        zoom_out_action.triggered.connect(self.zoom_out)
+        zoom_out_action.triggered.connect(self.zoom_out)  # type: ignore
         toolbar.addAction(zoom_out_action)
 
         # 1:1
         reset_zoom_action = QAction("1:1", self)
         reset_zoom_action.setToolTip("Reset Zoom to Original Size")
-        reset_zoom_action.triggered.connect(self.reset_zoom)
-        toolbar.addAction(reset_zoom_action)
+        reset_zoom_action.triggered.connect(self.reset_zoom)  # type: ignore
+        toolbar.addAction(reset_zoom_action)  # type: ignore
 
         # Fit Width
         fit_width_action = QAction("Fit W", self)
         fit_width_action.setToolTip("Fit image width to window")
-        fit_width_action.triggered.connect(self.fit_to_width)
+        fit_width_action.triggered.connect(self.fit_to_width)  # type: ignore
         toolbar.addAction(fit_width_action)
 
         # Fit Height
         fit_height_action = QAction("Fit H", self)
         fit_height_action.setToolTip("Fit image height to window")
-        fit_height_action.triggered.connect(self.fit_to_height)
+        fit_height_action.triggered.connect(self.fit_to_height)  # type: ignore
         toolbar.addAction(fit_height_action)
 
         # 添加分隔线
@@ -960,7 +930,7 @@ class ImageCanvas(QGraphicsView):
                 subcontrol-origin: padding;
             }
         """)
-        self.run_tool_button.clicked.connect(self.exec_yolo)
+        self.run_tool_button.clicked.connect(self.exec_yolo)   # type: ignore
         # 根据project_info判断模型是否存在以启用按钮
         self.run_tool_button.setEnabled(bool(getattr(self.project_info, 'yolo_model_path', None)))
         toolbar.addWidget(self.run_tool_button)
@@ -986,7 +956,7 @@ class ImageCanvas(QGraphicsView):
                 subcontrol-origin: padding;
             }
         """)  # 与Run按钮样式一致
-        self.config_button.clicked.connect(self.show_config_menu)
+        self.config_button.clicked.connect(self.show_config_menu)   # type: ignore
         toolbar.addWidget(self.config_button)
 
     def zoom_in(self):
@@ -1032,7 +1002,7 @@ class ImageCanvas(QGraphicsView):
 
     def fit_to_window(self):
         """将图片调整到最适合窗口的大小（保持宽高比）"""
-        self.fitInView(self.scene.sceneRect(), Qt.KeepAspectRatio)
+        self.fitInView(self.scene.sceneRect(), Qt.AspectRatioMode.KeepAspectRatio)
         self.current_scale = self.transform().m11()
 
     def fit_to_width(self):
@@ -1119,12 +1089,12 @@ class ImageCanvas(QGraphicsView):
         # 如果有选中的标注项，添加"放置最底层"选项
         if selected_items:
             send_to_back_action = QAction("放置最底层", self)
-            send_to_back_action.triggered.connect(self.send_selected_to_back)
+            send_to_back_action.triggered.connect(self.send_selected_to_back)   # type: ignore
             context_menu.addAction(send_to_back_action)
             
             # 添加删除选项
             delete_action = QAction("删除", self)
-            delete_action.triggered.connect(self.delete_selected_items)
+            delete_action.triggered.connect(self.delete_selected_items)   # type: ignore
             context_menu.addAction(delete_action)
             
             # 添加分隔线
@@ -1132,7 +1102,7 @@ class ImageCanvas(QGraphicsView):
 
         # 添加"全部清空"选项
         clear_all_action = QAction("全部清空", self)
-        clear_all_action.triggered.connect(self.clear_all_annotations)
+        clear_all_action.triggered.connect(self.clear_all_annotations)  # type: ignore
         context_menu.addAction(clear_all_action)
         
         # 查找点击位置下的所有AnnotationView对象
@@ -1156,7 +1126,7 @@ class ImageCanvas(QGraphicsView):
             # 为每个AnnotationView添加菜单项到一级菜单
             for annotation in sorted_annotations:
                 action = QAction(annotation.category.class_name, self)
-                action.triggered.connect(
+                action.triggered.connect(  # type: ignore
                     lambda checked, ann=annotation: ann.bring_to_top()
                 )
                 context_menu.addAction(action)
