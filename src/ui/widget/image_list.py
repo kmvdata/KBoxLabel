@@ -303,6 +303,7 @@ class ImageListView(QListView):
         self.setResizeMode(QListView.ResizeMode.Adjust)
         self.setUniformItemSizes(True)  # 优化性能
         self.last_selected_row = -1  # 记录上次选中的行
+        self.current_selection_anchor = -1  # 记录当前选择的锚点
 
         # 创建模型和委托（使用默认行高56px）
         self.model = ImageListModel(self, row_height=56)
@@ -348,16 +349,16 @@ class ImageListView(QListView):
             index = self.indexAt(event.pos())
             if index.isValid():
                 modifiers = QApplication.keyboardModifiers()
-                if modifiers == Qt.ShiftModifier and self.last_selected_row != -1:
+                if modifiers == Qt.ShiftModifier and self.current_selection_anchor != -1:
                     current_row = index.row()
                     selection_model = self.selectionModel()
+                    
+                    # 使用Toggle模式扩展选择，而不是替换选择
                     selection_model.select(
-                        QItemSelection(self.model.index(min(self.last_selected_row, current_row), 0),
-                                      self.model.index(max(self.last_selected_row, current_row), 0)),
-                        QItemSelectionModel.SelectionFlag.SelectCurrent
+                        QItemSelection(self.model.index(min(self.current_selection_anchor, current_row), 0),
+                                      self.model.index(max(self.current_selection_anchor, current_row), 0)),
+                        QItemSelectionModel.SelectionFlag.SelectCurrent | QItemSelectionModel.SelectionFlag.Rows
                     )
-                    # 更新最后选中的行
-                    self.last_selected_row = current_row
                     
                     # 加载最新选中的图片
                     file_path = self.model.data(index, Qt.UserRole)
@@ -365,12 +366,10 @@ class ImageListView(QListView):
                         self.sig_image_clicked.emit(file_path)  # type: ignore
                     
                     return
+                else:
+                    # 更新选择锚点
+                    self.current_selection_anchor = index.row()
         
-        # 更新最后选中的行
-        index = self.indexAt(event.pos())
-        if index.isValid():
-            self.last_selected_row = index.row()
-            
         super().mousePressEvent(event)
 
     def on_selection_changed(self, selected, deselected):
@@ -385,9 +384,13 @@ class ImageListView(QListView):
         # 发送信号
         self.sig_selection_changed.emit(total_count, selected_count)
         
-        # 如果有选中项，更新最后选中的行
+        # 如果有选中项，更新最后选中的行和选择锚点
         if indexes:
             self.last_selected_row = indexes[-1].row()
+            # 只有在没有按住Shift键时才更新锚点
+            modifiers = QApplication.keyboardModifiers()
+            if modifiers != Qt.ShiftModifier:
+                self.current_selection_anchor = self.last_selected_row
             
             # 加载最新选中的图片
             latest_selected_index = indexes[-1]
