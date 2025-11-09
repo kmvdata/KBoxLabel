@@ -683,68 +683,214 @@ class ImageListView(QListView):
             QMessageBox.critical(self, "错误", f"打开文件夹失败: {str(e)}")
 
     def on_run_clicked(self, index):
-        """Run菜单项点击事件：处理单个文件"""
-        if index.isValid() and self.project_info.is_model_loaded:
-            file_path_str = self.model.data(index, Qt.UserRole)
-            file_path = Path(file_path_str)
-            if file_path:
-                print(f"Running single file: {file_path.name}")
+        """Run菜单项点击事件：处理选中的所有文件"""
+        # 检查模型是否已加载
+        if not self.project_info.is_model_loaded:
+            QMessageBox.warning(self, "Warning", "YOLO model not loaded. Please load a model first.")
+            return
 
-                # 创建处理中对话框
-                progress_dialog = QDialog(self)
-                progress_dialog.setWindowTitle("Processing")
-                progress_dialog.setFixedSize(300, 100)
-                layout = QVBoxLayout(progress_dialog)
+        # 获取所有选中的索引
+        selected_indexes = self.selectionModel().selectedIndexes()
+        
+        # 如果没有选中项，直接返回
+        if not selected_indexes:
+            return
+            
+        # 如果只选中了一项且传入的index有效，则使用传入的index
+        # 否则使用所有选中的索引
+        if len(selected_indexes) == 1 and index.isValid():
+            indexes_to_process = [index]
+        else:
+            indexes_to_process = selected_indexes
+            
+        # 获取要处理的文件信息
+        files_to_process = []
+        for idx in indexes_to_process:
+            if idx.isValid():
+                file_path = self.model.image_paths[idx.row()]
+                file_name = os.path.basename(file_path)
+                files_to_process.append((idx.row(), file_path, file_name))
+                
+        # 如果没有有效文件，直接返回
+        if not files_to_process:
+            return
+            
+        total_files = len(files_to_process)
+        print(f"Running {total_files} selected files")
 
-                label = QLabel(f"Processing {file_path.name}...")
-                cancel_btn = QPushButton("Cancel")
+        # 创建总进度对话框
+        progress_dialog = QDialog(self)
+        progress_dialog.setWindowTitle("Processing")
+        progress_dialog.setWindowModality(Qt.WindowModal)
+        progress_dialog.setFixedSize(500, 200)
 
-                layout.addWidget(label)
-                layout.addWidget(cancel_btn)
-                progress_dialog.setLayout(layout)
+        # 创建主布局
+        main_layout = QVBoxLayout(progress_dialog)
+        main_layout.setContentsMargins(10, 10, 10, 10)
+        main_layout.setSpacing(8)
 
-                # 创建工作线程，传入project_info
-                worker = YoloWorker(file_path, self.project_info)
+        # 创建文本显示区域布局
+        text_layout = QVBoxLayout()
+        text_layout.setSpacing(8)
 
-                # 处理完成回调
-                def on_finished(success, msg, file_path):
-                    progress_dialog.accept()
-                    if success:
-                        QMessageBox.information(
-                            self, "Success",
-                            f"Completed processing {file_path.name}.\n{msg}"
-                        )
-                        # 刷新canvas
-                        self.sig_canvas_needs_reload.emit()
+        # 第一行：正在处理的文件名
+        filename_label = QLabel()
+        filename_label.setWordWrap(True)
+        filename_label.setMinimumHeight(60)
+        filename_label.setAlignment(Qt.AlignLeft | Qt.AlignTop)
+        text_layout.addWidget(filename_label)
 
-                # 错误处理回调
-                def on_error(msg, _file_path):
-                    progress_dialog.accept()
-                    QMessageBox.critical(
-                        self, "Error",
-                        f"Error processing {_file_path.name}:\n{msg}"
-                    )
+        # 第二行：处理进度
+        progress_text_label = QLabel()
+        progress_text_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        text_layout.addWidget(progress_text_label)
 
-                # 取消按钮回调 - 修复核心
-                def on_canceled():
-                    # 标记worker为取消状态
-                    worker.cancel()
-                    # 关闭对话框
-                    progress_dialog.accept()
-                    # 等待worker结束
-                    worker.wait()
-                    # 显示取消消息
-                    QMessageBox.information(self, "Cancelled", "Processing has been cancelled.")
+        main_layout.addLayout(text_layout)
 
-                # 连接信号与槽 - 只连接到on_canceled，避免冲突
-                worker.finished.connect(on_finished)
-                worker.error.connect(on_error)
-                cancel_btn.clicked.connect(on_canceled)
+        # 进度条
+        progress_bar = QProgressBar()
+        progress_bar.setRange(0, 100)
+        main_layout.addWidget(progress_bar)
+        main_layout.setSpacing(4)
 
-                # 启动工作线程
-                worker.start()
-                # 显示对话框
-                progress_dialog.exec_()
+        # 取消按钮
+        cancel_btn = QPushButton("Cancel")
+        main_layout.addWidget(cancel_btn)
+
+        # 统计信息
+        success_count = 0
+        error_count = 0
+        canceled = False
+        current_worker = None  # 跟踪当前正在执行的worker
+
+        # 创建总控线程管理所有文件处理
+        class SelectedFilesController(QThread):
+            # 更新信号：当前文件索引, 文件名, 进度文本, 完成百分比
+            update_progress = pyqtSignal(int, str, str, int)
+            # 完成信号：成功数, 错误数, 是否取消, 已处理数
+            processing_complete = pyqtSignal(int, int, bool, int)
+
+            def __init__(self, files, project_info: RefProjectInfo):
+                super().__init__()
+                self.files = files
+                self.project_info = project_info
+                self.is_canceled = False
+
+            def run(self):
+                success = 0
+                error = 0
+                total = len(self.files)
+                nonlocal current_worker
+
+                for i, (row, file_path_str, file_name) in enumerate(self.files, 1):
+                    if self.is_canceled:
+                        break
+
+                    file_path = Path(file_path_str)
+                    percentage = int((i / total) * 100) if total > 0 else 0
+                    progress_text = f"{i}/{total} files ({percentage}%)"
+                    self.update_progress.emit(i, file_name, progress_text, percentage)
+
+                    # 创建并启动工作线程
+                    current_worker = YoloWorker(file_path, self.project_info)
+                    current_worker.start()
+
+                    # 等待当前文件处理完成或取消
+                    while current_worker.isRunning() and not self.is_canceled:
+                        current_worker.msleep(100)
+
+                    if self.is_canceled:
+                        if current_worker and current_worker.isRunning():
+                            current_worker.cancel()
+                            current_worker.wait()
+                        break
+
+                    # 检查处理结果
+                    if current_worker.is_canceled:
+                        error += 1
+                    else:
+                        success += 1
+
+                # 发送最终进度
+                final_text = "Finishing up..." if not self.is_canceled else "Canceling..."
+                final_percentage = 100 if not self.is_canceled else progress_bar.value()
+                self.update_progress.emit(i, "", final_text, final_percentage)
+                self.processing_complete.emit(success, error, self.is_canceled, i)
+
+            def cancel(self):
+                self.is_canceled = True
+
+        # 创建总控线程
+        controller = SelectedFilesController(files_to_process, self.project_info)
+
+        # 更新进度条和标签
+        def update_progress_bar(index, file_name, text, percentage):
+            if file_name:
+                metrics = QFontMetrics(filename_label.font())
+                max_width = filename_label.width()
+                elided_text = metrics.elidedText(file_name, Qt.ElideLeft, max_width)
+                filename_label.setText(elided_text)
+
+            progress_text_label.setText(text)
+            progress_bar.setValue(percentage)
+
+        # 处理完成
+        def on_complete(success, error, is_canceled, processed):
+            nonlocal success_count, error_count, canceled
+            success_count = success
+            error_count = error
+            canceled = is_canceled
+            progress_bar.setValue(100)
+            filename_label.setText("Processing complete!")
+            progress_text_label.setText("")
+            # 关闭对话框
+            progress_dialog.accept()
+            # 刷新canvas
+            self.sig_canvas_needs_reload.emit()
+
+            # 显示结果统计
+            if canceled:
+                QMessageBox.information(
+                    self, "Cancelled",
+                    f"Processing cancelled.\nCompleted {success_count}/{total_files} files."
+                )
+            else:
+                result_msg = (f"Processing complete.\n"
+                              f"Total: {total_files}\n"
+                              f"Success: {success_count}\n"
+                              f"Errors: {error_count}")
+                QMessageBox.information(self, "Complete", result_msg)
+
+        # 取消处理
+        def on_cancel():
+            if controller.isRunning():
+                controller.cancel()
+                # 立即取消当前正在执行的任务
+                if current_worker and current_worker.isRunning():
+                    current_worker.cancel()
+                filename_label.setText("Canceling... Please wait.")
+                progress_text_label.setText("")
+
+                # 启动一个短延迟来确保线程有时间停止
+                QThread.msleep(200)
+                # 关闭对话框
+                progress_dialog.accept()
+                # 等待控制器结束
+                controller.wait()
+                # 显示取消消息
+                QMessageBox.information(self, "Cancelled", "Processing has been cancelled.")
+
+        # 连接信号与槽
+        controller.update_progress.connect(update_progress_bar)
+        controller.processing_complete.connect(on_complete)
+        cancel_btn.clicked.connect(on_cancel)
+
+        # 启动总控线程
+        controller.start()
+        # 刷新canvas
+        self.sig_canvas_needs_reload.emit()
+        # 显示进度对话框
+        progress_dialog.exec_()
 
     def on_run_all_clicked(self):
         """Run All菜单项点击事件：处理所有文件"""
