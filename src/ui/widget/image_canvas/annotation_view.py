@@ -451,6 +451,8 @@ class AnnotationView(QGraphicsRectItem):
         super().mouseReleaseEvent(event)
         # 鼠标释放后根据操作类型决定显示锚点的时机
         self._schedule_show_handles()
+        # 确保在鼠标释放后保持选中状态
+        self.select_annotation_view(True)
 
     def interactive_resize(self, mouse_pos):
         """交互式调整大小（修复对角线控制点固定问题）"""

@@ -403,7 +403,9 @@ class ImageCanvas(QGraphicsView):
 
             # 检查是否按住Shift键
             shift_pressed = event.modifiers() & Qt.ShiftModifier
-            if not shift_pressed:
+            
+            # 只有在点击的不是标注且没有按住Shift键时才取消所有选中状态
+            if not is_annotation and not shift_pressed:
                 self.unselect_all_annotations()
 
             # 当设置了当前类别时开始绘制新标注
@@ -475,11 +477,13 @@ class ImageCanvas(QGraphicsView):
                     isinstance(clicked_item.parentItem(), AnnotationView)
             )
             
-            # 点击空白区域且未按住Shift键时清除选择
+            # 只有点击空白区域且未按住Shift键时才清除选择
             if not is_annotation and not (event.modifiers() & Qt.ShiftModifier):
                 # 取消annotation_list中的选中状态
                 if self.annotation_list and self.annotation_list.selectionModel():
                     self.annotation_list.selectionModel().clearSelection()
+                # 取消画布上所有标注的选中状态
+                self.unselect_all_annotations()
 
         # 每次鼠标释放都保存标注
         if self.set_needs_save_annotations:
