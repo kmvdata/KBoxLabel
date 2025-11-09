@@ -710,9 +710,18 @@ class ProjectWindow(QMainWindow):
 
     def on_image_list_selection_changed(self, total_count, selected_count):
         """处理图片列表选择变化，更新状态栏"""
-        if selected_count > 0:
+        # 获取当前选中的索引
+        current_index = self.image_list.currentIndex()
+        
+        if selected_count == 1:
+            # 只选中一张图片时，显示具体是第几张
+            current_row = current_index.row() + 1  # 行号从0开始，所以加1
+            status_text = f"共加载 {total_count} 张图片，当前选中第 {current_row} 张"
+        elif selected_count > 1:
+            # 选中多张图片时，显示选中数量
             status_text = f"共加载 {total_count} 张图片，当前选中 {selected_count} 张"
         else:
+            # 未选中任何图片
             status_text = f"共加载 {total_count} 张图片，未选中任何图片"
         self.statusBar().showMessage(status_text)
 
