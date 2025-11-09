@@ -240,6 +240,14 @@ class ImageCanvas(QGraphicsView):
                     class_name_map[class_name] = new_category
                     category = new_category
                     print(f"信息: 数据库中类别 '{class_name}' 未定义，已创建新类别（ID={new_category.class_id}）")
+                    
+                    # 将新创建的类别保存到数据库并刷新annotation_list
+                    # 添加到project_info.categories中
+                    self.project_info.categories.append(new_category)
+                    # 保存到数据库
+                    self.project_info.save_categories()
+                    # 刷新annotation_list显示
+                    self.annotation_list.load_categories()
 
                 # 从KoloItem获取归一化坐标
                 x_center = Decimal(kolo_item.x_center)
@@ -300,6 +308,10 @@ class ImageCanvas(QGraphicsView):
                     reference_id=max((cat.class_id for cat in self.project_info.categories), default=0),
                     default_name=category.class_name
                 )
+                
+                # 将新创建的类别保存到数据库
+                self.project_info.categories.append(new_category)
+                self.project_info.save_categories()
 
             # 创建并添加AnnotationView
             item = AnnotationView(x1, y1, rect_width, rect_height, category, self)
