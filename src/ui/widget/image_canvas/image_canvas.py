@@ -1138,6 +1138,9 @@ class ImageCanvas(QGraphicsView):
             if item.isSelected():
                 item.send_to_back()
 
+        # 操作完成后刷新画布
+        self.viewport().update()
+
     def clear_all_annotations(self):
         """清空所有标注并删除对应的.kolo文件"""
         if not self.current_image_path or self.image_item is None:
