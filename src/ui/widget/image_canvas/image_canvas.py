@@ -514,7 +514,9 @@ class ImageCanvas(QGraphicsView):
             self.save_annotations()
 
         super().mouseReleaseEvent(event)
-
+        
+        # 每次鼠标释放时刷新画布
+        self.viewport().update()
 
     def mouseDoubleClickEvent(self, event):
         """处理鼠标双击事件"""
