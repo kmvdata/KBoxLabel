@@ -314,7 +314,6 @@ class ImageListView(QListView):
         # 连接信号
         self.doubleClicked.connect(self.handle_item_clicked)  # type: ignore
         self.selectionModel().selectionChanged.connect(self.on_selection_changed)  # type: ignore
-        self.clicked.connect(self.on_item_clicked)  # type: ignore
 
     def set_row_height(self, height):
         """统一设置行高（更新模型和委托）"""
@@ -328,20 +327,6 @@ class ImageListView(QListView):
     def load_images_from_path(self, project_path: Path):
         """从项目路径加载图片"""
         self.model.load_images_from_path(project_path)
-
-    def on_item_clicked(self, index):
-        """处理项点击事件，支持Shift键多选"""
-        if not index.isValid():
-            return
-            
-        # 获取当前选中的所有索引
-        selected_indexes = self.selectionModel().selectedIndexes()
-        if selected_indexes:
-            # 加载最新选中的图片
-            latest_selected_index = selected_indexes[-1]
-            file_path = self.model.data(latest_selected_index, Qt.UserRole)
-            if file_path:
-                self.sig_image_clicked.emit(Path(file_path))  # type: ignore
 
     def mousePressEvent(self, event):
         """重写鼠标按下事件以处理Shift键多选"""
@@ -396,6 +381,7 @@ class ImageListView(QListView):
             latest_selected_index = indexes[-1]
             file_path = self.model.data(latest_selected_index, Qt.UserRole)
             if file_path:
+                # 运行yolo后会执行此处，保留！
                 self.sig_image_clicked.emit(Path(file_path))  # type: ignore
 
     def handle_item_clicked(self, index):

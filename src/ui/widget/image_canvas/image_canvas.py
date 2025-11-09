@@ -173,6 +173,11 @@ class ImageCanvas(QGraphicsView):
     def load_image(self, image_path: Path):
         """加载指定路径的图片，并显示到画布上"""
         # 加载图片
+        if not image_path.exists():
+            raise FileNotFoundError(f"图片文件不存在: {image_path}")
+        if image_path == self.current_image_path:
+            print("图片已加载，无需重复加载")
+            return
         pixmap = QPixmap(str(image_path))
         if pixmap.isNull():
             raise ValueError(f"无法加载图片: {image_path}")
