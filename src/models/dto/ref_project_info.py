@@ -140,8 +140,8 @@ class RefProjectInfo:
         finally:
             session.close()
 
-    def exec_yolo(self, img_path: Path)-> list[KoloItem]:
-        return self.yolo_executor.exec_yolo(img_path)
+    def exec_yolo(self, img_path: Path, save_to_db: bool = False)-> list[KoloItem]:
+        return self.yolo_executor.exec_yolo(img_path, save_to_db)
 
 
     def save_categories(self):

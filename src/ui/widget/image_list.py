@@ -267,7 +267,7 @@ class YoloWorker(QThread):
                 raise Exception("YOLO model not loaded")
 
             # 使用project_info中的exec_yolo方法进行推理
-            results = self.project_info.exec_yolo(self.file_path)
+            results = self.project_info.exec_yolo(self.file_path, save_to_db=True)
 
             if self.is_canceled:
                 return
