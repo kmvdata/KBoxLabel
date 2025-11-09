@@ -54,9 +54,7 @@ class ProjectWindow(QMainWindow):
         self.thread_pool = QThreadPool(self)
         self.image_list = ImageListView(self.project_info)
         left_layout.addWidget(self.image_list)
-        # 连接选中项变化信号
-        self.image_list.sig_selection_changed.connect(self.on_image_list_selection_changed)  # type: ignore
-        self.image_list.selectionModel().selectionChanged.connect(self.on_image_selection_changed)  # type: ignore
+
 
         # ===== 中间图片编辑区域 =====
         # 创建ImageCanvas
@@ -126,6 +124,11 @@ class ProjectWindow(QMainWindow):
         self.image_list.sig_canvas_needs_reload.connect(
             self.image_canvas.reload_image
         )
+
+        # 连接选中项变化信号
+        self.image_list.sig_selection_changed.connect(self.on_image_list_selection_changed)  # type: ignore
+        # self.image_list.selectionModel().selectionChanged.connect(self.on_image_selection_changed)  # type: ignore
+        self.image_list.sig_image_clicked.connect(self.image_canvas.load_image)
 
         # 窗口加载完成后自动选中第一个元素
         QTimer.singleShot(0, self.select_first_image)
@@ -276,13 +279,6 @@ class ProjectWindow(QMainWindow):
             # 验证路径是否存在
             if not self.project_info.path.exists():
                 raise FileNotFoundError(f"项目目录不存在: {project_path}")
-
-            # 判断self.project_info.sqlite_path位置是否存在，如果不存在，创建这个sqlite文件
-            if self.project_info.sqlite_path and not self.project_info.sqlite_path.exists():
-                # 确保目录存在
-                self.project_info.sqlite_path.parent.mkdir(parents=True, exist_ok=True)
-                # 创建空的sqlite文件
-                self.project_info.sqlite_path.touch()
 
             # 更新UI
             self.setWindowTitle(self.window_title)
@@ -715,11 +711,20 @@ class ProjectWindow(QMainWindow):
         if self.left_status:
             self.left_status.setText(text)
 
-    def on_image_list_selection_changed(self, total_count, current_index):
+    def on_image_list_selection_changed(self, total_count, selected_count):
         """处理图片列表选择变化，更新状态栏"""
-        if current_index > 0:
-            status_text = f"共加载 {total_count} 张图片，当前选中第 {current_index} 张"
+        # 获取当前选中的索引
+        current_index = self.image_list.currentIndex()
+        
+        if selected_count == 1:
+            # 只选中一张图片时，显示具体是第几张
+            current_row = current_index.row() + 1  # 行号从0开始，所以加1
+            status_text = f"共加载 {total_count} 张图片，当前选中第 {current_row} 张"
+        elif selected_count > 1:
+            # 选中多张图片时，显示选中数量
+            status_text = f"共加载 {total_count} 张图片，当前选中 {selected_count} 张"
         else:
+            # 未选中任何图片
             status_text = f"共加载 {total_count} 张图片，未选中任何图片"
         self.statusBar().showMessage(status_text)
 

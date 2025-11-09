@@ -2,9 +2,9 @@
 import json
 from typing import Tuple
 
-from PyQt5.QtCore import pyqtSignal, Qt, QSize, QRect, QItemSelectionModel, QMimeData, \
+from PyQt5.QtCore import Qt, QSize, QRect, QItemSelectionModel, QMimeData, \
     QSortFilterProxyModel
-from PyQt5.QtGui import QStandardItemModel, QStandardItem, QPen, QDrag
+from PyQt5.QtGui import QStandardItemModel, QStandardItem, QPen, QDrag, QColor
 from PyQt5.QtWidgets import QLineEdit, QSpinBox, QListView, QStyledItemDelegate, QAbstractItemView, \
     QStyle, QToolBar, QWidget, QHBoxLayout, QMenu, QAction
 from ultralytics import YOLO
@@ -77,8 +77,12 @@ class AnnotationDelegate(QStyledItemDelegate):
             self.row_height
         )
 
+        # 创建带透明度的颜色，与AnnotationView中使用的透明度保持一致（0.35）
+        transparent_color = QColor(category_color)
+        transparent_color.setAlphaF(0.65)
+
         # 绘制元素
-        painter.fillRect(color_rect, category_color)  # 颜色方块
+        painter.fillRect(color_rect, transparent_color)  # 颜色方块（带透明度）
         painter.drawText(name_rect, Qt.AlignLeft | Qt.AlignVCenter, category_name)  # 文本
         painter.drawText(id_rect, Qt.AlignCenter, str(class_id))  # 序号
 
@@ -183,7 +187,7 @@ class EditableAnnotationDelegate(AnnotationDelegate):
                     from PyQt5.QtWidgets import QMessageBox
                     view = self.parent()
                     if view is not None:
-                        QMessageBox.warning(view, "重命名失败", f"名称 '{category_name}' 已存在，请使用其他名称。")
+                        QMessageBox.warning(QWidget(view), "重命名失败", f"名称 '{category_name}' 已存在，请使用其他名称。")
                     # 名称重复，不保存更改
                     pass
 
@@ -274,14 +278,14 @@ class AnnotationList(QListView):
         self.setModel(self.proxy_model)
 
         # 设置视图行为 - 移除双击编辑触发
-        self.setEditTriggers(QAbstractItemView.EditKeyPressed)
-        self.setSelectionBehavior(QAbstractItemView.SelectItems)
-        self.setSelectionMode(QAbstractItemView.SingleSelection)
+        self.setEditTriggers(QAbstractItemView.EditTrigger.EditKeyPressed)
+        self.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectItems)
+        self.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.setDragEnabled(True)
-        self.setDragDropMode(QAbstractItemView.DragOnly)
-        self.setDefaultDropAction(Qt.CopyAction)
-        self.setFocusPolicy(Qt.StrongFocus)
-        self.setAttribute(Qt.WA_AlwaysShowToolTips)
+        self.setDragDropMode(QAbstractItemView.DragDropMode.DragOnly)
+        self.setDefaultDropAction(Qt.DropAction.CopyAction)
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.setAttribute(Qt.WidgetAttribute.WA_AlwaysShowToolTips)
 
         # 设置委托
         self.delegate = EditableAnnotationDelegate(row_height, self)
@@ -428,7 +432,7 @@ class AnnotationList(QListView):
 
         if not self.selectionModel().isSelected(clicked_index):
             self.selectionModel().clearSelection()
-            self.selectionModel().select(clicked_index, QItemSelectionModel.ClearAndSelect)
+            self.selectionModel().select(clicked_index, QItemSelectionModel.SelectionFlag.ClearAndSelect)
 
     def _handle_selection_change(self, selected, deselected):
         if selected.indexes():
@@ -513,7 +517,7 @@ class AnnotationList(QListView):
         # 选中新项
         self.selectionModel().select(
             proxy_index,
-            QItemSelectionModel.ClearAndSelect
+            QItemSelectionModel.SelectionFlag.ClearAndSelect
         )
 
         self.save_categories()
@@ -581,7 +585,7 @@ class AnnotationList(QListView):
         if index.isValid():
             self.right_click_index = index
             self.selectionModel().clearSelection()
-            self.selectionModel().select(index, QItemSelectionModel.ClearAndSelect)
+            self.selectionModel().select(index, QItemSelectionModel.SelectionFlag.ClearAndSelect)
         else:
             self.right_click_index = None
 
@@ -590,26 +594,26 @@ class AnnotationList(QListView):
 
         # 添加菜单项
         add_action = QAction("新增", self)
-        add_action.triggered.connect(self._context_add)
+        add_action.triggered.connect(self._context_add)  # type:ignore
 
         rename_action = QAction("重命名", self)
-        rename_action.triggered.connect(self._handle_rename)
+        rename_action.triggered.connect(self._handle_rename) # type: ignore
         rename_action.setEnabled(index.isValid())  # 只有选中项时可用
 
         modify_id_action = QAction("修改ID", self)
-        modify_id_action.triggered.connect(self._handle_modify_id)
+        modify_id_action.triggered.connect(self._handle_modify_id) # type:ignore
         modify_id_action.setEnabled(index.isValid())  # 只有选中项时可用
 
         delete_action = QAction("删除", self)
-        delete_action.triggered.connect(self._handle_delete)
+        delete_action.triggered.connect(self._handle_delete)  # type:ignore
         delete_action.setEnabled(index.isValid())  # 只有选中项时可用
 
         # 添加排序相关菜单项
         menu.addSeparator()
         sort_name_action = QAction("按名称排序", self)
-        sort_name_action.triggered.connect(self._sort_by_name)
+        sort_name_action.triggered.connect(self._sort_by_name)  # type:ignore
         sort_id_action = QAction("按ID排序", self)
-        sort_id_action.triggered.connect(self._sort_by_id)
+        sort_id_action.triggered.connect(self._sort_by_id)  # type:ignore
 
         menu.addAction(sort_name_action)
         menu.addAction(sort_id_action)
@@ -647,7 +651,7 @@ class AnnotationList(QListView):
         """
         self.project_info.save_categories()
 
-    def load_categories_from_json(self):
+    def load_categories(self):
         """
         从数据库加载类别，与现有类别合并（仅当 class_id 和 class_name 都相同时视为重复）。
         重复项将重新生成颜色，最终列表按 class_id 排序。
@@ -712,25 +716,20 @@ class AnnotationList(QListView):
 
     def select_category_by_id(self, class_id: int):
         """根据类别ID选中对应的列表项"""
-        for i, category in enumerate(self.project_info.categories):
-            if category.class_id == class_id:
-                proxy_index = self.proxy_model.mapFromSource(self.source_model.index(i, 0))
-                self.selectionModel().select(
-                    proxy_index,
-                    QItemSelectionModel.ClearAndSelect
-                )
-                self.scrollTo(proxy_index)
-                return True
-        return False
+        return self._select_category_by_attr('class_id', class_id)
 
     def select_category_by_name(self, class_name: str):
         """根据类别名称选中对应的列表项"""
+        return self._select_category_by_attr('class_name', class_name)
+    
+    def _select_category_by_attr(self, attr_name: str, attr_value):
+        """根据指定属性名和值选中对应的列表项"""
         for i, category in enumerate(self.project_info.categories):
-            if category.class_name == class_name:
+            if getattr(category, attr_name) == attr_value:
                 proxy_index = self.proxy_model.mapFromSource(self.source_model.index(i, 0))
                 self.selectionModel().select(
                     proxy_index,
-                    QItemSelectionModel.ClearAndSelect
+                    QItemSelectionModel.SelectionFlag.ClearAndSelect
                 )
                 self.scrollTo(proxy_index)
                 return True

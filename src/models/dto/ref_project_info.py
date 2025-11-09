@@ -1,17 +1,15 @@
-import json
 from pathlib import Path
 from typing import Optional, List
 
 from PyQt5.QtGui import QColor
 
+from src.common.god.ksnowflake import KSnowflake
 from src.common.god.sqlite_db import SqliteDB
-from src.core.ksettings import KSettings
 from src.core.yolo_executor import YOLOExecutor
 from src.models.dto.annotation_category import AnnotationCategory
 from src.models.sql import gen_sql_tables, KoloItem
 from src.models.sql.annotation_category import AnnotationCategory as SQLAnnotationCategory
 from src.models.sql.kv_config import KVConfig
-from src.common.god.ksnowflake import KSnowflake
 
 
 class RefProjectInfo:
@@ -23,8 +21,8 @@ class RefProjectInfo:
         self.categories: list[AnnotationCategory] = []
 
         # 初始化数据库
-        gen_sql_tables(self.db_path)
-        self.sqlite_db: Optional[SqliteDB] = SqliteDB(self.db_path)
+        gen_sql_tables(self._db_path)
+        self.sqlite_db: Optional[SqliteDB] = SqliteDB(self._db_path)
 
     def exists(self) -> bool:
         if self.path is None:
@@ -32,10 +30,23 @@ class RefProjectInfo:
         return self.path.exists()
 
     @property
-    def db_path(self):
+    def _db_path(self):
         if self._config_dir is None:
             return None
         return self._config_dir / 'data.db'
+
+    @property
+    def _config_dir(self):
+        if self.path is None:
+            return None
+        # 如果存在同名的.kboxlabel文件夹，则使用它，如果不存在，则创建，然后返回路径
+        _config_dir = self.path / '.kboxlabel'
+
+        # 检查目录是否存在，如果不存在则创建
+        if not _config_dir.exists():
+            _config_dir.mkdir(parents=True, exist_ok=True)
+
+        return _config_dir
 
     @property
     def project_name(self) -> str:
@@ -57,70 +68,62 @@ class RefProjectInfo:
     def is_model_loaded(self):
         return self.yolo_executor.is_model_loaded()
 
-    @property
-    def sqlite_path(self) -> Optional[Path]:
-        if self.path is None:
-            return None
-        return self.path / '__sql_config__.sql'
-
-    def load_yolo_model(self, model_path: Optional[Path] = None) -> bool:
-        """加载YOLO模型并在成功后缓存路径"""
+    def model_path_in_db(self) -> Optional[Path]:
+        # 创建数据库会话
+        session = self.sqlite_db.db_session()
         try:
-            # 如果没有提供model_path，则从数据库获取
-            if model_path is None:
-                # 创建数据库会话
-                session = self.sqlite_db.db_session()
-                try:
-                    # 查询数据库中的模型路径
-                    kv_record = session.query(KVConfig).filter(KVConfig.key == self._yolo_model_key).first()
-                    if kv_record and kv_record.value:
-                        model_path = Path(kv_record.value)
-                    else:
-                        return False  # 数据库中没有模型路径
-                finally:
-                    session.close()
+            # 查询数据库中的模型路径
+            kv_record = session.query(KVConfig).filter(KVConfig.key == self._yolo_model_key).first()
+            if kv_record and kv_record.value:
+                return Path(kv_record.value)
+            else:
+                return None
+        finally:
+            session.close()
 
-            # 尝试加载模型
-            self.yolo_executor.load_yolo(model_path)
-            is_loaded = self.yolo_executor.is_model_loaded()
+    def load_yolo_model(self, model_path: Optional[Path] = None):
+        """加载YOLO模型并在成功后缓存路径"""
+        # 如果没有提供model_path，则从数据库获取
+        if model_path is None:
+            model_path = self.model_path_in_db()
 
-            if model_path is None or not is_loaded:
-                return is_loaded
-
-            session = self.sqlite_db.db_session()
-            try:
-                # 查询是否已有记录
-                kv_record = session.query(KVConfig).filter(KVConfig.key == self._yolo_model_key).first()
-
-                if is_loaded:
-                    # 加载成功，保存或更新路径
-                    if kv_record:
-                        kv_record.value = str(model_path)
-                    else:
-                        # 创建新记录
-                        kv_record = KVConfig()
-                        kv_record.kid = KSnowflake().gen_kid()
-                        kv_record.key = self._yolo_model_key
-                        kv_record.value = str(model_path)
-                        kv_record.comment = "YOLO模型路径"
-                        session.add(kv_record)
-                else:
-                    # 加载失败，清空记录
-                    if kv_record:
-                        session.delete(kv_record)
-
-                session.commit()
-            except Exception as e:
-                session.rollback()
-                print(f"更新数据库中的YOLO模型路径失败: {str(e)}")
-            finally:
-                session.close()
-
-            return is_loaded
-        except Exception as e:
-            # 可以根据实际需求修改异常处理方式
-            print(f"加载YOLO模型失败: {str(e)}")
+        if model_path is None:
             return False
+
+        # 尝试加载模型
+        self.yolo_executor.load_yolo(model_path)
+        is_loaded = self.yolo_executor.is_model_loaded()
+
+        # 更新数据库中的模型路径
+        session = self.sqlite_db.db_session()
+        try:
+            # 查询是否已有记录
+            kv_record = session.query(KVConfig).filter(KVConfig.key == self._yolo_model_key).first()
+
+            if is_loaded:
+                # 加载成功，保存或更新路径
+                if kv_record:
+                    kv_record.value = str(model_path)
+                else:
+                    # 创建新记录
+                    kv_record = KVConfig()
+                    kv_record.kid = KSnowflake().gen_kid()
+                    kv_record.key = self._yolo_model_key
+                    kv_record.value = str(model_path)
+                    kv_record.comment = "YOLO模型路径"
+                    session.add(kv_record)
+            else:
+                # 加载失败，清空记录
+                if kv_record:
+                    session.delete(kv_record)
+
+            session.commit()
+        except Exception as e:
+            session.rollback()
+            print(f"更新数据库中的YOLO模型路径失败: {str(e)}")
+        finally:
+            session.close()
+            return None
 
     def delete_yolo_model(self):
         """删除YOLO模型并清空数据库中的模型路径"""
@@ -137,42 +140,9 @@ class RefProjectInfo:
         finally:
             session.close()
 
-    def exec_yolo(self, img_path: Path)-> list[KoloItem]:
-        results = self.yolo_executor.exec_yolo(img_path)
-        # 生成与图片同名的.kolo文件路径
-        kolo_path = img_path.with_suffix('.kolo')
+    def exec_yolo(self, img_path: Path, save_to_db: bool = False)-> list[KoloItem]:
+        return self.yolo_executor.exec_yolo(img_path, save_to_db)
 
-        try:
-            # 写入检测结果到.kolo文件
-            with open(kolo_path, 'w', encoding='utf-8') as f:
-                for result in results:
-                    # 确保结果是字符串格式（根据实际结果类型调整）
-                    line = str(result) if isinstance(result, (list, tuple)) else result
-                    f.write(f"{line}\n")
-
-            # 记录成功日志
-            print(f"检测结果已成功保存到.kolo文件: {kolo_path}")
-
-        except Exception as e:
-            # 记录错误日志并抛出异常
-            error_msg = f"保存.kolo文件失败: {str(e)}"
-            print(error_msg)
-            raise Exception(error_msg)
-
-        return results
-
-    @property
-    def _config_dir(self):
-        if self.path is None:
-            return None
-        # 如果存在同名的.kboxlabel文件夹，则使用它，如果不存在，则创建，然后返回路径
-        _config_dir = self.path / '.kboxlabel'
-
-        # 检查目录是否存在，如果不存在则创建
-        if not _config_dir.exists():
-            _config_dir.mkdir(parents=True, exist_ok=True)
-
-        return _config_dir
 
     def save_categories(self):
         """
@@ -215,12 +185,11 @@ class RefProjectInfo:
 
         # 开始会话
         session = self.sqlite_db.db_session()
+        # 转换为AnnotationCategory对象列表
+        categories: list = []
         try:
             # 查询所有类别
             sql_categories = session.query(SQLAnnotationCategory).all()
-
-            # 转换为AnnotationCategory对象列表
-            categories = []
             for sql_cat in sql_categories:
                 category = AnnotationCategory(
                     class_id=sql_cat.class_id,
@@ -228,10 +197,17 @@ class RefProjectInfo:
                 )
                 category.color = QColor(sql_cat.color_r, sql_cat.color_g, sql_cat.color_b)
                 categories.append(category)
-
-            return categories
+        except Exception as e:
+            print(f"加载类别列表失败: {str(e)}")
         finally:
             session.close()
+            return categories
+
+    def load_kolo_item_from_db(self, img_path: Path) -> list[KoloItem]:
+        return self.yolo_executor.load_kolo_item_from_db(img_path)
+
+    def delete_kolo_item_for_image(self, img_path: Path):
+        return self.yolo_executor.delete_kolo_item_for_image(img_path)
 
     def find_annotation_by_name(self, name: str) -> Optional[AnnotationCategory]:
         """根据类别名称查找标注类别"""
@@ -247,3 +223,4 @@ class RefProjectInfo:
             if category.class_id == class_id:
                 return category
         return None  # 未找到时返回None
+

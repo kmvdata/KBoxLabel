@@ -4,7 +4,7 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Optional
 
-from PyQt5.QtCore import Qt, QRectF, QPointF, QEvent, QSize
+from PyQt5.QtCore import Qt, QRectF, QPointF, QSize
 from PyQt5.QtGui import QPixmap, QPen, QColor, QPainter, QBrush, QKeySequence, QFontMetrics, QIcon
 from PyQt5.QtWidgets import (QGraphicsView, QGraphicsScene, QGraphicsPixmapItem, QAction,
                              QToolBar, QSizePolicy, QMenu, QFileDialog, QMessageBox, QToolButton, QGraphicsItem)
@@ -31,8 +31,11 @@ class ImageCanvas(QGraphicsView):
         self.last_scale_factor = None
         self.gesture_start_scale = None
         self.base_scale = None
-        self.annotation_list = None
-        self.create_annotation_list()
+
+        # 初始化annotation list
+        self.annotation_list = AnnotationList(self.project_info)
+        self.annotation_list.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
+        self.annotation_list.load_categories()
 
         # 按钮引用
         self.delete_toolbar_action = None
@@ -42,6 +45,9 @@ class ImageCanvas(QGraphicsView):
 
         # 添加标志防止递归调用
         self._updating_delete_state = False
+
+        # 添加标志跟踪框选操作
+        self._is_rubber_band_selection = False
 
         # 连接模型加载完成的信号
         self._connect_model_signals()
@@ -60,12 +66,12 @@ class ImageCanvas(QGraphicsView):
         self.setBackgroundBrush(QBrush(checkerboard))
 
         # 设置视图属性
-        self.setAttribute(Qt.WA_TranslucentBackground, True)
-        self.setRenderHint(QPainter.Antialiasing)
-        self.setDragMode(QGraphicsView.RubberBandDrag)  # 启用框选模式
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        self.setRenderHint(QPainter.RenderHint.Antialiasing)
+        self.setDragMode(QGraphicsView.DragMode.RubberBandDrag) # 启用框选模式
         self.setInteractive(True)
-        self.setTransformationAnchor(QGraphicsView.AnchorUnderMouse)
-        self.setResizeAnchor(QGraphicsView.AnchorUnderMouse)
+        self.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
+        self.setResizeAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
         self.setMouseTracking(True)
         self.setInteractive(True)
 
@@ -76,7 +82,7 @@ class ImageCanvas(QGraphicsView):
         self.toolbar_height = 56  # 工具栏高度
 
         # 启用Pinch手势（用于触摸板捏合缩放）
-        self.grabGesture(Qt.PinchGesture)
+        self.grabGesture(Qt.GestureType.PinchGesture)
 
         # 图像和标注数据
         self.scene = QGraphicsScene(self)
@@ -112,20 +118,20 @@ class ImageCanvas(QGraphicsView):
             ])
 
         self.delete_action.setShortcuts(delete_shortcuts)
-        self.delete_action.triggered.connect(self.delete_selected_items)
+        self.delete_action.triggered.connect(self.delete_selected_items) # type: ignore
         self.addAction(self.delete_action)
 
         # 保存快捷键
         self.save_action = QAction("Save Annotations", self)
         self.save_action.setShortcut(QKeySequence.Save)
-        self.save_action.triggered.connect(self.save_annotations)
+        self.save_action.triggered.connect(self.save_annotations)  # type: ignore
         self.addAction(self.save_action)
 
         # 连接场景的选择变化信号
-        self.scene.selectionChanged.connect(self.on_selection_changed)
+        self.scene.selectionChanged.connect(self.on_selection_changed) # type: ignore
 
         # 添加上下文菜单策略
-        self.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(self.show_context_menu)
 
         # 改为使用QTimer延迟调用
@@ -140,7 +146,7 @@ class ImageCanvas(QGraphicsView):
         self.resetTransform()
         self.current_scale = 1.0
 
-    def clear_annotation_views(self):
+    def clear_annotation_views(self, save_annotations=True):
         """清理场景中所有的AnnotationView标注"""
         # 防止在删除过程中触发过多事件
         self.scene.blockSignals(True)
@@ -154,7 +160,8 @@ class ImageCanvas(QGraphicsView):
                 self.scene.removeItem(item)
 
             print(f"已清理 {len(annotation_items)} 个标注项")
-            self.save_annotations()
+            if save_annotations:
+                self.save_annotations()
             return len(annotation_items)
         finally:
             self.scene.blockSignals(False)
@@ -169,6 +176,11 @@ class ImageCanvas(QGraphicsView):
     def load_image(self, image_path: Path):
         """加载指定路径的图片，并显示到画布上"""
         # 加载图片
+        if not image_path.exists():
+            raise FileNotFoundError(f"图片文件不存在: {image_path}")
+        if image_path == self.current_image_path:
+            print("图片已加载，无需重复加载")
+            return
         pixmap = QPixmap(str(image_path))
         if pixmap.isNull():
             raise ValueError(f"无法加载图片: {image_path}")
@@ -208,13 +220,11 @@ class ImageCanvas(QGraphicsView):
 
         # 从数据库中查询所有匹配image_name的KoloItem对象
         try:
-            # 定义查询函数
-            def query_func(session):
-                from src.models.sql.kolo_item import KoloItem
-                return session.query(KoloItem).filter(KoloItem.image_name == image_name).all()
+
+            self.project_info.load_categories()
 
             # 执行查询
-            kolo_items = self.project_info.sqlite_db.execute_in_transaction(query_func)
+            kolo_items = self.project_info.load_kolo_item_from_db(image_path)
 
             # 处理查询结果
             for kolo_item in kolo_items:
@@ -233,6 +243,14 @@ class ImageCanvas(QGraphicsView):
                     class_name_map[class_name] = new_category
                     category = new_category
                     print(f"信息: 数据库中类别 '{class_name}' 未定义，已创建新类别（ID={new_category.class_id}）")
+                    
+                    # 将新创建的类别保存到数据库并刷新annotation_list
+                    # 添加到project_info.categories中
+                    self.project_info.categories.append(new_category)
+                    # 保存到数据库
+                    self.project_info.save_categories()
+                    # 刷新annotation_list显示
+                    self.annotation_list.load_categories()
 
                 # 从KoloItem获取归一化坐标
                 x_center = Decimal(kolo_item.x_center)
@@ -253,8 +271,6 @@ class ImageCanvas(QGraphicsView):
         except Exception as e:
             print(f"从数据库加载标注信息错误: {e}")
 
-        # 打印所有标注坐标
-        self.print_all_annotation_coordinates()
 
     def load_annotation_view_from_kilo_item(self, kolo_item: KoloItem):
         """根据KoloItem对象在画布上添加对应的标注"""
@@ -295,11 +311,15 @@ class ImageCanvas(QGraphicsView):
                     reference_id=max((cat.class_id for cat in self.project_info.categories), default=0),
                     default_name=category.class_name
                 )
+                
+                # 将新创建的类别保存到数据库
+                self.project_info.categories.append(new_category)
+                self.project_info.save_categories()
 
             # 创建并添加AnnotationView
             item = AnnotationView(x1, y1, rect_width, rect_height, category, self)
             self.scene.addItem(item)
-            item.setFlags(item.flags() & ~QGraphicsItem.ItemIsMovable)
+            item.setFlags(item.flags() & ~QGraphicsItem.GraphicsItemFlag.ItemIsMovable)
             item.selected = False
             item.setSelected(False)
             return True
@@ -374,38 +394,6 @@ class ImageCanvas(QGraphicsView):
             # 直接缩放
             self.scale(scale_factor, scale_factor)
 
-    def event(self, event: QEvent):
-        """处理事件，包括手势事件"""
-        if event.type() == QEvent.Gesture:
-            return self.gestureEvent(event)
-        return super().event(event)
-
-    def gestureEvent(self, event: QEvent):
-        """处理手势事件（触摸板捏合缩放）"""
-        pinch = event.gesture(Qt.PinchGesture)
-        if pinch:
-            if pinch.state() == Qt.GestureStarted:
-                # 记录初始状态
-                self.base_scale = self.current_scale
-                self.last_scale_factor = 1.0
-                self.gesture_start_scale = self.current_scale
-            elif pinch.state() == Qt.GestureUpdated:
-                # 计算增量缩放因子（相对于上一次更新）
-                current_scale_factor = pinch.scaleFactor()
-                scale_factor = current_scale_factor / self.last_scale_factor
-                self.last_scale_factor = current_scale_factor
-
-                # 获取手势中心点（转换为视图坐标）
-                center_point = pinch.centerPoint().toPoint()
-
-                # 执行缩放
-                self.zoom(scale_factor, center_point)
-            elif pinch.state() == Qt.GestureFinished:
-                # 重置手势状态
-                self.last_scale_factor = 1.0
-            return True
-        return False
-
     def mousePressEvent(self, event):
         self.viewport().update()
         if event.button() == Qt.LeftButton:
@@ -415,6 +403,13 @@ class ImageCanvas(QGraphicsView):
                     clicked_item and clicked_item.parentItem() and
                     isinstance(clicked_item.parentItem(), AnnotationView)
             )
+
+            # 检查是否按住Shift键
+            shift_pressed = event.modifiers() & Qt.ShiftModifier
+            
+            # 只有在点击的不是标注且没有按住Shift键且不是框选操作时才取消所有选中状态
+            if not is_annotation and not shift_pressed and not self._is_rubber_band_selection:
+                self.unselect_all_annotations()
 
             # 当设置了当前类别时开始绘制新标注
             if not is_annotation and self.current_category is not None:
@@ -429,8 +424,17 @@ class ImageCanvas(QGraphicsView):
                 self.temp_rect_item.setZValue(10)  # 确保在最上层显示
                 return  # 拦截事件，避免默认处理
 
-        super().mousePressEvent(event)  # 继续默认事件处理
+            # 如果点击在标注上且按住Shift键，切换该标注的选中状态
+            if is_annotation and shift_pressed:
+                if isinstance(clicked_item, AnnotationView):
+                    clicked_item.clicked_with_shift()
+                elif clicked_item.parentItem() and isinstance(clicked_item.parentItem(), AnnotationView):
+                    _parent_item = clicked_item.parentItem()
+                    if hasattr(_parent_item, 'clicked_with_shift'):
+                        _parent_item.clicked_with_shift()
+                return  # 拦截事件，避免默认处理
 
+        super().mousePressEvent(event)  # 继续默认事件处理
 
     def mouseReleaseEvent(self, event):
         """处理鼠标释放事件，无论操作是什么都保存标注"""
@@ -455,7 +459,7 @@ class ImageCanvas(QGraphicsView):
             if rect.width() >= 10 and rect.height() >= 10:
                 # 创建新AnnotationView并设置当前类别
                 item = AnnotationView(
-                    rect.x(), rect.y(), rect.width(), rect.height(),
+                    Decimal(rect.x()), Decimal(rect.y()), Decimal(rect.width()), Decimal(rect.height()),
                     self.current_category,
                     self
                 )
@@ -466,7 +470,7 @@ class ImageCanvas(QGraphicsView):
                 item.select_annotation_view()
                 created_new_annotation = True
 
-        # 如果没有创建新的标注，则清除选择
+        # 如果没有创建新的标注，则处理选择逻辑
         if not created_new_annotation:
             # 检查是否点击在现有标注或其锚点上
             clicked_item = self.itemAt(event.pos())
@@ -475,20 +479,44 @@ class ImageCanvas(QGraphicsView):
                     isinstance(clicked_item.parentItem(), AnnotationView)
             )
             
-            # 点击空白区域时清除选择
-            if not is_annotation:
-                self.unselect_all_annotations()
-                        
+            # 只有点击空白区域且未按住Shift键时才清除选择
+            if not is_annotation and not (event.modifiers() & Qt.ShiftModifier):
                 # 取消annotation_list中的选中状态
                 if self.annotation_list and self.annotation_list.selectionModel():
                     self.annotation_list.selectionModel().clearSelection()
+                # 取消画布上所有标注的选中状态
+                self.unselect_all_annotations()
 
+        # 处理框选完成后的标注选择
+        if self.rubberBandRect().isValid() and not self.drawing:
+            # 获取框选区域
+            rubber_band_rect = self.rubberBandRect()
+            if not rubber_band_rect.isNull() and rubber_band_rect.width() > 1 and rubber_band_rect.height() > 1:
+                # 将视图坐标转换为场景坐标
+                scene_top_left = self.mapToScene(rubber_band_rect.topLeft())
+                scene_bottom_right = self.mapToScene(rubber_band_rect.bottomRight())
+                scene_rect = QRectF(scene_top_left, scene_bottom_right)
+                
+                # 查找框选区域内的所有标注
+                items_in_rect = self.scene.items(scene_rect, Qt.ItemSelectionMode.IntersectsItemShape, 
+                                                Qt.SortOrder.AscendingOrder, self.transform())
+                
+                # 选择框选区域内的所有AnnotationView
+                for item in items_in_rect:
+                    if isinstance(item, AnnotationView):
+                        item.select_annotation_view(True)
+                        
+        # 重置框选标志（无论是否进行了框选操作）
+        self._is_rubber_band_selection = False
+                        
         # 每次鼠标释放都保存标注
         if self.set_needs_save_annotations:
             self.save_annotations()
 
         super().mouseReleaseEvent(event)
-
+        
+        # 每次鼠标释放时刷新画布
+        self.viewport().update()
 
     def mouseDoubleClickEvent(self, event):
         """处理鼠标双击事件"""
@@ -523,6 +551,10 @@ class ImageCanvas(QGraphicsView):
             rect = QRectF(self.start_point, current_point).normalized()
             self.temp_rect_item.setRect(rect)
             return  # 拦截事件，避免默认处理
+
+        # 如果开始框选，设置标志
+        if not self._is_rubber_band_selection and self.dragMode() == QGraphicsView.DragMode.RubberBandDrag:
+            self._is_rubber_band_selection = True
 
         super().mouseMoveEvent(event)
 
@@ -618,128 +650,11 @@ class ImageCanvas(QGraphicsView):
 
             # 执行事务
             self.project_info.sqlite_db.execute_in_transaction(transaction_func)
-            # 打印所有标注坐标
-            self.print_all_annotation_coordinates()
             
             return True
         except Exception as e:
             print(f"保存标注文件时出错: {e}")
             return False
-
-    def create_toolbar(self):
-        """创建并返回一个工具栏，包含缩放控制按钮、删除按钮和YOLO相关按钮"""
-        toolbar = QToolBar("Image Tools")
-        toolbar.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)
-        toolbar.setIconSize(QSize(24, 24))
-        toolbar.setFixedHeight(self.toolbar_height)  # 应用工具栏高度设置
-
-        # 尝试加载系统主题图标，如果失败则使用文本
-        try:
-            # Zoom In
-            zoom_in_action = QAction("Zoom In", self)
-            zoom_in_action.setIcon(self._get_icon("zoom-in", "+"))
-            zoom_in_action.setToolTip("Zoom In (10%)")
-            zoom_in_action.triggered.connect(self.zoom_in)
-            toolbar.addAction(zoom_in_action)
-
-            # Zoom Out
-            zoom_out_action = QAction("Zoom Out", self)
-            zoom_out_action.setIcon(self._get_icon("zoom-out", "-"))
-            zoom_out_action.setToolTip("Zoom Out (10%)")
-            zoom_out_action.triggered.connect(self.zoom_out)
-            toolbar.addAction(zoom_out_action)
-
-            # 1:1
-            reset_zoom_action = QAction("1:1", self)
-            reset_zoom_action.setIcon(self._get_icon("zoom-original", "1:1"))
-            reset_zoom_action.setToolTip("Reset Zoom to Original Size")
-            reset_zoom_action.triggered.connect(self.reset_zoom)
-            toolbar.addAction(reset_zoom_action)
-
-            # Fit Width
-            fit_width_action = QAction("Fit Width", self)
-            fit_width_action.setIcon(self._get_icon("zoom-fit-width", "Fit W"))
-            fit_width_action.setToolTip("Fit image width to window")
-            fit_width_action.triggered.connect(self.fit_to_width)
-            toolbar.addAction(fit_width_action)
-
-            # Fit Height
-            fit_height_action = QAction("Fit Height", self)
-            fit_height_action.setIcon(self._get_icon("zoom-fit-height", "Fit H"))
-            fit_height_action.setToolTip("Fit image height to window")
-            fit_height_action.triggered.connect(self.fit_to_height)
-            toolbar.addAction(fit_height_action)
-
-            # 添加分隔线
-            toolbar.addSeparator()
-
-            # YOLO Run Button - 使用QToolButton
-            self.run_tool_button = QToolButton()
-            self.run_tool_button.setText("Run")
-            self.run_tool_button.setIcon(self._get_icon("system-run", "▶"))
-            self.run_tool_button.setToolTip("Run YOLO model")
-            self.run_tool_button.setIconSize(QSize(24, 24))
-            self.run_tool_button.setFixedSize(50, 56)  # 与Config按钮尺寸一致
-            self.run_tool_button.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)  # 文本在图标下方
-            self.run_tool_button.setStyleSheet("""
-                QToolButton {
-                    text-align: center;
-                    padding-top: 2px;
-                    padding-bottom: 2px;
-                }
-                QToolButton::icon {
-                    subcontrol-position: top;
-                    subcontrol-origin: padding;
-                    margin-bottom: 4px;  /* 图标和文字之间的间距 */
-                }
-                QToolButton::text {
-                    padding: 0px;
-                }
-                QToolButton:disabled {
-                    color: #888888;
-                    icon-size: 24px;
-                }
-            """)
-            self.run_tool_button.clicked.connect(self.exec_yolo)
-            # 根据是否有模型设置初始状态（通过project_info判断）
-            self.run_tool_button.setEnabled(bool(getattr(self.project_info, 'yolo_model_path', None)))
-            toolbar.addWidget(self.run_tool_button)
-
-            # 创建YOLO配置菜单
-            self.create_yolo_menu()
-
-            # YOLO Config Button - 使用QToolButton，与Run按钮风格一致
-            self.config_button = QToolButton()
-            self.config_button.setText("Config")
-            self.config_button.setIcon(self._get_icon("configure", "⋮"))
-            self.config_button.setToolTip("YOLO model configuration")
-            self.config_button.setIconSize(QSize(24, 24))
-            self.config_button.setFixedSize(50, 56)  # 与Run按钮尺寸一致
-            self.config_button.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)  # 文本在图标下方
-            self.config_button.setStyleSheet("""
-                QToolButton {
-                    text-align: center;
-                    padding-top: 2px;
-                    padding-bottom: 2px;
-                }
-                QToolButton::icon {
-                    subcontrol-position: top;
-                    subcontrol-origin: padding;
-                    margin-bottom: 4px;  /* 图标和文字之间的间距 */
-                }
-                QToolButton::text {
-                    padding: 0px;
-                }
-            """)  # 确保文字在图标正下方且垂直居中
-            self.config_button.clicked.connect(self.show_config_menu)
-            toolbar.addWidget(self.config_button)
-
-        except Exception as e:
-            print(f"创建工具栏时出错: {e}")
-            # 创建纯文本工具栏作为备选方案
-            self._create_text_toolbar(toolbar)
-
-        return toolbar
 
     def create_yolo_menu(self):
         """创建YOLO配置菜单，包含run, edit, delete选项"""
@@ -747,19 +662,19 @@ class ImageCanvas(QGraphicsView):
 
         # 运行子菜单
         self.run_action = QAction("Run", self)
-        self.run_action.triggered.connect(self.exec_yolo)
+        self.run_action.triggered.connect(self.exec_yolo)  # type: ignore
         # 运行选项状态通过project_info判断
         self.run_action.setEnabled(self.project_info.is_model_loaded)
         self.config_menu.addAction(self.run_action)
 
         # 编辑子菜单
         edit_action = QAction("Edit", self)
-        edit_action.triggered.connect(self.select_yolo_model)
+        edit_action.triggered.connect(self.select_yolo_model)  # type: ignore
         self.config_menu.addAction(edit_action)
 
         # 删除子菜单
         delete_action = QAction("Delete", self)
-        delete_action.triggered.connect(self.delete_yolo_model)
+        delete_action.triggered.connect(self.delete_yolo_model)  # type: ignore
         # 删除选项只在有模型时可用（通过project_info判断）
         delete_action.setEnabled(self.project_info.is_model_loaded)
         self.config_menu.addAction(delete_action)
@@ -833,7 +748,7 @@ class ImageCanvas(QGraphicsView):
             return
 
         try:
-            self.clear_annotation_views()
+            self.clear_annotation_views(save_annotations=False)
             # 调用YOLOExecutor的exec_yolo方法（复用已有实现）
             detection_results = self.project_info.exec_yolo(img_path=self.current_image_path)
 
@@ -842,7 +757,6 @@ class ImageCanvas(QGraphicsView):
             if detection_results:
                 logging.info("YOLO detection results:")
                 for kolo_item in detection_results:
-                    print(kolo_item)
                     logging.info(kolo_item)
                     self.load_annotation_view_from_kilo_item(kolo_item)  # 复用加载到画布的方法
                 
@@ -896,47 +810,91 @@ class ImageCanvas(QGraphicsView):
             return QIcon(pixmap)
         return icon
 
+
+    def create_toolbar(self):
+        """创建并返回一个工具栏，包含缩放控制按钮、删除按钮和YOLO相关按钮"""
+        toolbar = QToolBar("Image Tools")
+        toolbar.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)
+        toolbar.setIconSize(QSize(24, 24))
+        toolbar.setFixedHeight(self.toolbar_height)  # 应用工具栏高度设置
+
+        # 尝试加载系统主题图标，如果失败则使用文本
+        try:
+            # 创建缩放相关按钮
+            self._create_zoom_actions(toolbar)
+
+            # 添加分隔线
+            toolbar.addSeparator()
+
+            # 创建YOLO相关按钮
+            self._create_yolo_actions(toolbar, use_icons=True)
+
+        except Exception as e:
+            print(f"创建工具栏时出错: {e}")
+            # 创建纯文本工具栏作为备选方案
+            self._create_text_toolbar(toolbar)
+
+        return toolbar
+
     def _create_text_toolbar(self, toolbar):
         """创建纯文本工具栏作为备选方案"""
-        # Zoom In
-        zoom_in_action = QAction("+", self)
-        zoom_in_action.setToolTip("Zoom In (10%)")
-        zoom_in_action.triggered.connect(self.zoom_in)
-        toolbar.addAction(zoom_in_action)
-
-        # Zoom Out
-        zoom_out_action = QAction("-", self)
-        zoom_out_action.setToolTip("Zoom Out (10%)")
-        zoom_out_action.triggered.connect(self.zoom_out)
-        toolbar.addAction(zoom_out_action)
-
-        # 1:1
-        reset_zoom_action = QAction("1:1", self)
-        reset_zoom_action.setToolTip("Reset Zoom to Original Size")
-        reset_zoom_action.triggered.connect(self.reset_zoom)
-        toolbar.addAction(reset_zoom_action)
-
-        # Fit Width
-        fit_width_action = QAction("Fit W", self)
-        fit_width_action.setToolTip("Fit image width to window")
-        fit_width_action.triggered.connect(self.fit_to_width)
-        toolbar.addAction(fit_width_action)
-
-        # Fit Height
-        fit_height_action = QAction("Fit H", self)
-        fit_height_action.setToolTip("Fit image height to window")
-        fit_height_action.triggered.connect(self.fit_to_height)
-        toolbar.addAction(fit_height_action)
+        # 创建缩放相关按钮
+        self._create_zoom_actions(toolbar)
 
         # 添加分隔线
         toolbar.addSeparator()
 
-        # YOLO Run Button (文本备选)
+        # 创建YOLO相关按钮
+        self._create_yolo_actions(toolbar, use_icons=False)
+
+    def _create_zoom_actions(self, toolbar):
+        """创建缩放相关的动作按钮"""
+        # Zoom In
+        zoom_in_action = QAction("Zoom In", self)
+        zoom_in_action.setIcon(self._get_icon("zoom-in", "+"))
+        zoom_in_action.setToolTip("Zoom In (10%)")
+        zoom_in_action.triggered.connect(self.zoom_in)  # type: ignore
+        toolbar.addAction(zoom_in_action)
+
+        # Zoom Out
+        zoom_out_action = QAction("Zoom Out", self)
+        zoom_out_action.setIcon(self._get_icon("zoom-out", "-"))
+        zoom_out_action.setToolTip("Zoom Out (10%)")
+        zoom_out_action.triggered.connect(self.zoom_out)  # type: ignore
+        toolbar.addAction(zoom_out_action)
+
+        # 1:1
+        reset_zoom_action = QAction("1:1", self)
+        reset_zoom_action.setIcon(self._get_icon("zoom-original", "1:1"))
+        reset_zoom_action.setToolTip("Reset Zoom to Original Size")
+        reset_zoom_action.triggered.connect(self.reset_zoom) # type: ignore
+        toolbar.addAction(reset_zoom_action)
+
+        # Fit Width
+        fit_width_action = QAction("Fit Width", self)
+        fit_width_action.setIcon(self._get_icon("zoom-fit-width", "Fit W"))
+        fit_width_action.setToolTip("Fit image width to window")
+        fit_width_action.triggered.connect(self.fit_to_width)  # type: ignore
+        toolbar.addAction(fit_width_action)
+
+        # Fit Height
+        fit_height_action = QAction("Fit Height", self)
+        fit_height_action.setIcon(self._get_icon("zoom-fit-height", "Fit H"))
+        fit_height_action.setToolTip("Fit image height to window")
+        fit_height_action.triggered.connect(self.fit_to_height)  # type: ignore
+        toolbar.addAction(fit_height_action)
+
+    def _create_yolo_actions(self, toolbar, use_icons=True):
+        """创建YOLO相关的动作按钮"""
+        # YOLO Run Button - 使用QToolButton
         self.run_tool_button = QToolButton()
         self.run_tool_button.setText("Run")
+        if use_icons:
+            self.run_tool_button.setIcon(self._get_icon("system-run", "▶"))
         self.run_tool_button.setToolTip("Run YOLO model")
+        self.run_tool_button.setIconSize(QSize(24, 24))
         self.run_tool_button.setFixedSize(50, 56)  # 与Config按钮尺寸一致
-        self.run_tool_button.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)
+        self.run_tool_button.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)  # 文本在图标下方
         self.run_tool_button.setStyleSheet("""
             QToolButton {
                 text-align: center;
@@ -946,10 +904,18 @@ class ImageCanvas(QGraphicsView):
             QToolButton::icon {
                 subcontrol-position: top;
                 subcontrol-origin: padding;
+                margin-bottom: 4px;  /* 图标和文字之间的间距 */
+            }
+            QToolButton::text {
+                padding: 0px;
+            }
+            QToolButton:disabled {
+                color: #888888;
+                icon-size: 24px;
             }
         """)
-        self.run_tool_button.clicked.connect(self.exec_yolo)
-        # 根据project_info判断模型是否存在以启用按钮
+        self.run_tool_button.clicked.connect(self.exec_yolo)  # type: ignore
+        # 根据是否有模型设置初始状态（通过project_info判断）
         self.run_tool_button.setEnabled(bool(getattr(self.project_info, 'yolo_model_path', None)))
         toolbar.addWidget(self.run_tool_button)
 
@@ -959,8 +925,10 @@ class ImageCanvas(QGraphicsView):
         # YOLO Config Button - 使用QToolButton，与Run按钮风格一致
         self.config_button = QToolButton()
         self.config_button.setText("Config")
-        self.config_button.setIcon(self._get_icon("configure", "⋮"))
+        if use_icons:
+            self.config_button.setIcon(self._get_icon("configure", "⋮"))
         self.config_button.setToolTip("YOLO model configuration")
+        self.config_button.setIconSize(QSize(24, 24))
         self.config_button.setFixedSize(50, 56)  # 与Run按钮尺寸一致
         self.config_button.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)  # 文本在图标下方
         self.config_button.setStyleSheet("""
@@ -972,9 +940,13 @@ class ImageCanvas(QGraphicsView):
             QToolButton::icon {
                 subcontrol-position: top;
                 subcontrol-origin: padding;
+                margin-bottom: 4px;  /* 图标和文字之间的间距 */
             }
-        """)  # 与Run按钮样式一致
-        self.config_button.clicked.connect(self.show_config_menu)
+            QToolButton::text {
+                padding: 0px;
+            }
+        """)  # 确保文字在图标正下方且垂直居中
+        self.config_button.clicked.connect(self.show_config_menu)  # type: ignore
         toolbar.addWidget(self.config_button)
 
     def zoom_in(self):
@@ -1020,7 +992,7 @@ class ImageCanvas(QGraphicsView):
 
     def fit_to_window(self):
         """将图片调整到最适合窗口的大小（保持宽高比）"""
-        self.fitInView(self.scene.sceneRect(), Qt.KeepAspectRatio)
+        self.fitInView(self.scene.sceneRect(), Qt.AspectRatioMode.KeepAspectRatio)
         self.current_scale = self.transform().m11()
 
     def fit_to_width(self):
@@ -1065,15 +1037,6 @@ class ImageCanvas(QGraphicsView):
         # 确保图片居中显示
         self.centerOn(self.scene.sceneRect().center())
 
-    def create_annotation_list(self):
-        """创建AnnotationList对象，并绑定对应方法"""
-        # 创建自定义标注列表组件
-        self.annotation_list = AnnotationList(self.project_info)
-        self.annotation_list.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
-        self.annotation_list.load_categories_from_json()
-
-        return self.annotation_list
-
     def on_selection_changed(self):
         """处理场景中选择变化的事件"""
         # 先获取选中的标注项
@@ -1116,12 +1079,12 @@ class ImageCanvas(QGraphicsView):
         # 如果有选中的标注项，添加"放置最底层"选项
         if selected_items:
             send_to_back_action = QAction("放置最底层", self)
-            send_to_back_action.triggered.connect(self.send_selected_to_back)
+            send_to_back_action.triggered.connect(self.send_selected_to_back)   # type: ignore
             context_menu.addAction(send_to_back_action)
             
             # 添加删除选项
             delete_action = QAction("删除", self)
-            delete_action.triggered.connect(self.delete_selected_items)
+            delete_action.triggered.connect(self.delete_selected_items)   # type: ignore
             context_menu.addAction(delete_action)
             
             # 添加分隔线
@@ -1129,7 +1092,7 @@ class ImageCanvas(QGraphicsView):
 
         # 添加"全部清空"选项
         clear_all_action = QAction("全部清空", self)
-        clear_all_action.triggered.connect(self.clear_all_annotations)
+        clear_all_action.triggered.connect(self.clear_all_annotations)  # type: ignore
         context_menu.addAction(clear_all_action)
         
         # 查找点击位置下的所有AnnotationView对象
@@ -1153,7 +1116,7 @@ class ImageCanvas(QGraphicsView):
             # 为每个AnnotationView添加菜单项到一级菜单
             for annotation in sorted_annotations:
                 action = QAction(annotation.category.class_name, self)
-                action.triggered.connect(
+                action.triggered.connect(  # type: ignore
                     lambda checked, ann=annotation: ann.bring_to_top()
                 )
                 context_menu.addAction(action)
@@ -1174,6 +1137,9 @@ class ImageCanvas(QGraphicsView):
         for item in annotation_items:
             if item.isSelected():
                 item.send_to_back()
+
+        # 操作完成后刷新画布
+        self.viewport().update()
 
     def clear_all_annotations(self):
         """清空所有标注并删除对应的.kolo文件"""
@@ -1224,43 +1190,3 @@ class ImageCanvas(QGraphicsView):
             print("缓存的YOLO模型加载成功")
         else:
             print(f"缓存的YOLO模型加载失败: {error_message}")
-
-    def print_all_annotation_coordinates(self):
-        """打印当前画布上所有标注视图的坐标值"""
-        if not self.current_image_path or self.image_item is None:
-            print("没有加载图像")
-            return
-
-        # 获取图像尺寸
-        img_width = self.image_item.pixmap().width()
-        img_height = self.image_item.pixmap().height()
-
-        print(f"图像尺寸: {img_width} x {img_height}")
-        print("标注坐标信息 (x_center, y_center, width, height):")
-
-        # 收集所有AnnotationView并按class_id排序
-        annotations = []
-        for item in self.scene.items():
-            if isinstance(item, AnnotationView):
-                annotations.append(item)
-
-        # 按class_name排序
-        annotations.sort(key=lambda _item: _item.category.class_name)
-
-        for i, item in enumerate(annotations):
-            # 获取当前在场景中的绝对位置和大小
-            rect_to_log = item.sceneBoundingRect()
-            x = rect_to_log.x()
-            y = rect_to_log.y()
-            width = rect_to_log.width()
-            height = rect_to_log.height()
-
-            # 计算归一化坐标
-            x_center = (x + width / 2) / img_width
-            y_center = (y + height / 2) / img_height
-            norm_width = width / img_width
-            norm_height = height / img_height
-
-            print(f"  {i+1}. {item.category.class_name}: "
-                  f"x_center={x_center:.19f}, y_center={y_center:.19f}, "
-                  f"width={norm_width:.19f}, height={norm_height:.19f}")

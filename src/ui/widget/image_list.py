@@ -4,11 +4,11 @@ import sys
 from pathlib import Path
 
 from PyQt5.QtCore import (Qt, QSize, QThreadPool, QRunnable, pyqtSignal,
-                          QAbstractListModel, QModelIndex, QObject, QThread)
-from PyQt5.QtGui import (QPixmap, QIcon, QImage, QPainter, QFontMetrics)
+                          QAbstractListModel, QModelIndex, QObject, QThread, QItemSelection, QItemSelectionModel)
+from PyQt5.QtGui import (QPixmap, QIcon, QImage, QPainter, QFontMetrics, QKeySequence)
 from PyQt5.QtWidgets import (QListView, QStyledItemDelegate, QStyle,
                              QMenu, QInputDialog, QMessageBox, QDialog, QVBoxLayout,
-                             QLabel, QPushButton, QProgressBar)
+                             QLabel, QPushButton, QProgressBar, QApplication)
 
 from src.models.dto.ref_project_info import RefProjectInfo
 
@@ -237,7 +237,7 @@ class ImageListItemDelegate(QStyledItemDelegate):
         # 计算文本显示区域
         text_width = text_rect.width() - 4
         metrics = painter.fontMetrics()
-        elided_text = metrics.elidedText(file_name, Qt.ElideRight, text_width)
+        elided_text = metrics.elidedText(file_name, Qt.TextElideMode.ElideRight, text_width)
 
         painter.drawText(text_rect, Qt.AlignLeft | Qt.AlignVCenter, elided_text)
 
@@ -267,7 +267,7 @@ class YoloWorker(QThread):
                 raise Exception("YOLO model not loaded")
 
             # 使用project_info中的exec_yolo方法进行推理
-            results = self.project_info.exec_yolo(self.file_path)
+            results = self.project_info.exec_yolo(self.file_path, save_to_db=True)
 
             if self.is_canceled:
                 return
@@ -277,12 +277,12 @@ class YoloWorker(QThread):
             else:
                 msg = "No objects found."
 
-            self.finished.emit(True, msg, self.file_path)
+            self.finished.emit(True, msg, self.file_path) # type: ignore
 
         except Exception as e:
             if not self.is_canceled:
                 error_msg = f"{str(e)}"
-                self.error.emit(error_msg, self.file_path)
+                self.error.emit(error_msg, self.file_path)  # type: ignore
 
     def cancel(self):
         """取消任务"""
@@ -291,17 +291,19 @@ class YoloWorker(QThread):
 
 # ====================== 图片列表视图 ======================
 class ImageListView(QListView):
-    sig_image_clicked = pyqtSignal(str)
+    sig_image_clicked = pyqtSignal(Path)
     sig_canvas_needs_reload = pyqtSignal()  # 发送canvas需要reload的信号
     sig_selection_changed = pyqtSignal(int, int)  # 发送图片总数和当前选中索引信号
 
     def __init__(self, project_info: RefProjectInfo):
         super().__init__()
         self.project_info = project_info
-        self.setSelectionMode(QListView.SingleSelection)
-        self.setVerticalScrollMode(QListView.ScrollPerPixel)
-        self.setResizeMode(QListView.Adjust)
+        self.setSelectionMode(QListView.SelectionMode.ExtendedSelection)  # 改为扩展选择模式
+        self.setVerticalScrollMode(QListView.ScrollMode.ScrollPerPixel)
+        self.setResizeMode(QListView.ResizeMode.Adjust)
         self.setUniformItemSizes(True)  # 优化性能
+        self.last_selected_row = -1  # 记录上次选中的行
+        self.current_selection_anchor = -1  # 记录当前选择的锚点
 
         # 创建模型和委托（使用默认行高56px）
         self.model = ImageListModel(self, row_height=56)
@@ -326,24 +328,71 @@ class ImageListView(QListView):
         """从项目路径加载图片"""
         self.model.load_images_from_path(project_path)
 
+    def mousePressEvent(self, event):
+        """重写鼠标按下事件以处理Shift键多选"""
+        if event.button() == Qt.LeftButton:
+            index = self.indexAt(event.pos())
+            if index.isValid():
+                modifiers = QApplication.keyboardModifiers()
+                if modifiers == Qt.ShiftModifier and self.current_selection_anchor != -1:
+                    current_row = index.row()
+                    selection_model = self.selectionModel()
+                    
+                    # 使用Toggle模式扩展选择，而不是替换选择
+                    selection_model.select(
+                        QItemSelection(self.model.index(min(self.current_selection_anchor, current_row), 0),
+                                      self.model.index(max(self.current_selection_anchor, current_row), 0)),
+                        QItemSelectionModel.SelectionFlag.SelectCurrent | QItemSelectionModel.SelectionFlag.Rows
+                    )
+                    
+                    # 加载最新选中的图片
+                    file_path = self.model.data(index, Qt.UserRole)
+                    if file_path:
+                        self.sig_image_clicked.emit(Path(file_path))  # type: ignore
+                    
+                    return
+                else:
+                    # 更新选择锚点
+                    self.current_selection_anchor = index.row()
+        
+        super().mousePressEvent(event)
+
     def on_selection_changed(self, selected, deselected):
         """处理选择变化事件"""
         # 获取当前选中索引
-        indexes = selected.indexes()
-        current_index = indexes[0].row() + 1 if indexes else 0
+        indexes = self.selectionModel().selectedIndexes()
+        selected_count = len(indexes)
         
         # 获取总图片数
         total_count = self.model.rowCount()
         
         # 发送信号
-        self.sig_selection_changed.emit(total_count, current_index)
+        self.sig_selection_changed.emit(total_count, selected_count)
+        
+        # 如果有选中项，更新最后选中的行和选择锚点
+        if indexes:
+            self.last_selected_row = indexes[-1].row()
+            # 只有在没有按住Shift键时才更新锚点
+            modifiers = QApplication.keyboardModifiers()
+            if modifiers != Qt.ShiftModifier:
+                self.current_selection_anchor = self.last_selected_row
+            
+            # 加载最新选中的图片
+            latest_selected_index = indexes[-1]
+            file_path = self.model.data(latest_selected_index, Qt.UserRole)
+            if file_path:
+                # 运行yolo后会执行此处，保留！
+                self.sig_image_clicked.emit(Path(file_path))  # type: ignore
 
     def handle_item_clicked(self, index):
         """处理项点击事件"""
         if index.isValid():
+            # 更新最后选中的行
+            self.last_selected_row = index.row()
+            
             file_path = self.model.data(index, Qt.UserRole)
             if file_path:
-                self.sig_image_clicked.emit(file_path)  # type: ignore
+                self.sig_image_clicked.emit(Path(file_path))  # type: ignore
 
     def contextMenuEvent(self, event):
         """处理右键菜单事件"""
@@ -483,38 +532,96 @@ class ImageListView(QListView):
                 QMessageBox.critical(self, "错误", f"重命名失败: {str(e)}")
 
     def delete_selected(self, index):
-        """删除单个文件"""
-        if not index.isValid():
+        """删除文件（支持多选删除）"""
+        # 获取所有选中的索引
+        selected_indexes = self.selectionModel().selectedIndexes()
+        
+        # 如果没有选中项，直接返回
+        if not selected_indexes:
             return
-
-        # 获取文件信息
-        file_path = self.model.image_paths[index.row()]
-        file_name = os.path.basename(file_path)
-
+            
+        # 如果只选中了一项且传入的index有效，则使用传入的index
+        # 否则使用所有选中的索引
+        if len(selected_indexes) == 1 and index.isValid():
+            indexes_to_delete = [index]
+        else:
+            indexes_to_delete = selected_indexes
+            
+        # 获取要删除的文件信息
+        files_to_delete = []
+        for idx in indexes_to_delete:
+            if idx.isValid():
+                file_path = self.model.image_paths[idx.row()]
+                file_name = os.path.basename(file_path)
+                files_to_delete.append((idx.row(), file_path, file_name))
+                
+        # 如果没有有效文件，直接返回
+        if not files_to_delete:
+            return
+            
         # 确认删除
-        reply = QMessageBox.question(
-            self,
-            "确认删除",
-            f"确定要删除 '{file_name}' 吗？\n此操作不可恢复！",
-            QMessageBox.Yes | QMessageBox.No
-        )
-
+        if len(files_to_delete) == 1:
+            # 单个文件删除确认
+            file_name = files_to_delete[0][2]
+            reply = QMessageBox.question(
+                self,
+                "确认删除",
+                f"确定要删除 '{file_name}' 吗？\n此操作不可恢复！",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            )
+        else:
+            # 多个文件删除确认
+            reply = QMessageBox.question(
+                self,
+                "确认删除",
+                f"确定要删除选中的 {len(files_to_delete)} 个文件吗？\n此操作不可恢复！",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            )
+            
         if reply == QMessageBox.Yes:
             try:
-                # 删除文件
-                os.remove(file_path)
-
-                # 从模型中移除
-                self.model.beginRemoveRows(QModelIndex(), index.row(), index.row())
-                del self.model.image_paths[index.row()]
-                self.model.endRemoveRows()
-
-                # 清理缩略图缓存
-                if file_path in self.model.thumbnail_cache:
-                    del self.model.thumbnail_cache[file_path]
+                # 按行号降序排列，从后往前删除，避免索引变化问题
+                files_to_delete.sort(key=lambda x: x[0], reverse=True)
+                
+                # 记录删除成功的文件和失败的文件
+                success_count = 0
+                failed_files = []
+                
+                for row, file_path, file_name in files_to_delete:
+                    try:
+                        # 删除文件
+                        os.remove(file_path)
+                        success_count += 1
+                    except Exception as e:
+                        failed_files.append((file_name, str(e)))
+                        
+                # 从模型中批量移除（需要处理索引变化）
+                for row, file_path, file_name in files_to_delete:
+                    # 从数据库中删除相关的kolo item项
+                    self.project_info.delete_kolo_item_for_image(Path(file_path))
+                    
+                    # 从模型中移除
+                    self.model.beginRemoveRows(QModelIndex(), row, row)
+                    del self.model.image_paths[row]
+                    self.model.endRemoveRows()
+                    
+                    # 清理缩略图缓存
+                    if file_path in self.model.thumbnail_cache:
+                        del self.model.thumbnail_cache[file_path]
+                        
+                # 显示结果信息
+                if failed_files:
+                    error_msg = f"成功删除 {success_count} 个文件。\n\n以下文件删除失败：\n"
+                    for file_name, error in failed_files[:5]:  # 只显示前5个错误
+                        error_msg += f"{file_name}: {error}\n"
+                    if len(failed_files) > 5:
+                        error_msg += f"... 还有 {len(failed_files) - 5} 个文件删除失败\n"
+                    QMessageBox.warning(self, "删除完成", error_msg)
+                elif len(files_to_delete) > 1:
+                    QMessageBox.information(self, "删除完成", f"成功删除 {success_count} 个文件。")
 
             except Exception as e:
-                QMessageBox.critical(self, "错误", f"删除失败: {str(e)}")
+                QMessageBox.critical(self, "错误", f"删除过程中发生错误: {str(e)}")
 
     def open_in_explorer(self, index):
         """在系统文件管理器中打开文件所在目录并选中文件"""
@@ -562,68 +669,214 @@ class ImageListView(QListView):
             QMessageBox.critical(self, "错误", f"打开文件夹失败: {str(e)}")
 
     def on_run_clicked(self, index):
-        """Run菜单项点击事件：处理单个文件"""
-        if index.isValid() and self.project_info.is_model_loaded:
-            file_path_str = self.model.data(index, Qt.UserRole)
-            file_path = Path(file_path_str)
-            if file_path:
-                print(f"Running single file: {file_path.name}")
+        """Run菜单项点击事件：处理选中的所有文件"""
+        # 检查模型是否已加载
+        if not self.project_info.is_model_loaded:
+            QMessageBox.warning(self, "Warning", "YOLO model not loaded. Please load a model first.")
+            return
 
-                # 创建处理中对话框
-                progress_dialog = QDialog(self)
-                progress_dialog.setWindowTitle("Processing")
-                progress_dialog.setFixedSize(300, 100)
-                layout = QVBoxLayout(progress_dialog)
+        # 获取所有选中的索引
+        selected_indexes = self.selectionModel().selectedIndexes()
+        
+        # 如果没有选中项，直接返回
+        if not selected_indexes:
+            return
+            
+        # 如果只选中了一项且传入的index有效，则使用传入的index
+        # 否则使用所有选中的索引
+        if len(selected_indexes) == 1 and index.isValid():
+            indexes_to_process = [index]
+        else:
+            indexes_to_process = selected_indexes
+            
+        # 获取要处理的文件信息
+        files_to_process = []
+        for idx in indexes_to_process:
+            if idx.isValid():
+                file_path = self.model.image_paths[idx.row()]
+                file_name = os.path.basename(file_path)
+                files_to_process.append((idx.row(), file_path, file_name))
+                
+        # 如果没有有效文件，直接返回
+        if not files_to_process:
+            return
+            
+        total_files = len(files_to_process)
+        print(f"Running {total_files} selected files")
 
-                label = QLabel(f"Processing {file_path.name}...")
-                cancel_btn = QPushButton("Cancel")
+        # 创建总进度对话框
+        progress_dialog = QDialog(self)
+        progress_dialog.setWindowTitle("Processing")
+        progress_dialog.setWindowModality(Qt.WindowModal)
+        progress_dialog.setFixedSize(500, 200)
 
-                layout.addWidget(label)
-                layout.addWidget(cancel_btn)
-                progress_dialog.setLayout(layout)
+        # 创建主布局
+        main_layout = QVBoxLayout(progress_dialog)
+        main_layout.setContentsMargins(10, 10, 10, 10)
+        main_layout.setSpacing(8)
 
-                # 创建工作线程，传入project_info
-                worker = YoloWorker(file_path, self.project_info)
+        # 创建文本显示区域布局
+        text_layout = QVBoxLayout()
+        text_layout.setSpacing(8)
 
-                # 处理完成回调
-                def on_finished(success, msg, file_path):
-                    progress_dialog.accept()
-                    if success:
-                        QMessageBox.information(
-                            self, "Success",
-                            f"Completed processing {file_path.name}.\n{msg}"
-                        )
-                        # 刷新canvas
-                        self.sig_canvas_needs_reload.emit()
+        # 第一行：正在处理的文件名
+        filename_label = QLabel()
+        filename_label.setWordWrap(True)
+        filename_label.setMinimumHeight(60)
+        filename_label.setAlignment(Qt.AlignLeft | Qt.AlignTop)
+        text_layout.addWidget(filename_label)
 
-                # 错误处理回调
-                def on_error(msg, _file_path):
-                    progress_dialog.accept()
-                    QMessageBox.critical(
-                        self, "Error",
-                        f"Error processing {_file_path.name}:\n{msg}"
-                    )
+        # 第二行：处理进度
+        progress_text_label = QLabel()
+        progress_text_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        text_layout.addWidget(progress_text_label)
 
-                # 取消按钮回调 - 修复核心
-                def on_canceled():
-                    # 标记worker为取消状态
-                    worker.cancel()
-                    # 关闭对话框
-                    progress_dialog.accept()
-                    # 等待worker结束
-                    worker.wait()
-                    # 显示取消消息
-                    QMessageBox.information(self, "Cancelled", "Processing has been cancelled.")
+        main_layout.addLayout(text_layout)
 
-                # 连接信号与槽 - 只连接到on_canceled，避免冲突
-                worker.finished.connect(on_finished)
-                worker.error.connect(on_error)
-                cancel_btn.clicked.connect(on_canceled)
+        # 进度条
+        progress_bar = QProgressBar()
+        progress_bar.setRange(0, 100)
+        main_layout.addWidget(progress_bar)
+        main_layout.setSpacing(4)
 
-                # 启动工作线程
-                worker.start()
-                # 显示对话框
-                progress_dialog.exec_()
+        # 取消按钮
+        cancel_btn = QPushButton("Cancel")
+        main_layout.addWidget(cancel_btn)
+
+        # 统计信息
+        success_count = 0
+        error_count = 0
+        canceled = False
+        current_worker = None  # 跟踪当前正在执行的worker
+
+        # 创建总控线程管理所有文件处理
+        class SelectedFilesController(QThread):
+            # 更新信号：当前文件索引, 文件名, 进度文本, 完成百分比
+            update_progress = pyqtSignal(int, str, str, int)
+            # 完成信号：成功数, 错误数, 是否取消, 已处理数
+            processing_complete = pyqtSignal(int, int, bool, int)
+
+            def __init__(self, files, project_info: RefProjectInfo):
+                super().__init__()
+                self.files = files
+                self.project_info = project_info
+                self.is_canceled = False
+
+            def run(self):
+                success = 0
+                error = 0
+                total = len(self.files)
+                nonlocal current_worker
+
+                for i, (row, file_path_str, file_name) in enumerate(self.files, 1):
+                    if self.is_canceled:
+                        break
+
+                    file_path = Path(file_path_str)
+                    percentage = int((i / total) * 100) if total > 0 else 0
+                    progress_text = f"{i}/{total} files ({percentage}%)"
+                    self.update_progress.emit(i, file_name, progress_text, percentage)
+
+                    # 创建并启动工作线程
+                    current_worker = YoloWorker(file_path, self.project_info)
+                    current_worker.start()
+
+                    # 等待当前文件处理完成或取消
+                    while current_worker.isRunning() and not self.is_canceled:
+                        current_worker.msleep(100)
+
+                    if self.is_canceled:
+                        if current_worker and current_worker.isRunning():
+                            current_worker.cancel()
+                            current_worker.wait()
+                        break
+
+                    # 检查处理结果
+                    if current_worker.is_canceled:
+                        error += 1
+                    else:
+                        success += 1
+
+                # 发送最终进度
+                final_text = "Finishing up..." if not self.is_canceled else "Canceling..."
+                final_percentage = 100 if not self.is_canceled else progress_bar.value()
+                self.update_progress.emit(i, "", final_text, final_percentage)
+                self.processing_complete.emit(success, error, self.is_canceled, i)
+
+            def cancel(self):
+                self.is_canceled = True
+
+        # 创建总控线程
+        controller = SelectedFilesController(files_to_process, self.project_info)
+
+        # 更新进度条和标签
+        def update_progress_bar(index, file_name, text, percentage):
+            if file_name:
+                metrics = QFontMetrics(filename_label.font())
+                max_width = filename_label.width()
+                elided_text = metrics.elidedText(file_name, Qt.ElideLeft, max_width)
+                filename_label.setText(elided_text)
+
+            progress_text_label.setText(text)
+            progress_bar.setValue(percentage)
+
+        # 处理完成
+        def on_complete(success, error, is_canceled, processed):
+            nonlocal success_count, error_count, canceled
+            success_count = success
+            error_count = error
+            canceled = is_canceled
+            progress_bar.setValue(100)
+            filename_label.setText("Processing complete!")
+            progress_text_label.setText("")
+            # 关闭对话框
+            progress_dialog.accept()
+            # 刷新canvas
+            self.sig_canvas_needs_reload.emit()
+
+            # 显示结果统计
+            if canceled:
+                QMessageBox.information(
+                    self, "Cancelled",
+                    f"Processing cancelled.\nCompleted {success_count}/{total_files} files."
+                )
+            else:
+                result_msg = (f"Processing complete.\n"
+                              f"Total: {total_files}\n"
+                              f"Success: {success_count}\n"
+                              f"Errors: {error_count}")
+                QMessageBox.information(self, "Complete", result_msg)
+
+        # 取消处理
+        def on_cancel():
+            if controller.isRunning():
+                controller.cancel()
+                # 立即取消当前正在执行的任务
+                if current_worker and current_worker.isRunning():
+                    current_worker.cancel()
+                filename_label.setText("Canceling... Please wait.")
+                progress_text_label.setText("")
+
+                # 启动一个短延迟来确保线程有时间停止
+                QThread.msleep(200)
+                # 关闭对话框
+                progress_dialog.accept()
+                # 等待控制器结束
+                controller.wait()
+                # 显示取消消息
+                QMessageBox.information(self, "Cancelled", "Processing has been cancelled.")
+
+        # 连接信号与槽
+        controller.update_progress.connect(update_progress_bar)
+        controller.processing_complete.connect(on_complete)
+        cancel_btn.clicked.connect(on_cancel)
+
+        # 启动总控线程
+        controller.start()
+        # 刷新canvas
+        self.sig_canvas_needs_reload.emit()
+        # 显示进度对话框
+        progress_dialog.exec_()
 
     def on_run_all_clicked(self):
         """Run All菜单项点击事件：处理所有文件"""
