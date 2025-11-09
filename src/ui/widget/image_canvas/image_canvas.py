@@ -46,6 +46,9 @@ class ImageCanvas(QGraphicsView):
         # 添加标志防止递归调用
         self._updating_delete_state = False
 
+        # 添加标志跟踪框选操作
+        self._is_rubber_band_selection = False
+
         # 连接模型加载完成的信号
         self._connect_model_signals()
 
@@ -404,8 +407,8 @@ class ImageCanvas(QGraphicsView):
             # 检查是否按住Shift键
             shift_pressed = event.modifiers() & Qt.ShiftModifier
             
-            # 只有在点击的不是标注且没有按住Shift键时才取消所有选中状态
-            if not is_annotation and not shift_pressed:
+            # 只有在点击的不是标注且没有按住Shift键且不是框选操作时才取消所有选中状态
+            if not is_annotation and not shift_pressed and not self._is_rubber_band_selection:
                 self.unselect_all_annotations()
 
             # 当设置了当前类别时开始绘制新标注
@@ -432,7 +435,6 @@ class ImageCanvas(QGraphicsView):
                 return  # 拦截事件，避免默认处理
 
         super().mousePressEvent(event)  # 继续默认事件处理
-
 
     def mouseReleaseEvent(self, event):
         """处理鼠标释放事件，无论操作是什么都保存标注"""
@@ -485,6 +487,28 @@ class ImageCanvas(QGraphicsView):
                 # 取消画布上所有标注的选中状态
                 self.unselect_all_annotations()
 
+        # 处理框选完成后的标注选择
+        if self.rubberBandRect().isValid() and not self.drawing:
+            # 获取框选区域
+            rubber_band_rect = self.rubberBandRect()
+            if not rubber_band_rect.isNull() and rubber_band_rect.width() > 1 and rubber_band_rect.height() > 1:
+                # 将视图坐标转换为场景坐标
+                scene_top_left = self.mapToScene(rubber_band_rect.topLeft())
+                scene_bottom_right = self.mapToScene(rubber_band_rect.bottomRight())
+                scene_rect = QRectF(scene_top_left, scene_bottom_right)
+                
+                # 查找框选区域内的所有标注
+                items_in_rect = self.scene.items(scene_rect, Qt.ItemSelectionMode.IntersectsItemShape, 
+                                                Qt.SortOrder.AscendingOrder, self.transform())
+                
+                # 选择框选区域内的所有AnnotationView
+                for item in items_in_rect:
+                    if isinstance(item, AnnotationView):
+                        item.select_annotation_view(True)
+                        
+        # 重置框选标志（无论是否进行了框选操作）
+        self._is_rubber_band_selection = False
+                        
         # 每次鼠标释放都保存标注
         if self.set_needs_save_annotations:
             self.save_annotations()
@@ -525,6 +549,10 @@ class ImageCanvas(QGraphicsView):
             rect = QRectF(self.start_point, current_point).normalized()
             self.temp_rect_item.setRect(rect)
             return  # 拦截事件，避免默认处理
+
+        # 如果开始框选，设置标志
+        if not self._is_rubber_band_selection and self.dragMode() == QGraphicsView.DragMode.RubberBandDrag:
+            self._is_rubber_band_selection = True
 
         super().mouseMoveEvent(event)
 
