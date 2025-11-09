@@ -608,6 +608,9 @@ class ImageListView(QListView):
                         
                 # 从模型中批量移除（需要处理索引变化）
                 for row, file_path, file_name in files_to_delete:
+                    # 从数据库中删除相关的kolo item项
+                    self.project_info.delete_kolo_item_for_image(Path(file_path))
+                    
                     # 从模型中移除
                     self.model.beginRemoveRows(QModelIndex(), row, row)
                     del self.model.image_paths[row]

@@ -133,6 +133,7 @@ class YOLOExecutor:
             with self.parent.sqlite_db.db_session() as session:
                 # 删除image_name为img_path.name的所有行
                 deleted_count = session.query(KoloItem).filter(KoloItem.image_name == img_path.name).delete()
+                session.commit()  # 确保提交事务
                 logging.debug(f"从数据库删除了 {deleted_count} 个Kolo项目")
         except Exception as e:
             logging.error(f"从数据库删除Kolo项目时出错: {str(e)}")
