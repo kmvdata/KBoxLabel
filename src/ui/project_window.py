@@ -54,9 +54,7 @@ class ProjectWindow(QMainWindow):
         self.thread_pool = QThreadPool(self)
         self.image_list = ImageListView(self.project_info)
         left_layout.addWidget(self.image_list)
-        # 连接选中项变化信号
-        self.image_list.sig_selection_changed.connect(self.on_image_list_selection_changed)  # type: ignore
-        self.image_list.selectionModel().selectionChanged.connect(self.on_image_selection_changed)  # type: ignore
+
 
         # ===== 中间图片编辑区域 =====
         # 创建ImageCanvas
@@ -126,6 +124,11 @@ class ProjectWindow(QMainWindow):
         self.image_list.sig_canvas_needs_reload.connect(
             self.image_canvas.reload_image
         )
+
+        # 连接选中项变化信号
+        self.image_list.sig_selection_changed.connect(self.on_image_list_selection_changed)  # type: ignore
+        self.image_list.selectionModel().selectionChanged.connect(self.on_image_selection_changed)  # type: ignore
+        self.image_list.sig_image_clicked.connect(self.image_canvas.load_image)
 
         # 窗口加载完成后自动选中第一个元素
         QTimer.singleShot(0, self.select_first_image)

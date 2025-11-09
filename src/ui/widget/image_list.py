@@ -291,7 +291,7 @@ class YoloWorker(QThread):
 
 # ====================== 图片列表视图 ======================
 class ImageListView(QListView):
-    sig_image_clicked = pyqtSignal(str)
+    sig_image_clicked = pyqtSignal(Path)
     sig_canvas_needs_reload = pyqtSignal()  # 发送canvas需要reload的信号
     sig_selection_changed = pyqtSignal(int, int)  # 发送图片总数和当前选中索引信号
 
@@ -341,7 +341,7 @@ class ImageListView(QListView):
             latest_selected_index = selected_indexes[-1]
             file_path = self.model.data(latest_selected_index, Qt.UserRole)
             if file_path:
-                self.sig_image_clicked.emit(file_path)  # type: ignore
+                self.sig_image_clicked.emit(Path(file_path))  # type: ignore
 
     def mousePressEvent(self, event):
         """重写鼠标按下事件以处理Shift键多选"""
@@ -363,7 +363,7 @@ class ImageListView(QListView):
                     # 加载最新选中的图片
                     file_path = self.model.data(index, Qt.UserRole)
                     if file_path:
-                        self.sig_image_clicked.emit(file_path)  # type: ignore
+                        self.sig_image_clicked.emit(Path(file_path))  # type: ignore
                     
                     return
                 else:
@@ -396,7 +396,7 @@ class ImageListView(QListView):
             latest_selected_index = indexes[-1]
             file_path = self.model.data(latest_selected_index, Qt.UserRole)
             if file_path:
-                self.sig_image_clicked.emit(file_path)  # type: ignore
+                self.sig_image_clicked.emit(Path(file_path))  # type: ignore
 
     def handle_item_clicked(self, index):
         """处理项点击事件"""
@@ -406,7 +406,7 @@ class ImageListView(QListView):
             
             file_path = self.model.data(index, Qt.UserRole)
             if file_path:
-                self.sig_image_clicked.emit(file_path)  # type: ignore
+                self.sig_image_clicked.emit(Path(file_path))  # type: ignore
 
     def contextMenuEvent(self, event):
         """处理右键菜单事件"""
