@@ -153,7 +153,7 @@ class AnnotationView(QGraphicsRectItem):
         # 1. 绘制内侧矩形（当前颜色，原始坐标）
         # 创建带透明度的颜色
         transparent_color = QColor(self.current_color)
-        transparent_color.setAlphaF(0.35)
+        transparent_color.setAlphaF(0.65)
         
         # 先绘制填充区域
         fill_brush = QBrush(transparent_color)

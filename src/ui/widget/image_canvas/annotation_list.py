@@ -4,7 +4,7 @@ from typing import Tuple
 
 from PyQt5.QtCore import Qt, QSize, QRect, QItemSelectionModel, QMimeData, \
     QSortFilterProxyModel
-from PyQt5.QtGui import QStandardItemModel, QStandardItem, QPen, QDrag
+from PyQt5.QtGui import QStandardItemModel, QStandardItem, QPen, QDrag, QColor
 from PyQt5.QtWidgets import QLineEdit, QSpinBox, QListView, QStyledItemDelegate, QAbstractItemView, \
     QStyle, QToolBar, QWidget, QHBoxLayout, QMenu, QAction
 from ultralytics import YOLO
@@ -77,8 +77,12 @@ class AnnotationDelegate(QStyledItemDelegate):
             self.row_height
         )
 
+        # 创建带透明度的颜色，与AnnotationView中使用的透明度保持一致（0.35）
+        transparent_color = QColor(category_color)
+        transparent_color.setAlphaF(0.65)
+
         # 绘制元素
-        painter.fillRect(color_rect, category_color)  # 颜色方块
+        painter.fillRect(color_rect, transparent_color)  # 颜色方块（带透明度）
         painter.drawText(name_rect, Qt.AlignLeft | Qt.AlignVCenter, category_name)  # 文本
         painter.drawText(id_rect, Qt.AlignCenter, str(class_id))  # 序号
 
