@@ -224,3 +224,26 @@ class RefProjectInfo:
                 return category
         return None  # 未找到时返回None
 
+    def rename_image_for_kolo_item(self, old_img_path: Path, new_img_path: Path):
+        """
+        在数据库中，把kolo_item表中image_name=old_image.name的项目，全部改成image_name=new_image.name
+        :param old_img_path: 旧图片路径
+        :param new_img_path: 新图片路径
+        """
+        # 获取数据库会话
+        session = self.sqlite_db.db_session()
+        try:
+            # 更新kolo_item表中所有image_name等于old_img_path.name的记录为new_img_path.name
+            session.query(KoloItem).filter(KoloItem.image_name == old_img_path.name).update(
+                {KoloItem.image_name: new_img_path.name}
+            )
+            # 提交事务
+            session.commit()
+        except Exception as e:
+            # 回滚事务
+            session.rollback()
+            print(f"重命名图片关联的kolo_item记录失败: {str(e)}")
+            raise e
+        finally:
+            # 关闭会话
+            session.close()

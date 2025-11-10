@@ -251,7 +251,7 @@ class ImageListView(QListView):
         total_count = self.model.rowCount()
         
         # 发送信号
-        self.sig_selection_changed.emit(total_count, selected_count)
+        self.sig_selection_changed.emit(total_count, selected_count)  # type: ignore
         
         # 如果有选中项，更新最后选中的行和选择锚点
         if indexes:
@@ -338,8 +338,8 @@ class ImageListView(QListView):
             return
 
         # 获取当前文件路径
-        old_path = self.model.image_paths[index.row()]
-        old_name = os.path.basename(old_path)
+        old_path = Path(self.model.image_paths[index.row()])
+        old_name = old_path.name
         name, ext = os.path.splitext(old_name)
 
         # 弹出输入对话框
@@ -362,39 +362,24 @@ class ImageListView(QListView):
                 return
 
             # 构建新路径
-            dir_path = os.path.dirname(old_path)
-            new_path = os.path.join(dir_path, new_name + ext)
+            new_path = old_path.parent / (new_name + ext)
 
             # 检查新文件是否已存在
-            if os.path.exists(new_path):
+            if new_path.exists():
                 QMessageBox.warning(self, "错误", "文件已存在！")
                 return
 
             try:
                 # 重命名文件
-                os.rename(old_path, new_path)
-
-                # 查找并重命名关联的.txt和.kolo文件
-                associated_extensions = ['.txt', '.kolo']
-                for assoc_ext in associated_extensions:
-                    old_assoc_path = os.path.join(dir_path, name + assoc_ext)
-                    new_assoc_path = os.path.join(dir_path, new_name + assoc_ext)
-
-                    # 如果关联文件存在，则重命名
-                    if os.path.exists(old_assoc_path):
-                        try:
-                            os.rename(old_assoc_path, new_assoc_path)
-                        except Exception as assoc_e:
-                            # 记录错误但继续处理其他文件
-                            print(f"重命名关联文件失败 {old_assoc_path}: {str(assoc_e)}")
+                os.rename(str(old_path), str(new_path))
 
                 # 更新模型数据
-                self.model.image_paths[index.row()] = new_path
+                self.model.image_paths[index.row()] = str(new_path)
                 self.model.dataChanged.emit(index, index)
 
                 # 更新缩略图缓存
-                if old_path in self.model.thumbnail_cache:
-                    self.model.thumbnail_cache[new_path] = self.model.thumbnail_cache.pop(old_path)
+                if str(old_path) in self.model.thumbnail_cache:
+                    self.model.thumbnail_cache[str(new_path)] = self.model.thumbnail_cache.pop(str(old_path))
 
                 # 重命名成功后手动触发选中项变化
                 # 获取当前选择模型
@@ -411,6 +396,7 @@ class ImageListView(QListView):
                         selection_model.selection(),
                         selection_model.selection()  # 通常这里传递新旧选择，但这里都传递相同值
                     )
+                self.project_info.rename_image_for_kolo_item(old_path, new_path)
 
             except Exception as e:
                 QMessageBox.critical(self, "错误", f"重命名失败: {str(e)}")
@@ -892,8 +878,8 @@ class ImageListView(QListView):
                 # 发送最终进度
                 final_text = "Finishing up..." if not self.is_canceled else "Canceling..."
                 final_percentage = 100 if not self.is_canceled else progress_bar.value()
-                self.update_progress.emit(i, "", final_text, final_percentage)
-                self.processing_complete.emit(success, error, self.is_canceled, i)
+                self.update_progress.emit(i, "", final_text, final_percentage)  # type: ignore
+                self.processing_complete.emit(success, error, self.is_canceled, i)  # type: ignore
 
             def cancel(self):
                 self.is_canceled = True
@@ -920,14 +906,14 @@ class ImageListView(QListView):
                                      progress_text_label, progress_dialog)
 
         # 连接信号与槽
-        controller.update_progress.connect(update_progress_bar)
-        controller.processing_complete.connect(on_complete)
-        cancel_btn.clicked.connect(on_cancel)
+        controller.update_progress.connect(update_progress_bar) # type: ignore
+        controller.processing_complete.connect(on_complete) # type: ignore
+        cancel_btn.clicked.connect(on_cancel) # type: ignore
 
         # 启动总控线程
         controller.start()
         # 刷新canvas
-        self.sig_canvas_needs_reload.emit()
+        self.sig_canvas_needs_reload.emit() # type: ignore
         # 显示进度对话框
         progress_dialog.exec_()
 
