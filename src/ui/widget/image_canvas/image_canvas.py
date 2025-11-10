@@ -513,9 +513,13 @@ class ImageCanvas(QGraphicsView):
                     self.unselect_all_annotations()
                 
                 # 选择框选区域内的所有AnnotationView
+                selected_count = 0
                 for item in items_in_rect:
                     if isinstance(item, AnnotationView):
-                        item.select_annotation_view(True)
+                        # 直接设置选中状态，而不是调用select_annotation_view方法
+                        # 因为select_annotation_view会取消其他项的选中状态，不适合多选场景
+                        item.set_selected_flag_internal(True)
+                        selected_count += 1
                         
                 # 更新annotation_list的选中状态
                 self._update_annotation_list_selection()
