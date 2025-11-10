@@ -319,7 +319,7 @@ class ImageListView(QListView):
         smart_jump_action.setEnabled(self.model.rowCount() > 0)
 
         # 连接菜单项信号
-        rename_action.triggered.connect(lambda: self.rename_selected(index))  # type: ignore
+        rename_action.triggered.connect(lambda: self.rename_image_with_index(index))  # type: ignore
         delete_action.triggered.connect(lambda: self.delete_selected())  # type: ignore
         open_action.triggered.connect(lambda: self.open_in_explorer(index))  # type: ignore
         run_action.triggered.connect(lambda: self.on_run_clicked(index))  # type: ignore
@@ -332,7 +332,7 @@ class ImageListView(QListView):
         # 显示菜单
         menu.exec_(self.mapToGlobal(event.pos()))
 
-    def rename_selected(self, index):
+    def rename_image_with_index(self, index):
         """重命名单个文件"""
         if not index.isValid():
             return
