@@ -389,7 +389,7 @@ class ImageListView(QListView):
                     selection_model.clearSelection()
                     # 重新选择同一行（因为只是重命名，行位置不变）
                     new_index = self.model.index(index.row(), 0)
-                    selection_model.select(new_index, selection_model.Select)
+                    selection_model.select(new_index, QItemSelectionModel.SelectionFlag.Select)
 
                     # 手动发射selectionChanged信号
                     selection_model.selectionChanged.emit(  # type: ignore
@@ -472,7 +472,7 @@ class ImageListView(QListView):
                     self.handle_item_clicked(prev_index)
                 else:
                     # 没有可选项，清空画布
-                    self.sig_canvas_needs_reload.emit()
+                    self.sig_canvas_needs_reload.emit() # type: ignore
                 
                 # 按行号降序排列，从后往前删除，避免索引变化问题
                 files_to_delete.sort(key=lambda x: x[0], reverse=True)
@@ -762,8 +762,8 @@ class ImageListView(QListView):
                 # 发送最终进度
                 final_text = "Finishing up..." if not self.is_canceled else "Canceling..."
                 final_percentage = 100 if not self.is_canceled else progress_bar.value()
-                self.update_progress.emit(i, "", final_text, final_percentage)
-                self.processing_complete.emit(success, error, self.is_canceled, i)
+                self.update_progress.emit(i, "", final_text, final_percentage) # type: ignore
+                self.processing_complete.emit(success, error, self.is_canceled, i) # type: ignore
 
             def cancel(self):
                 self.is_canceled = True
@@ -790,9 +790,9 @@ class ImageListView(QListView):
                                      progress_text_label, progress_dialog)
 
         # 连接信号与槽
-        controller.update_progress.connect(update_progress_bar)
-        controller.processing_complete.connect(on_complete)
-        cancel_btn.clicked.connect(on_cancel)
+        controller.update_progress.connect(update_progress_bar) # type: ignore
+        controller.processing_complete.connect(on_complete) # type: ignore
+        cancel_btn.clicked.connect(on_cancel) # type: ignore
 
         # 启动总控线程
         controller.start()
