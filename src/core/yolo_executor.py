@@ -186,6 +186,7 @@ class YOLOExecutor:
         logging.debug(f"合并后最终结果数量: {len(merged_results)}")
         if save_to_db:
             # 保存结果到数据库
+            self.delete_kolo_item_for_image(img_path)
             self.save_kolo_item_to_db(merged_results)
         return merged_results
 
