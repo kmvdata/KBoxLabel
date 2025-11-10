@@ -17,7 +17,7 @@ from PyQt5.QtWidgets import QProgressDialog, QMessageBox
 from src.models.dto.ref_project_info import RefProjectInfo
 from src.models.sql.kolo_item import KoloItem
 from src.ui.widget.image_canvas.image_canvas import ImageCanvas
-from src.ui.widget.image_list import ImageListView
+from src.ui.widget.image_list.image_list import ImageListView
 from src.ui.widget.main_menu_bar import MainMenuBar
 
 
@@ -148,7 +148,7 @@ class ProjectWindow(QMainWindow):
 
     def on_image_selected(self, file_path: str):
         """实际处理选中图片的逻辑"""
-        print(f"✅ 图片选中: {file_path}")
+        print(f"图片选中: {file_path}")
         try:
             self.image_canvas.load_image(Path(file_path))
         except (OSError, FileNotFoundError) as e:
@@ -225,7 +225,7 @@ class ProjectWindow(QMainWindow):
                     raise OSError("Path is not a directory")
 
                 # 通过主窗口方法设置路径
-                self.main_window.set_project_path(str(p))
+                self.main_window.set_project_path(p)
                 self.accept()  # 关闭对话框
             except OSError as e:
                 QMessageBox.critical(

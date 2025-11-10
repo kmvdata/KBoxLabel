@@ -436,7 +436,7 @@ class ImageListView(QListView):
 
         # 连接菜单项信号
         rename_action.triggered.connect(lambda: self.rename_selected(index))  # type: ignore
-        delete_action.triggered.connect(lambda: self.delete_selected(index))  # type: ignore
+        delete_action.triggered.connect(lambda: self.delete_selected())  # type: ignore
         open_action.triggered.connect(lambda: self.open_in_explorer(index))  # type: ignore
         run_action.triggered.connect(lambda: self.on_run_clicked(index))  # type: ignore
         run_all_action.triggered.connect(self.on_run_all_clicked)  # type: ignore
