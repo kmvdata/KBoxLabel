@@ -501,10 +501,20 @@ class ImageCanvas(QGraphicsView):
                 items_in_rect = self.scene.items(scene_rect, Qt.ItemSelectionMode.IntersectsItemShape, 
                                                 Qt.SortOrder.AscendingOrder, self.transform())
                 
+                # 检查是否按住Shift键进行多选
+                shift_pressed = event.modifiers() & Qt.ShiftModifier
+                
+                # 如果没有按住Shift键，先清除所有选中状态
+                if not shift_pressed:
+                    self.unselect_all_annotations()
+                
                 # 选择框选区域内的所有AnnotationView
                 for item in items_in_rect:
                     if isinstance(item, AnnotationView):
                         item.select_annotation_view(True)
+                        
+                # 更新annotation_list的选中状态
+                self._update_annotation_list_selection()
                         
         # 重置框选标志（无论是否进行了框选操作）
         self._is_rubber_band_selection = False
@@ -584,6 +594,11 @@ class ImageCanvas(QGraphicsView):
             if len(selected_items) > 0:
                 # 如果删除了annotation, 立即保存
                 self.save_annotations()
+                
+            # 清除annotation_list中的选中状态
+            if self.annotation_list and self.annotation_list.selectionModel():
+                self.annotation_list.selectionModel().clearSelection()
+                
             print(f"已删除 {len(selected_items)} 个标注项")
 
         finally:
@@ -1043,6 +1058,13 @@ class ImageCanvas(QGraphicsView):
         selected_items = [item for item in self.scene.items()
                           if isinstance(item, AnnotationView) and item.isSelected()]
 
+        # 如果选中多个项，清除annotation_list中的选中状态
+        if len(selected_items) > 1:
+            if self.annotation_list and self.annotation_list.selectionModel():
+                self.annotation_list.selectionModel().clearSelection()
+            return
+            
+        # 如果没有选中项，也清除annotation_list中的选中状态
         if not selected_items:
             return
 
@@ -1190,3 +1212,18 @@ class ImageCanvas(QGraphicsView):
             print("缓存的YOLO模型加载成功")
         else:
             print(f"缓存的YOLO模型加载失败: {error_message}")
+
+    def _update_annotation_list_selection(self):
+        """更新annotation_list的选中状态以匹配画布上的选中项"""
+        # 获取画布上所有选中的标注项
+        selected_items = [item for item in self.scene.items()
+                         if isinstance(item, AnnotationView) and item.isSelected()]
+                         
+        # 如果选中多个项或没有选中项，清除annotation_list中的选中状态
+        if len(selected_items) != 1:
+            if self.annotation_list and self.annotation_list.selectionModel():
+                self.annotation_list.selectionModel().clearSelection()
+        else:
+            # 如果只选中一个项，更新annotation_list中的选中状态
+            selected_item = selected_items[0]
+            self.annotation_list.select_category_by_name(selected_item.category.class_name)
