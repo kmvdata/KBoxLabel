@@ -411,8 +411,8 @@ class ImageCanvas(QGraphicsView):
             if not is_annotation and not shift_pressed and not self._is_rubber_band_selection:
                 self.unselect_all_annotations()
 
-            # 当设置了当前类别时开始绘制新标注
-            if not is_annotation and self.current_category is not None:
+            # 当设置了当前类别时开始绘制新标注，但按住Shift键时不创建新标注
+            if not is_annotation and self.current_category is not None and not shift_pressed:
                 self.start_point = self.mapToScene(event.pos())
                 self.drawing = True
 
@@ -439,6 +439,9 @@ class ImageCanvas(QGraphicsView):
     def mouseReleaseEvent(self, event):
         """处理鼠标释放事件，无论操作是什么都保存标注"""
         created_new_annotation = False
+        # 检查是否按住Shift键
+        shift_pressed = event.modifiers() & Qt.ShiftModifier
+        
         if self.drawing and event.button() == Qt.LeftButton:
             self.drawing = False
             current_point = self.mapToScene(event.pos())
@@ -456,7 +459,8 @@ class ImageCanvas(QGraphicsView):
                 self.temp_rect_item = None
 
             # 检查矩形尺寸：宽度和高度都必须至少为10px
-            if rect.width() >= 10 and rect.height() >= 10:
+            # 但按住Shift键时不创建新标注
+            if rect.width() >= 10 and rect.height() >= 10 and not shift_pressed:
                 # 创建新AnnotationView并设置当前类别
                 item = AnnotationView(
                     Decimal(rect.x()), Decimal(rect.y()), Decimal(rect.width()), Decimal(rect.height()),
@@ -480,7 +484,7 @@ class ImageCanvas(QGraphicsView):
             )
             
             # 只有点击空白区域且未按住Shift键时才清除选择
-            if not is_annotation and not (event.modifiers() & Qt.ShiftModifier):
+            if not is_annotation and not shift_pressed:
                 # 取消annotation_list中的选中状态
                 if self.annotation_list and self.annotation_list.selectionModel():
                     self.annotation_list.selectionModel().clearSelection()
