@@ -246,7 +246,11 @@ class AnnotationView(QGraphicsRectItem):
         if event.modifiers() & Qt.ShiftModifier:
             self.clicked_with_shift()
         else:
-            self.select_annotation_view()  # 选中当前项
+            # 修改这里，使用image_canvas的select_single_annotation方法确保同步
+            if self.image_canvas:
+                self.image_canvas.select_single_annotation(self)
+            else:
+                self.select_annotation_view()  # 选中当前项
             self.setFocus(Qt.FocusReason.MouseFocusReason)  # 设置焦点以接收键盘事件
         # 标记为鼠标操作
         self.mouse_operation_in_progress = True
@@ -602,12 +606,21 @@ class AnnotationView(QGraphicsRectItem):
             return
             # 只有在选中时才启用移动功能
         if selected:
+            # 取消其他AnnotationView的选中状态
+            scene = self.scene()
+            if scene:
+                for item in scene.items():
+                    if isinstance(item, AnnotationView) and item != self:
+                        item.set_selected_flag_internal(False)
             self.setZValue(1000)  # 将选中的项置于顶层
         self.set_selected_flag_internal(selected)
         self.update()
 
     def clicked_with_shift(self):
+        # 修改这里，确保同步更新annotation_list
         self.set_selected_flag_internal(not self.isSelected())
+        if self.isSelected() and self.image_canvas and self.image_canvas.annotation_list:
+            self.image_canvas.annotation_list.select_category_by_name(self.category.class_name)
         self.update()
 
     def set_needs_save_annotation(self):
@@ -687,7 +700,10 @@ class AnnotationView(QGraphicsRectItem):
         self.reset_z_values()
         
         # 选中当前项
-        self.select_annotation_view()
+        if self.image_canvas:
+            self.image_canvas.select_single_annotation(self)
+        else:
+            self.select_annotation_view()
 
     def send_to_back(self):
         """将当前标注项置于最底层"""

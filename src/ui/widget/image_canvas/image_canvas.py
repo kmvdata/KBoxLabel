@@ -546,7 +546,8 @@ class ImageCanvas(QGraphicsView):
                 # 查找AnnotationView项并选中第一个
                 for item in items_at_pos:
                     if isinstance(item, AnnotationView):
-                        item.select_annotation_view()
+                        # 修改这里，使用select_single_annotation确保同步
+                        self.select_single_annotation(item)
                         break
 
                 return
@@ -1087,7 +1088,8 @@ class ImageCanvas(QGraphicsView):
         # self.annotation_selected.emit(category)
 
         # 选中列表中对应的项
-        self.annotation_list.select_category_by_name(category.class_name)
+        if self.annotation_list:
+            self.annotation_list.select_category_by_name(category.class_name)
 
     def show_context_menu(self, position):
         """显示上下文菜单"""
@@ -1127,10 +1129,6 @@ class ImageCanvas(QGraphicsView):
             # 添加分隔线
             context_menu.addSeparator()
             
-            # 选中zValue最大的AnnotationView
-            top_annotation = max(annotation_views_at_pos, key=lambda item: item.zValue())
-            top_annotation.select_annotation_view()
-
             # 按zValue排序，从高到低显示
             sorted_annotations = sorted(annotation_views_at_pos, 
                                      key=lambda item: item.zValue(), reverse=True)
@@ -1138,8 +1136,9 @@ class ImageCanvas(QGraphicsView):
             # 为每个AnnotationView添加菜单项到一级菜单
             for annotation in sorted_annotations:
                 action = QAction(annotation.category.class_name, self)
+                # 确保在选择时取消其他项的选中状态，并同步更新annotation_list
                 action.triggered.connect(  # type: ignore
-                    lambda checked, ann=annotation: ann.bring_to_top()
+                    lambda checked, ann=annotation: self.select_single_annotation(ann)
                 )
                 context_menu.addAction(action)
 
@@ -1227,3 +1226,17 @@ class ImageCanvas(QGraphicsView):
             # 如果只选中一个项，更新annotation_list中的选中状态
             selected_item = selected_items[0]
             self.annotation_list.select_category_by_name(selected_item.category.class_name)
+
+    def select_single_annotation(self, annotation_view):
+        """选中单个标注视图，取消其他所有标注视图的选中状态，并同步更新annotation_list"""
+        # 取消所有其他标注的选中状态
+        for item in self.scene.items():
+            if isinstance(item, AnnotationView) and item != annotation_view:
+                item.set_selected_flag_internal(False)
+        
+        # 选中指定的标注视图
+        annotation_view.select_annotation_view()
+        
+        # 同步更新annotation_list
+        if self.annotation_list:
+            self.annotation_list.select_category_by_name(annotation_view.category.class_name)
