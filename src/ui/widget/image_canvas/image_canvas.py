@@ -421,7 +421,7 @@ class ImageCanvas(QGraphicsView):
                     QRectF(self.start_point, self.start_point),
                     QPen(Qt.red, 2, Qt.DashLine)
                 )
-                self.temp_rect_item.setZValue(10)  # 确保在最上层显示
+                self.temp_rect_item.setZValue(10000)  # 确保在最上层显示
                 return  # 拦截事件，避免默认处理
 
             # 如果点击在标注上且按住Shift键，切换该标注的选中状态
@@ -1138,7 +1138,7 @@ class ImageCanvas(QGraphicsView):
                 action = QAction(annotation.category.class_name, self)
                 # 确保在选择时取消其他项的选中状态，并同步更新annotation_list
                 action.triggered.connect(  # type: ignore
-                    lambda checked, ann=annotation: self.select_single_annotation(ann)
+                    lambda checked, ann=annotation: self.select_single_annotation(ann) or print('kkkkkkk')
                 )
                 context_menu.addAction(action)
 
@@ -1240,3 +1240,6 @@ class ImageCanvas(QGraphicsView):
         # 同步更新annotation_list
         if self.annotation_list:
             self.annotation_list.select_category_by_name(annotation_view.category.class_name)
+
+        # 刷新画布
+        self.viewport().update()

@@ -610,10 +610,10 @@ class AnnotationView(QGraphicsRectItem):
             scene = self.scene()
             if scene:
                 for item in scene.items():
-                    if isinstance(item, AnnotationView) and item != self:
+                    if isinstance(item, AnnotationView) and item != self and hasattr(item, 'set_selected_flag_internal'):
                         item.set_selected_flag_internal(False)
-            self.setZValue(1000)  # 将选中的项置于顶层
         self.set_selected_flag_internal(selected)
+        self.bring_to_top()
         self.update()
 
     def clicked_with_shift(self):
