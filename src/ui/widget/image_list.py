@@ -580,6 +580,37 @@ class ImageListView(QListView):
             
         if reply == QMessageBox.Yes:
             try:
+                # 对选中项按行号排序
+                files_to_delete.sort(key=lambda x: x[0])
+                
+                # 计算要选中的项
+                next_index = None
+                prev_index = None
+                
+                # 优先选择最下面一项的下一项
+                last_row = files_to_delete[-1][0]  # 最下面一项的行号
+                if last_row + 1 < self.model.rowCount():
+                    next_index = self.model.index(last_row + 1, 0)
+                
+                # 如果下一项不存在，则选择最上面一项的前一项
+                if next_index is None:
+                    first_row = files_to_delete[0][0]  # 最上面一项的行号
+                    if first_row > 0:
+                        prev_index = self.model.index(first_row - 1, 0)
+                
+                # 执行选择操作
+                if next_index is not None:
+                    # 选择下一项
+                    self.setCurrentIndex(next_index)
+                    self.handle_item_clicked(next_index)
+                elif prev_index is not None:
+                    # 选择前一项
+                    self.setCurrentIndex(prev_index)
+                    self.handle_item_clicked(prev_index)
+                else:
+                    # 没有可选项，清空画布
+                    self.sig_canvas_needs_reload.emit()
+                
                 # 按行号降序排列，从后往前删除，避免索引变化问题
                 files_to_delete.sort(key=lambda x: x[0], reverse=True)
                 
