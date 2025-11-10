@@ -740,7 +740,7 @@ class ProjectWindow(QMainWindow):
             self.set_left_status(f"已加载 {count} 张图片")
             
             # 自动跳转到最后一个有标注的图片
-            QTimer.singleShot(100, self.image_list.auto_jump_to_last_annotated_image)
+            QTimer.singleShot(100, self.image_list.jump_to_last_annotated_image)
             
     def closeEvent(self, event):
         """

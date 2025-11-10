@@ -327,7 +327,7 @@ class ImageListView(QListView):
         
         # 连接新菜单项的信号
         jump_to_action.triggered.connect(self.on_jump_to_clicked)  # type: ignore
-        smart_jump_action.triggered.connect(self.on_smart_jump_clicked)  # type: ignore
+        smart_jump_action.triggered.connect(self.jump_to_last_annotated_image)  # type: ignore
 
         # 显示菜单
         menu.exec_(self.mapToGlobal(event.pos()))
@@ -953,8 +953,9 @@ class ImageListView(QListView):
                 # 模拟点击事件以加载图片
                 self.handle_item_clicked(index)
 
-    def on_smart_jump_clicked(self):
-        """智能跳转菜单项点击事件：按照id排序，获取最后一个kolo_item，然后跳转至这个item对应的图片"""
+    def jump_to_last_annotated_image(self):
+        """跳转到最后一个有标注的图片的通用方法
+        """
         if self.model.rowCount() == 0:
             return
             
@@ -967,7 +968,7 @@ class ImageListView(QListView):
             # 执行查询
             last_kolo_item = self.project_info.sqlite_db.execute_in_transaction(query_func)
             
-            # 如果没有找到任何KoloItem，显示提示信息
+            # 如果没有找到任何KoloItem，根据参数决定是否显示提示信息
             if not last_kolo_item:
                 QMessageBox.information(self, "智能跳转", "数据库中没有找到任何标注记录。")
                 return
@@ -990,48 +991,10 @@ class ImageListView(QListView):
                         self.handle_item_clicked(index)
                     return
                     
-            # 如果没有找到对应的图片文件，显示提示信息
+            # 如果没有找到对应的图片文件，根据参数决定是否显示提示信息
             QMessageBox.information(self, "智能跳转", f"未找到与最后一条标注记录关联的图片文件: {target_image_name}")
             
         except Exception as e:
-            print(f"智能跳转时出错: {e}")
-            QMessageBox.warning(self, "错误", f"智能跳转时发生错误: {str(e)}")
-
-    def auto_jump_to_last_annotated_image(self):
-        """自动跳转到最后一个有标注的图片（在项目加载后调用）"""
-        if self.model.rowCount() == 0:
-            return
-            
-        try:
-            # 定义查询函数，获取按ID排序的最后一个KoloItem
-            def query_func(session):
-                from src.models.sql.kolo_item import KoloItem
-                return session.query(KoloItem).order_by(KoloItem.id.desc()).first()
-            
-            # 执行查询
-            last_kolo_item = self.project_info.sqlite_db.execute_in_transaction(query_func)
-            
-            # 如果没有找到任何KoloItem，不执行任何操作
-            if not last_kolo_item:
-                return
-                
-            # 获取最后一个KoloItem对应的图片名称
-            target_image_name = last_kolo_item.image_name
-            
-            # 遍历所有图片，查找对应的图片文件
-            for i in range(self.model.rowCount()):
-                file_path = self.model.image_paths[i]
-                # 获取图片文件名
-                image_file_name = os.path.basename(file_path)
-                
-                # 如果图片文件名匹配，则跳转到该图片
-                if image_file_name == target_image_name:
-                    index = self.model.index(i, 0)
-                    if index.isValid():
-                        self.setCurrentIndex(index)
-                        # 模拟点击事件以加载图片
-                        self.handle_item_clicked(index)
-                    return
-                    
-        except Exception as e:
-            print(f"自动跳转到最后标注图片时出错: {e}")
+            print(f"跳转到最后标注图片时出错: {e}")
+            # 根据参数决定是否显示错误提示
+            QMessageBox.warning(self, "错误", f"跳转时发生错误: {str(e)}")
