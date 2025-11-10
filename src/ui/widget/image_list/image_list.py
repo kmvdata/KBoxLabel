@@ -608,6 +608,28 @@ class ImageListView(QListView):
             # 根据参数决定是否显示错误提示
             QMessageBox.warning(self, "错误", f"跳转时发生错误: {str(e)}")
 
+    def on_jump_to_clicked(self):
+        """跳转至...菜单项点击事件"""
+        if self.model.rowCount() == 0:
+            return
+
+        # 弹出输入对话框让用户输入要跳转到的图片序号
+        max_index = self.model.rowCount()
+        jump_to, ok = QInputDialog.getInt(
+            self,
+            "跳转至...",
+            f"请输入图片序号 (1-{max_index}):",
+            1, 1, max_index, 1
+        )
+
+        if ok:
+            # 跳转到指定图片（索引从0开始，所以需要减1）
+            index = self.model.index(jump_to - 1, 0)
+            if index.isValid():
+                self.setCurrentIndex(index)
+                # 模拟点击事件以加载图片
+                self.handle_item_clicked(index)
+
     def _get_files_to_process(self, indexes_to_process):
         """获取需要处理的文件列表"""
         files_to_process = []
@@ -962,26 +984,3 @@ class ImageListView(QListView):
         self.sig_canvas_needs_reload.emit() # type: ignore
         # 显示进度对话框
         progress_dialog.exec_()
-
-    def on_jump_to_clicked(self):
-        """跳转至...菜单项点击事件"""
-        if self.model.rowCount() == 0:
-            return
-            
-        # 弹出输入对话框让用户输入要跳转到的图片序号
-        max_index = self.model.rowCount()
-        jump_to, ok = QInputDialog.getInt(
-            self,
-            "跳转至...",
-            f"请输入图片序号 (1-{max_index}):",
-            1, 1, max_index, 1
-        )
-        
-        if ok:
-            # 跳转到指定图片（索引从0开始，所以需要减1）
-            index = self.model.index(jump_to - 1, 0)
-            if index.isValid():
-                self.setCurrentIndex(index)
-                # 模拟点击事件以加载图片
-                self.handle_item_clicked(index)
-
