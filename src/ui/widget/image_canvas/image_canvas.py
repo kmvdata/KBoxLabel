@@ -686,7 +686,7 @@ class ImageCanvas(QGraphicsView):
 
         # 运行子菜单
         self.run_action = QAction("Run", self)
-        self.run_action.triggered.connect(self.exec_yolo)  # type: ignore
+        self.run_action.triggered.connect(self.on_run_clicked)  # type: ignore
         # 运行选项状态通过project_info判断
         self.run_action.setEnabled(self.project_info.is_model_loaded)
         self.config_menu.addAction(self.run_action)
@@ -758,7 +758,7 @@ class ImageCanvas(QGraphicsView):
         self.project_info.delete_yolo_model()
 
     # 然后是调用YOLOExecutor的代码（例如UI类中的方法）
-    def exec_yolo(self):
+    def on_run_clicked(self):
         """执行YOLO模型的方法，识别当前图片目标并按指定格式输出日志"""
         import logging
         # 检查模型是否加载
@@ -938,7 +938,7 @@ class ImageCanvas(QGraphicsView):
                 icon-size: 24px;
             }
         """)
-        self.run_tool_button.clicked.connect(self.exec_yolo)  # type: ignore
+        self.run_tool_button.clicked.connect(self.on_run_clicked)  # type: ignore
         # 根据是否有模型设置初始状态（通过project_info判断）
         self.run_tool_button.setEnabled(bool(getattr(self.project_info, 'yolo_model_path', None)))
         toolbar.addWidget(self.run_tool_button)
