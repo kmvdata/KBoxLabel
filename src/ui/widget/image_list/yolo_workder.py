@@ -12,9 +12,9 @@ class YoloWorker(QThread):
     error = pyqtSignal(str, Path)  # 错误消息, 文件路径
     progress_updated = pyqtSignal(int)  # 进度更新信号 (0-100)
 
-    def __init__(self, input_file_path, project_info: RefProjectInfo):
+    def __init__(self, input_file_path: str|Path, project_info: RefProjectInfo):
         super().__init__()
-        self.file_path = input_file_path
+        self.file_path: Path = Path(input_file_path)
         self.project_info = project_info  # 保存RefProjectInfo实例
         self.is_canceled = False
 
@@ -43,7 +43,7 @@ class YoloWorker(QThread):
         except Exception as e:
             if not self.is_canceled:
                 error_msg = f"{str(e)}"
-                self.error.emit(error_msg, self.file_path)  # type: ignore
+                self.error.emit(error_msg, str(self.file_path))  # type: ignore
 
     def cancel(self):
         """取消任务"""
