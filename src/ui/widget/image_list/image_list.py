@@ -670,6 +670,11 @@ class ImageListView(QListView):
         progress_bar.setValue(0)
         layout.addWidget(progress_bar)
 
+        # 添加进度标签（显示在取消按钮上方）
+        progress_label = QLabel("")
+        progress_label.setAlignment(Qt.AlignRight)
+        layout.addWidget(progress_label)
+
         cancel_button = QPushButton("Cancel")
         layout.addWidget(cancel_button)
 
@@ -707,6 +712,10 @@ class ImageListView(QListView):
             # 更新UI显示当前处理的文件
             file_label.setText(f"正在处理: {os.path.basename(file_path)}")
             progress_bar.setValue(i)
+            
+            # 更新进度标签（格式：当前处理项/总数量）
+            progress_label.setText(f"{i+1}/{total_count}")
+            
             QApplication.processEvents()  # 保持UI响应
 
             # 创建YoloWorker工作线程进行处理
@@ -749,6 +758,9 @@ class ImageListView(QListView):
 
         # 更新进度条到最后
         progress_bar.setValue(len(indexes_to_process) if not canceled else processed_count)
+        # 更新进度标签为最终状态
+        if not canceled:
+            progress_label.setText(f"{total_count}/{total_count}")
         QApplication.processEvents()
 
         # 隐藏并销毁进度对话框
