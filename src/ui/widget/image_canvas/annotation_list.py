@@ -10,7 +10,7 @@ from PyQt5.QtWidgets import QLineEdit, QSpinBox, QListView, QStyledItemDelegate,
 from ultralytics import YOLO
 
 from src.models.dto.annotation_category import AnnotationCategory
-from src.models.dto.ref_project_info import RefProjectInfo
+from src.core.project_info import ProjectInfo
 
 
 class AnnotationDelegate(QStyledItemDelegate):
@@ -253,7 +253,7 @@ class AnnotationList(QListView):
     # 可配置的工具栏高度变量（默认56px）
     TOOLBAR_HEIGHT = 56
 
-    def __init__(self, project_info: RefProjectInfo, row_height=56):
+    def __init__(self, project_info: ProjectInfo, row_height=56):
         super().__init__()
         self.search_edit = None
         self.project_info = project_info

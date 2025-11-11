@@ -14,7 +14,7 @@ from PyQt5.QtWidgets import (QMainWindow, QWidget, QHBoxLayout, QVBoxLayout,
                              )  # 新增导入
 from PyQt5.QtWidgets import QProgressDialog, QMessageBox
 
-from src.models.dto.ref_project_info import RefProjectInfo
+from src.core.project_info import ProjectInfo
 from src.models.sql.kolo_item import KoloItem
 from src.ui.widget.image_canvas.image_canvas import ImageCanvas
 from src.ui.widget.image_list.image_list import ImageListView
@@ -28,7 +28,7 @@ class ProjectWindow(QMainWindow):
         self.left_status = None
         self.image_cache = None
         self.visible_range = (0, 0)
-        self.project_info = RefProjectInfo(path=project_path)
+        self.project_info = ProjectInfo(path=project_path)
         self.setGeometry(300, 200, 1000, 600)
 
         # 将 self (MainWindow) 明确转换为 QWidget 类型

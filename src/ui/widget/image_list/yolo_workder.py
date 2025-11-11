@@ -3,7 +3,7 @@ from pathlib import Path
 from PyQt5.QtCore import (pyqtSignal,
                           QThread)
 
-from src.models.dto.ref_project_info import RefProjectInfo
+from src.core.project_info import ProjectInfo
 
 
 class YoloWorker(QThread):
@@ -12,7 +12,7 @@ class YoloWorker(QThread):
     error = pyqtSignal(str, Path)  # 错误消息, 文件路径
     progress_updated = pyqtSignal(int)  # 进度更新信号 (0-100)
 
-    def __init__(self, input_file_path: str|Path, project_info: RefProjectInfo):
+    def __init__(self, input_file_path: str|Path, project_info: ProjectInfo):
         super().__init__()
         self.file_path: Path = Path(input_file_path)
         self.project_info = project_info  # 保存RefProjectInfo实例

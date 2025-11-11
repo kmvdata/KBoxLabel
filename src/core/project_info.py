@@ -8,7 +8,7 @@ from src.models.dto.annotation_category import AnnotationCategory
 from src.models.sql.kolo_item import KoloItem
 
 
-class RefProjectInfo:
+class ProjectInfo:
     """可变容器，用于同步 project_path 的变化，包含YOLO模型配置缓存功能"""
 
     def __init__(self, path: Path|str):

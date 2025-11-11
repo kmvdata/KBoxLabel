@@ -7,7 +7,7 @@ from PIL import Image  # 用于获取图像尺寸
 from src.models.sql.kolo_item import KoloItem
 
 if TYPE_CHECKING:
-    from src.models.dto.ref_project_info import RefProjectInfo
+    from src.core.project_info import ProjectInfo
 
 
 class YOLOExecutor:
@@ -15,11 +15,11 @@ class YOLOExecutor:
     
     yolo_model_path_key = "yolo_model_path"  # 类属性，固定值为"yolo_model_path"
 
-    def __init__(self, parent: 'RefProjectInfo' = None):
+    def __init__(self, parent: 'ProjectInfo' = None):
         self.yolo_model = None  # 存储加载好的YOLO模型
         self.model_name = None  # 存储模型名称
         self.yolo_model_path: Optional[Path] = None  # 实例属性，存储加载的模型路径
-        self.parent: Optional['RefProjectInfo'] = parent  # RefProjectInfo类型的父对象
+        self.parent: Optional['ProjectInfo'] = parent  # RefProjectInfo类型的父对象
 
     def is_model_loaded(self) -> bool:
         """

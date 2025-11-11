@@ -4,13 +4,13 @@ import sys
 from pathlib import Path
 
 from PyQt5.QtCore import (Qt, QSize, QThreadPool, pyqtSignal,
-                          QAbstractListModel, QModelIndex, QThread, QItemSelection, QItemSelectionModel)
-from PyQt5.QtGui import (QPixmap, QIcon, QPainter, QFontMetrics)
+                          QAbstractListModel, QModelIndex, QItemSelection, QItemSelectionModel)
+from PyQt5.QtGui import (QPixmap, QIcon, QPainter)
 from PyQt5.QtWidgets import (QListView, QStyledItemDelegate, QStyle,
                              QMenu, QInputDialog, QMessageBox, QDialog, QVBoxLayout,
                              QLabel, QPushButton, QProgressBar, QApplication)
 
-from src.models.dto.ref_project_info import RefProjectInfo
+from src.core.project_info import ProjectInfo
 from src.ui.widget.image_list.thumbnail_loader import ThumbnailLoader
 from src.ui.widget.image_list.yolo_workder import YoloWorker
 
@@ -179,7 +179,7 @@ class ImageListView(QListView):
     sig_canvas_needs_reload = pyqtSignal()  # 发送canvas需要reload的信号
     sig_selection_changed = pyqtSignal(int, int)  # 发送图片总数和当前选中索引信号
 
-    def __init__(self, project_info: RefProjectInfo):
+    def __init__(self, project_info: ProjectInfo):
         super().__init__()
         self.project_info = project_info
         self.setSelectionMode(QListView.SelectionMode.ExtendedSelection)  # 改为扩展选择模式
