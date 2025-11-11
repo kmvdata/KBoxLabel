@@ -327,26 +327,23 @@ class ProjectWindow(QMainWindow):
 
     def export_project_to_yolo(self):
         """
-        从数据库读取所有kolo_item对象，转换为YOLO格式，显示进度条和取消按钮
+        按照图片列表顺序逐一处理，将标注信息转换为YOLO格式，显示进度条和取消按钮
         """
         # 检查项目路径是否存在
         if not self.project_info.path.exists():
             QMessageBox.warning(self, "导出失败", "项目路径不存在")
             return
 
-        # 创建数据库会话
-        session = self.project_info.sqlite_db.db_session()
-        
         try:
-            # 获取总记录数用于进度条
-            total_items = session.query(KoloItem).count()
+            # 获取图片列表总数用于进度条
+            total_images = len(self.image_list.model.image_paths)
             
-            if total_items == 0:
-                QMessageBox.information(self, "导出完成", "未找到任何标注数据")
+            if total_images == 0:
+                QMessageBox.information(self, "导出完成", "未找到任何图片")
                 return
 
             # 创建进度对话框
-            progress_dialog = QProgressDialog("正在导出标注数据...", "取消", 0, total_items, self)
+            progress_dialog = QProgressDialog("正在导出标注数据...", "取消", 0, total_images, self)
             progress_dialog.setWindowTitle("导出进度")
             progress_dialog.setWindowModality(Qt.WindowModal)
             progress_dialog.setMinimumDuration(0)
@@ -355,20 +352,18 @@ class ProjectWindow(QMainWindow):
             # 创建类别名称到ID的映射
             class_name_to_id = {category.class_name: category.class_id for category in self.project_info.categories}
             
-            # 按image_name分组查询，避免一次性加载所有数据到内存
-            image_names = session.query(KoloItem.image_name).distinct().all()
-            image_names = [name[0] for name in image_names]
-            
             # 处理每个图片的标注数据
             processed_count = 0
-            for i, image_name in enumerate(image_names):
+            for i, image_path in enumerate(self.image_list.model.image_paths):
+                image_name = os.path.basename(image_path)
+                
                 # 检查是否取消
                 if progress_dialog.wasCanceled():
                     QMessageBox.information(self, "导出中止", "用户取消了导出操作")
                     return
 
                 # 更新进度对话框
-                progress_dialog.setValue(processed_count)
+                progress_dialog.setValue(i)
                 progress_dialog.setLabelText(f"正在导出: {image_name}")
 
                 # 处理事件队列，确保UI更新
@@ -379,8 +374,14 @@ class ProjectWindow(QMainWindow):
                 txt_path = self.project_info.path / f"{Path(image_name).stem}.txt"
                 
                 try:
-                    # 查询该图片的所有标注
-                    kolo_items = session.query(KoloItem).filter(KoloItem.image_name == image_name).all()
+                    # 从domain模块获取该图片的标注信息
+                    kolo_items = self.project_info.domain.load_kolo_items_for_image(image_name)
+                    
+                    # 如果没有标注数据，删除可能存在的旧txt文件
+                    if not kolo_items:
+                        if txt_path.exists():
+                            txt_path.unlink()
+                        continue
                     
                     # 写入YOLO格式的txt文件
                     with open(txt_path, 'w', encoding='utf-8') as txt_file:
@@ -402,11 +403,11 @@ class ProjectWindow(QMainWindow):
                     # 继续处理其他图片而不是中断整个过程
 
             # 完成进度
-            progress_dialog.setValue(total_items)
-            QMessageBox.information(self, "导出完成", f"成功导出 {len(image_names)} 个文件，共 {processed_count} 条标注")
+            progress_dialog.setValue(total_images)
+            QMessageBox.information(self, "导出完成", f"成功导出 {total_images} 个文件，共 {processed_count} 条标注")
 
-        finally:
-            session.close()
+        except Exception as e:
+            QMessageBox.warning(self, "导出失败", f"导出过程中发生错误: {str(e)}")
 
     def export_project_to_coco(self):
         """
