@@ -12,7 +12,7 @@ from PyQt5.QtWidgets import (QGraphicsView, QGraphicsScene, QGraphicsPixmapItem,
 from src.common.god.korm_base import KOrmBase
 from src.models.dto.annotation_category import AnnotationCategory
 from src.core.project_info import ProjectInfo
-from src.models.sql.kolo_item import KoloItem
+from src.common.domain.models.kolo_item import KoloItem
 from src.ui.widget.image_canvas.annotation_list import AnnotationList
 from src.ui.widget.image_canvas.annotation_view import AnnotationView
 

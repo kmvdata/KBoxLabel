@@ -13,7 +13,7 @@ class AnnotationCategory(KOrmBase):
 
     id = Column(INTEGER, primary_key=True, comment='自增id')
     class_id = Column(INTEGER, nullable=False, unique=False, comment='类别ID')
-    class_name = Column(String(64), nullable=False, comment='类别名称')
+    class_name = Column(String(64), nullable=False, unique=True, comment='类别名称')
 
     color_r = Column(INTEGER, nullable=False, unique=False, comment='颜色R值')
     color_g = Column(INTEGER, nullable=False, unique=False, comment='颜色G值')
@@ -24,4 +24,3 @@ class AnnotationCategory(KOrmBase):
                          default=func.current_timestamp(),  # 插入时默认当前时间
                          onupdate=func.current_timestamp(),  # 更新时自动更新为当前时间
                          comment='更新时间')
-

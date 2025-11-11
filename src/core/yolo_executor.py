@@ -4,7 +4,7 @@ from typing import Optional, TYPE_CHECKING
 
 from PIL import Image  # 用于获取图像尺寸
 
-from src.models.sql.kolo_item import KoloItem
+from src.common.domain.models.kolo_item import KoloItem
 
 if TYPE_CHECKING:
     from src.core.project_info import ProjectInfo

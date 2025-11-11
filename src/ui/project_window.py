@@ -15,7 +15,7 @@ from PyQt5.QtWidgets import (QMainWindow, QWidget, QHBoxLayout, QVBoxLayout,
 from PyQt5.QtWidgets import QProgressDialog, QMessageBox
 
 from src.core.project_info import ProjectInfo
-from src.models.sql.kolo_item import KoloItem
+from src.common.domain.models.kolo_item import KoloItem
 from src.ui.widget.image_canvas.image_canvas import ImageCanvas
 from src.ui.widget.image_list.image_list import ImageListView
 from src.ui.widget.main_menu_bar import MainMenuBar

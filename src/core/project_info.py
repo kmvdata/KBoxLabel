@@ -1,11 +1,10 @@
 from pathlib import Path
 from typing import Optional, List
 
-from src.common.domain import gen_sql_tables
 from src.common.domain.project_domain import ProjectDomain
 from src.core.yolo_executor import YOLOExecutor
 from src.models.dto.annotation_category import AnnotationCategory
-from src.models.sql.kolo_item import KoloItem
+from src.common.domain.models.kolo_item import KoloItem
 
 
 class ProjectInfo:
@@ -17,7 +16,6 @@ class ProjectInfo:
         self.categories: list[AnnotationCategory] = []
 
         # 初始化数据库
-        gen_sql_tables(self._db_path)
         self.domain: ProjectDomain = ProjectDomain(self._db_path)
 
     def exists(self) -> bool:

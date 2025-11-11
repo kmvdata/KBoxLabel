@@ -571,7 +571,7 @@ class ImageListView(QListView):
         try:
             # 定义查询函数，获取按ID排序的最后一个KoloItem
             def query_func(session):
-                from src.models.sql.kolo_item import KoloItem
+                from src.common.domain.models.kolo_item import KoloItem
                 return session.query(KoloItem).order_by(KoloItem.id.desc()).first()
 
             # 执行查询

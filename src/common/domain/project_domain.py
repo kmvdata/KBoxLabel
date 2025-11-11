@@ -6,9 +6,9 @@ from PyQt5.QtGui import QColor
 from src.common.god.ksnowflake import KSnowflake
 from src.common.domain.abs_sqlite_domain import AbsSqliteDomain
 from src.models.dto.annotation_category import AnnotationCategory
-from src.models.sql.annotation_category import AnnotationCategory as SQLAnnotationCategory
-from src.models.sql.kolo_item import KoloItem
-from src.models.sql.kv_config import KVConfig
+from src.common.domain.models.annotation_category import AnnotationCategory as SQLAnnotationCategory
+from src.common.domain.models.kolo_item import KoloItem
+from src.common.domain.models.kv_config import KVConfig
 
 
 class ProjectDomain(AbsSqliteDomain):

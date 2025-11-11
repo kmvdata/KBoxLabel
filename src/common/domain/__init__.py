@@ -3,9 +3,9 @@ from pathlib import Path
 from sqlalchemy import engine_from_config, text
 
 from src.common.god.logger import logger
-from src.models.sql.annotation_category import AnnotationCategory
-from src.models.sql.kolo_item import KoloItem
-from src.models.sql.kv_config import KVConfig
+from src.common.domain.models.annotation_category import AnnotationCategory
+from src.common.domain.models.kolo_item import KoloItem
+from src.common.domain.models.kv_config import KVConfig
 
 
 def gen_sql_tables(db_path: Path):
