@@ -1,0 +1,204 @@
+from pathlib import Path
+from typing import Optional, List
+
+from PyQt5.QtGui import QColor
+
+from src.common.god.ksnowflake import KSnowflake
+from src.common.domain.sqlite_db import SqliteDB
+from src.models.dto.annotation_category import AnnotationCategory
+from src.models.sql.annotation_category import AnnotationCategory as SQLAnnotationCategory
+from src.models.sql.kolo_item import KoloItem
+from src.models.sql.kv_config import KVConfig
+
+
+class ProjectDomain:
+    """数据库领域类"""
+    def __init__(self, db_path: Path):
+        self.db_path = db_path
+        self.sqlite_db = SqliteDB(db_path)
+        self.db_session = self.sqlite_db.db_session
+    
+    def model_path_in_db(self) -> Optional[Path]:
+        """从数据库查询模型路径"""
+        # 创建数据库会话
+        session = self.sqlite_db.db_session()
+        try:
+            # 查询数据库中的模型路径
+            kv_record = session.query(KVConfig).filter(KVConfig.key == "yolo_model_path").first()
+            if kv_record and kv_record.value:
+                return Path(kv_record.value)
+            else:
+                return None
+        finally:
+            session.close()
+            
+    def save_model_path(self, model_path: Path):
+        """保存模型路径到数据库"""
+        session = self.sqlite_db.db_session()
+        try:
+            # 查询是否已有记录
+            kv_record = session.query(KVConfig).filter(KVConfig.key == "yolo_model_path").first()
+
+            # 保存或更新路径
+            if kv_record:
+                kv_record.value = str(model_path)
+            else:
+                # 创建新记录
+                kv_record = KVConfig()
+                kv_record.kid = KSnowflake().gen_kid()
+                kv_record.key = "yolo_model_path"
+                kv_record.value = str(model_path)
+                kv_record.comment = "YOLO模型路径"
+                session.add(kv_record)
+
+            session.commit()
+        except Exception as e:
+            session.rollback()
+            print(f"更新数据库中的YOLO模型路径失败: {str(e)}")
+        finally:
+            session.close()
+            
+    def delete_model_path(self):
+        """从数据库中删除模型路径"""
+        # 创建数据库会话
+        session = self.sqlite_db.db_session()
+        try:
+            # 删除模型路径记录
+            session.query(KVConfig).filter(KVConfig.key == "yolo_model_path").delete()
+            session.commit()
+        except Exception as e:
+            session.rollback()
+            print(f"删除数据库中的YOLO模型路径失败: {str(e)}")
+        finally:
+            session.close()
+            
+    def save_categories(self, categories: List[AnnotationCategory]):
+        """
+        将类别列表保存到数据库中
+        """
+        # 开始事务
+        session = self.sqlite_db.db_session()
+        try:
+            # 清除现有的所有类别
+            session.query(SQLAnnotationCategory).delete()
+
+            # 添加所有当前类别
+            for category in categories:
+                sql_category = SQLAnnotationCategory()
+                sql_category.class_id = category.class_id
+                sql_category.class_name = category.class_name
+                sql_category.color_r = category.color.red()
+                sql_category.color_g = category.color.green()
+                sql_category.color_b = category.color.blue()
+                session.add(sql_category)
+
+            # 提交事务
+            session.commit()
+        except Exception as e:
+            # 回滚事务
+            session.rollback()
+            raise e
+        finally:
+            session.close()
+            
+    def load_categories(self) -> List[AnnotationCategory]:
+        """
+        从数据库加载类别列表
+        """
+        # 开始会话
+        session = self.sqlite_db.db_session()
+        # 转换为AnnotationCategory对象列表
+        categories: list = []
+        try:
+            # 查询所有类别
+            sql_categories = session.query(SQLAnnotationCategory).all()
+            for sql_cat in sql_categories:
+                category = AnnotationCategory(
+                    class_id=sql_cat.class_id,
+                    class_name=sql_cat.class_name
+                )
+                category.color = QColor(sql_cat.color_r, sql_cat.color_g, sql_cat.color_b)
+                categories.append(category)
+        except Exception as e:
+            print(f"加载类别列表失败: {str(e)}")
+        finally:
+            session.close()
+            return categories
+            
+    def rename_image_for_kolo_item(self, old_img_name: str, new_img_name: str):
+        """
+        在数据库中，把kolo_item表中image_name=old_img_name的项目，全部改成image_name=new_img_name
+        :param old_img_name: 旧图片名称
+        :param new_img_name: 新图片名称
+        """
+        # 获取数据库会话
+        session = self.sqlite_db.db_session()
+        try:
+            # 更新kolo_item表中所有image_name等于old_img_name的记录为new_img_name
+            session.query(KoloItem).filter(KoloItem.image_name == old_img_name).update(
+                {KoloItem.image_name: new_img_name}
+            )
+            # 提交事务
+            session.commit()
+        except Exception as e:
+            # 回滚事务
+            session.rollback()
+            print(f"重命名图片关联的kolo_item记录失败: {str(e)}")
+            raise e
+        finally:
+            # 关闭会话
+            session.close()
+            
+    def load_kolo_item_from_db(self, img_name: str) -> list[KoloItem]:
+        """
+        从数据库加载指定图片的kolo项
+        :param img_name: 图片名称
+        :return: KoloItem列表
+        """
+        try:
+            # 创建数据库会话
+            with self.sqlite_db.db_session() as session:
+                # 从数据库读取image_name为img_name的行
+                kolo_items = session.query(KoloItem).filter(KoloItem.image_name == img_name).all()
+                return kolo_items
+        except Exception as e:
+            print(f"从数据库加载Kolo项目时出错: {str(e)}")
+            return []
+            
+    def delete_kolo_item_for_image(self, img_name: str):
+        """
+        从数据库删除指定图片的kolo项
+        :param img_name: 图片名称
+        """
+        try:
+            # 创建数据库会话
+            with self.sqlite_db.db_session() as session:
+                # 删除image_name为img_name的所有行
+                deleted_count = session.query(KoloItem).filter(KoloItem.image_name == img_name).delete()
+                session.commit()  # 确保提交事务
+                print(f"从数据库删除了 {deleted_count} 个Kolo项目")
+        except Exception as e:
+            print(f"从数据库删除Kolo项目时出错: {str(e)}")
+            
+    def save_kolo_item_to_db(self, kolo_items: list[KoloItem]):
+        """
+        保存kolo项到数据库
+        :param kolo_items: KoloItem对象列表
+        """
+        def transaction_func(session):
+            # 批量插入KoloItem对象
+            session.add_all(kolo_items)
+        
+        try:
+            self.execute_in_transaction(transaction_func)
+            print(f"保存了 {len(kolo_items)} 个Kolo项目到数据库")
+        except Exception as e:
+            print(f"保存Kolo项目到数据库时出错: {str(e)}")
+
+    def execute_in_transaction(self, transaction_func):
+        """
+        在事务中执行函数
+        :param transaction_func: 要执行的函数，接收session作为第一个参数
+        :return: 函数的返回值
+        """
+        return self.sqlite_db.execute_in_transaction(transaction_func)

@@ -116,37 +116,13 @@ class YOLOExecutor:
         return detection_results
 
     def load_kolo_item_from_db(self, img_path: Path) -> list[KoloItem]:
-        try:
-            # 创建数据库会话
-            with self.parent.sqlite_db.db_session() as session:
-                # 从数据库读取image_name为img_path.name的行
-                kolo_items = session.query(KoloItem).filter(KoloItem.image_name == img_path.name).all()
-                logging.debug(f"从数据库加载到 {len(kolo_items)} 个Kolo项目")
-                return kolo_items
-        except Exception as e:
-            logging.error(f"从数据库加载Kolo项目时出错: {str(e)}")
-            return []
+        return self.parent.project_domain.load_kolo_item_from_db(img_path.name)
 
     def delete_kolo_item_for_image(self, img_path: Path):
-        try:
-            # 创建数据库会话
-            with self.parent.sqlite_db.db_session() as session:
-                # 删除image_name为img_path.name的所有行
-                deleted_count = session.query(KoloItem).filter(KoloItem.image_name == img_path.name).delete()
-                session.commit()  # 确保提交事务
-                logging.debug(f"从数据库删除了 {deleted_count} 个Kolo项目")
-        except Exception as e:
-            logging.error(f"从数据库删除Kolo项目时出错: {str(e)}")
+        self.parent.project_domain.delete_kolo_item_for_image(img_path.name)
 
     def save_kolo_item_to_db(self, kolo_items: list[KoloItem]):
-        try:
-            with self.parent.sqlite_db.db_session() as session:
-                # 批量插入KoloItem对象
-                session.add_all(kolo_items)
-                session.commit()  # 确保提交事务
-                logging.debug(f"保存了 {len(kolo_items)} 个Kolo项目到数据库")
-        except Exception as e:
-            logging.error(f"保存Kolo项目到数据库时出错: {str(e)}")
+        self.parent.project_domain.save_kolo_item_to_db(kolo_items)
 
     def exec_yolo(self, img_path: Path, save_to_db: bool = False)-> list[KoloItem]:
         """使用yolo识别目标，从.kolo文件读取现有数据，合并结果"""

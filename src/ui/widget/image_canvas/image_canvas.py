@@ -12,7 +12,7 @@ from PyQt5.QtWidgets import (QGraphicsView, QGraphicsScene, QGraphicsPixmapItem,
 from src.common.god.korm_base import KOrmBase
 from src.models.dto.annotation_category import AnnotationCategory
 from src.models.dto.ref_project_info import RefProjectInfo
-from src.models.sql import KoloItem
+from src.models.sql.kolo_item import KoloItem
 from src.ui.widget.image_canvas.annotation_list import AnnotationList
 from src.ui.widget.image_canvas.annotation_view import AnnotationView
 
@@ -673,7 +673,7 @@ class ImageCanvas(QGraphicsView):
                     session.add(kolo_item)
 
             # 执行事务
-            self.project_info.sqlite_db.execute_in_transaction(transaction_func)
+            self.project_info.execute_in_transaction(transaction_func)
             
             return True
         except Exception as e:

@@ -575,7 +575,7 @@ class ImageListView(QListView):
                 return session.query(KoloItem).order_by(KoloItem.id.desc()).first()
 
             # 执行查询
-            last_kolo_item = self.project_info.sqlite_db.execute_in_transaction(query_func)
+            last_kolo_item = self.project_info.project_domain.execute_in_transaction(query_func)
 
             # 如果没有找到任何KoloItem，根据参数决定是否显示提示信息
             if not last_kolo_item:
