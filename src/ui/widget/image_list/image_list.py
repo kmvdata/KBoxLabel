@@ -396,7 +396,7 @@ class ImageListView(QListView):
                         selection_model.selection(),
                         selection_model.selection()  # 通常这里传递新旧选择，但这里都传递相同值
                     )
-                self.project_info.rename_image_for_kolo_item(old_path, new_path)
+                self.project_info.domain.rename_image_for_kolo_item(old_path, new_path)
 
             except Exception as e:
                 QMessageBox.critical(self, "错误", f"重命名失败: {str(e)}")
@@ -492,7 +492,7 @@ class ImageListView(QListView):
                 # 从模型中批量移除（需要处理索引变化）
                 for row, file_path, file_name in files_to_delete:
                     # 从数据库中删除相关的kolo item项
-                    self.project_info.delete_kolo_item_for_image(Path(file_path))
+                    self.project_info.domain.delete_kolo_item_for_image(file_name)
                     
                     # 从模型中移除
                     self.model.beginRemoveRows(QModelIndex(), row, row)

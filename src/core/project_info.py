@@ -110,11 +110,6 @@ class ProjectInfo:
         self.categories = self.domain.load_categories()
         return self.categories
 
-    def load_kolo_item_from_db(self, img_path: Path) -> list[KoloItem]:
-        return self.yolo_executor.load_kolo_item_from_db(img_path)
-
-    def delete_kolo_item_for_image(self, img_path: Path):
-        return self.yolo_executor.delete_kolo_item_for_image(img_path)
 
     def find_annotation_by_name(self, name: str) -> Optional[AnnotationCategory]:
         """根据类别名称查找标注类别"""
@@ -131,10 +126,3 @@ class ProjectInfo:
                 return category
         return None  # 未找到时返回None
 
-    def rename_image_for_kolo_item(self, old_img_path: Path, new_img_path: Path):
-        """
-        在数据库中，把kolo_item表中image_name=old_image.name的项目，全部改成image_name=new_image.name
-        :param old_img_path: 旧图片路径
-        :param new_img_path: 新图片路径
-        """
-        self.domain.rename_image_for_kolo_item(old_img_path.name, new_img_path.name)

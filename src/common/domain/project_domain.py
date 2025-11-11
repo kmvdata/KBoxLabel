@@ -192,3 +192,35 @@ class ProjectDomain(AbsSqliteDomain):
             print(f"保存了 {len(kolo_items)} 个Kolo项目到数据库")
         except Exception as e:
             print(f"保存Kolo项目到数据库时出错: {str(e)}")
+
+    def restore_kolo_item_for_image(self, kolo_items: list[KoloItem], img_name: str):
+        """
+        从数据库删除指定图片的kolo项, 然后在同一个事务中保存kolo项到数据库
+        :param kolo_items: KoloItem对象列表
+        :param img_name: 图片名称
+        """
+
+        try:
+            # 创建数据库会话
+            with self.db_session() as session:
+                # 删除image_name为img_name的所有行
+                deleted_count = session.query(KoloItem).filter(KoloItem.image_name == img_name).delete()
+                session.commit()  # 确保提交事务
+                print(f"从数据库删除了 {deleted_count} 个Kolo项目")
+                session.expire_all()
+        except Exception as e:
+            print(f"从数据库删除Kolo项目时出错: {str(e)}")
+
+        try:
+            # 创建数据库会话
+            with self.db_session() as session:
+                # 删除image_name为img_name的所有行
+                session.add_all(kolo_items)
+                session.commit()  # 确保提交事务
+
+                # 打印每个kolo_item的kid和class_name
+                for kolo_item in kolo_items:
+                    print(f"添加的Kolo项目: {kolo_item.kid} {kolo_item.class_name}")
+                print(f"向数据库删除了 {len(kolo_items)} 个Kolo项目")
+        except Exception as e:
+            print(f"向数据库添加Kolo项目时出错: {str(e)}")

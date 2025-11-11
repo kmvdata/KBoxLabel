@@ -115,15 +115,6 @@ class YOLOExecutor:
                 detection_results.append(kolo_item)
         return detection_results
 
-    def load_kolo_item_from_db(self, img_path: Path) -> list[KoloItem]:
-        return self.parent.domain.load_kolo_item_from_db(img_path.name)
-
-    def delete_kolo_item_for_image(self, img_path: Path):
-        self.parent.domain.delete_kolo_item_for_image(img_path.name)
-
-    def save_kolo_item_to_db(self, kolo_items: list[KoloItem]):
-        self.parent.domain.save_kolo_item_to_db(kolo_items)
-
     def exec_yolo(self, img_path: Path, save_to_db: bool = False)-> list[KoloItem]:
         """使用yolo识别目标，从.kolo文件读取现有数据，合并结果"""
         # 保留原有参数检查逻辑
@@ -151,19 +142,17 @@ class YOLOExecutor:
             img_height,
             img_path.name
         )
-        logging.debug(f"YOLO检测到 {len(detection_results)} 个目标")
+        len_detections = len(detection_results)
 
         # 从数据库加载项目并添加到检测结果中
-        kolo_items_in_db = self.load_kolo_item_from_db(img_path)
+        kolo_items_in_db = self.parent.domain.load_kolo_item_from_db(img_path.name)
         detection_results.extend(kolo_items_in_db)
 
         # 合并相似结果并返回
         merged_results = self.merge_similar_detections(detection_results)
-        logging.debug(f"合并后最终结果数量: {len(merged_results)}")
         if save_to_db:
             # 保存结果到数据库
-            self.delete_kolo_item_for_image(img_path)
-            self.save_kolo_item_to_db(merged_results)
+            self.parent.domain.restore_kolo_item_for_image(merged_results, img_path.name)
         return merged_results
 
     @staticmethod
