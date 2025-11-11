@@ -147,7 +147,7 @@ class ProjectDomain(AbsSqliteDomain):
             # 关闭会话
             session.close()
             
-    def load_kolo_item_from_db(self, img_name: str) -> list[KoloItem]:
+    def load_kolo_items_for_image(self, img_name: str) -> list[KoloItem]:
         """
         从数据库加载指定图片的kolo项
         :param img_name: 图片名称
@@ -163,7 +163,7 @@ class ProjectDomain(AbsSqliteDomain):
             print(f"从数据库加载Kolo项目时出错: {str(e)}")
             return []
             
-    def delete_kolo_item_for_image(self, img_name: str):
+    def delete_kolo_items_for_image(self, img_name: str):
         """
         从数据库删除指定图片的kolo项
         :param img_name: 图片名称

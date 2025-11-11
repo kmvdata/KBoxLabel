@@ -145,7 +145,7 @@ class YOLOExecutor:
         len_detections = len(detection_results)
 
         # 从数据库加载项目并添加到检测结果中
-        kolo_items_in_db = self.parent.domain.load_kolo_item_from_db(img_path.name)
+        kolo_items_in_db = self.parent.domain.load_kolo_items_for_image(img_path.name)
         detection_results.extend(kolo_items_in_db)
 
         # 合并相似结果并返回

@@ -224,7 +224,7 @@ class ImageCanvas(QGraphicsView):
             self.project_info.load_categories()
 
             # 执行查询
-            kolo_items = self.project_info.domain.load_kolo_item_from_db(image_path.name)
+            kolo_items = self.project_info.domain.load_kolo_items_for_image(image_path.name)
 
             # 处理查询结果
             for kolo_item in kolo_items:
