@@ -18,7 +18,7 @@ class RefProjectInfo:
 
         # 初始化数据库
         gen_sql_tables(self._db_path)
-        self.project_domain: ProjectDomain = ProjectDomain(self._db_path)
+        self.domain: ProjectDomain = ProjectDomain(self._db_path)
 
     def exists(self) -> bool:
         if self.path is None:
@@ -65,7 +65,7 @@ class RefProjectInfo:
         return self.yolo_executor.is_model_loaded()
 
     def model_path_in_db(self) -> Optional[Path]:
-        return self.project_domain.model_path_in_db()
+        return self.domain.model_path_in_db()
 
     def load_yolo_model(self, model_path: Optional[Path] = None):
         """加载YOLO模型并在成功后缓存路径"""
@@ -82,10 +82,10 @@ class RefProjectInfo:
 
         if is_loaded:
             # 加载成功，保存路径到数据库
-            self.project_domain.save_model_path(model_path)
+            self.domain.save_model_path(model_path)
         else:
             # 加载失败，清空数据库中的模型路径
-            self.project_domain.delete_model_path()
+            self.domain.delete_model_path()
             
         return None
 
@@ -93,7 +93,7 @@ class RefProjectInfo:
         """删除YOLO模型并清空数据库中的模型路径"""
         # 创建数据库会话
         self.yolo_executor.clear_model()
-        self.project_domain.delete_model_path()
+        self.domain.delete_model_path()
 
     def exec_yolo(self, img_path: Path, save_to_db: bool = False)-> list[KoloItem]:
         return self.yolo_executor.exec_yolo(img_path, save_to_db)
@@ -103,13 +103,13 @@ class RefProjectInfo:
         """
         将当前的 categories 列表保存到数据库中
         """
-        self.project_domain.save_categories(self.categories)
+        self.domain.save_categories(self.categories)
 
     def load_categories(self) -> List[AnnotationCategory]:
         """
         从数据库加载类别列表
         """
-        self.categories = self.project_domain.load_categories()
+        self.categories = self.domain.load_categories()
         return self.categories
 
     def load_kolo_item_from_db(self, img_path: Path) -> list[KoloItem]:
@@ -139,4 +139,4 @@ class RefProjectInfo:
         :param old_img_path: 旧图片路径
         :param new_img_path: 新图片路径
         """
-        self.project_domain.rename_image_for_kolo_item(old_img_path.name, new_img_path.name)
+        self.domain.rename_image_for_kolo_item(old_img_path.name, new_img_path.name)

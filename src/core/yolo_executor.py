@@ -116,13 +116,13 @@ class YOLOExecutor:
         return detection_results
 
     def load_kolo_item_from_db(self, img_path: Path) -> list[KoloItem]:
-        return self.parent.project_domain.load_kolo_item_from_db(img_path.name)
+        return self.parent.domain.load_kolo_item_from_db(img_path.name)
 
     def delete_kolo_item_for_image(self, img_path: Path):
-        self.parent.project_domain.delete_kolo_item_for_image(img_path.name)
+        self.parent.domain.delete_kolo_item_for_image(img_path.name)
 
     def save_kolo_item_to_db(self, kolo_items: list[KoloItem]):
-        self.parent.project_domain.save_kolo_item_to_db(kolo_items)
+        self.parent.domain.save_kolo_item_to_db(kolo_items)
 
     def exec_yolo(self, img_path: Path, save_to_db: bool = False)-> list[KoloItem]:
         """使用yolo识别目标，从.kolo文件读取现有数据，合并结果"""

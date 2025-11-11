@@ -4,24 +4,22 @@ from typing import Optional, List
 from PyQt5.QtGui import QColor
 
 from src.common.god.ksnowflake import KSnowflake
-from src.common.domain.sqlite_db import SqliteDB
+from src.common.domain.abs_sqlite_domain import AbsSqliteDomain
 from src.models.dto.annotation_category import AnnotationCategory
 from src.models.sql.annotation_category import AnnotationCategory as SQLAnnotationCategory
 from src.models.sql.kolo_item import KoloItem
 from src.models.sql.kv_config import KVConfig
 
 
-class ProjectDomain:
+class ProjectDomain(AbsSqliteDomain):
     """数据库领域类"""
     def __init__(self, db_path: Path):
-        self.db_path = db_path
-        self.sqlite_db = SqliteDB(db_path)
-        self.db_session = self.sqlite_db.db_session
+        super().__init__(db_path)
     
     def model_path_in_db(self) -> Optional[Path]:
         """从数据库查询模型路径"""
         # 创建数据库会话
-        session = self.sqlite_db.db_session()
+        session = self.db_session()
         try:
             # 查询数据库中的模型路径
             kv_record = session.query(KVConfig).filter(KVConfig.key == "yolo_model_path").first()
@@ -34,7 +32,7 @@ class ProjectDomain:
             
     def save_model_path(self, model_path: Path):
         """保存模型路径到数据库"""
-        session = self.sqlite_db.db_session()
+        session = self.db_session()
         try:
             # 查询是否已有记录
             kv_record = session.query(KVConfig).filter(KVConfig.key == "yolo_model_path").first()
@@ -61,7 +59,7 @@ class ProjectDomain:
     def delete_model_path(self):
         """从数据库中删除模型路径"""
         # 创建数据库会话
-        session = self.sqlite_db.db_session()
+        session = self.db_session()
         try:
             # 删除模型路径记录
             session.query(KVConfig).filter(KVConfig.key == "yolo_model_path").delete()
@@ -77,7 +75,7 @@ class ProjectDomain:
         将类别列表保存到数据库中
         """
         # 开始事务
-        session = self.sqlite_db.db_session()
+        session = self.db_session()
         try:
             # 清除现有的所有类别
             session.query(SQLAnnotationCategory).delete()
@@ -106,7 +104,7 @@ class ProjectDomain:
         从数据库加载类别列表
         """
         # 开始会话
-        session = self.sqlite_db.db_session()
+        session = self.db_session()
         # 转换为AnnotationCategory对象列表
         categories: list = []
         try:
@@ -132,7 +130,7 @@ class ProjectDomain:
         :param new_img_name: 新图片名称
         """
         # 获取数据库会话
-        session = self.sqlite_db.db_session()
+        session = self.db_session()
         try:
             # 更新kolo_item表中所有image_name等于old_img_name的记录为new_img_name
             session.query(KoloItem).filter(KoloItem.image_name == old_img_name).update(
@@ -157,7 +155,7 @@ class ProjectDomain:
         """
         try:
             # 创建数据库会话
-            with self.sqlite_db.db_session() as session:
+            with self.db_session() as session:
                 # 从数据库读取image_name为img_name的行
                 kolo_items = session.query(KoloItem).filter(KoloItem.image_name == img_name).all()
                 return kolo_items
@@ -172,7 +170,7 @@ class ProjectDomain:
         """
         try:
             # 创建数据库会话
-            with self.sqlite_db.db_session() as session:
+            with self.db_session() as session:
                 # 删除image_name为img_name的所有行
                 deleted_count = session.query(KoloItem).filter(KoloItem.image_name == img_name).delete()
                 session.commit()  # 确保提交事务
@@ -194,11 +192,3 @@ class ProjectDomain:
             print(f"保存了 {len(kolo_items)} 个Kolo项目到数据库")
         except Exception as e:
             print(f"保存Kolo项目到数据库时出错: {str(e)}")
-
-    def execute_in_transaction(self, transaction_func):
-        """
-        在事务中执行函数
-        :param transaction_func: 要执行的函数，接收session作为第一个参数
-        :return: 函数的返回值
-        """
-        return self.sqlite_db.execute_in_transaction(transaction_func)

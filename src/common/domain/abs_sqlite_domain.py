@@ -15,7 +15,7 @@ from src.common.god.common_error import CommonError
 from src.common.god.logger import logger
 
 
-class SqliteDB(object):
+class AbsSqliteDomain(object):
 
     def __init__(self, db_path: Path):
         self.db_path = None

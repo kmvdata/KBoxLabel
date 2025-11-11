@@ -673,7 +673,7 @@ class ImageCanvas(QGraphicsView):
                     session.add(kolo_item)
 
             # 执行事务
-            self.project_info.execute_in_transaction(transaction_func)
+            self.project_info.domain.execute_in_transaction(transaction_func)
             
             return True
         except Exception as e:
