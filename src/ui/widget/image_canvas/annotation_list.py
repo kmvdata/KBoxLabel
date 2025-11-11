@@ -4,7 +4,7 @@ from typing import Tuple
 
 from PyQt5.QtCore import Qt, QSize, QRect, QItemSelectionModel, QMimeData, \
     QSortFilterProxyModel
-from PyQt5.QtGui import QStandardItemModel, QStandardItem, QPen, QDrag, QColor
+from PyQt5.QtGui import QStandardItemModel, QStandardItem, QPen, QDrag, QColor, QPainter, QPixmap
 from PyQt5.QtWidgets import QLineEdit, QSpinBox, QListView, QStyledItemDelegate, QAbstractItemView, \
     QStyle, QToolBar, QWidget, QHBoxLayout, QMenu, QAction
 from ultralytics import YOLO
@@ -90,6 +90,40 @@ class AnnotationDelegate(QStyledItemDelegate):
         border_pen = QPen(option.palette.windowText().color(), 1)
         painter.setPen(border_pen)
         painter.drawRect(color_rect)
+
+    def create_drag_pixmap(self, category: AnnotationCategory) -> QPixmap:
+        """创建用于拖拽的 pixmap"""
+        # 创建一个适当大小的 pixmap
+        width = 200
+        height = 40
+        pixmap = QPixmap(width, height)
+        pixmap.fill(Qt.transparent)
+        
+        # 创建绘图器
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.Antialiasing)
+        
+        # 绘制颜色方块
+        color_size = height - 8
+        color_rect = QRect(4, 4, color_size, color_size)
+        
+        # 使用带透明度的颜色
+        transparent_color = QColor(category.color)
+        transparent_color.setAlphaF(0.65)
+        painter.fillRect(color_rect, transparent_color)
+        
+        # 绘制边框
+        border_pen = QPen(Qt.black, 1)
+        painter.setPen(border_pen)
+        painter.drawRect(color_rect)
+        
+        # 绘制类别名称
+        text_rect = QRect(color_size + 12, 0, width - color_size - 16, height)
+        painter.setPen(Qt.black)
+        painter.drawText(text_rect, Qt.AlignLeft | Qt.AlignVCenter, category.class_name)
+        
+        painter.end()
+        return pixmap
 
 
 class EditableAnnotationDelegate(AnnotationDelegate):
@@ -423,6 +457,12 @@ class AnnotationList(QListView):
 
         drag = QDrag(self)
         drag.setMimeData(mime_data)
+        
+        # 使用自定义的 pixmap 作为拖拽图像
+        pixmap = self.delegate.create_drag_pixmap(category)
+        drag.setPixmap(pixmap)
+        drag.setHotSpot(pixmap.rect().center())  # 设置热点为中心点
+        
         drag.exec_(supportedActions)
 
     def _handle_item_click(self, clicked_index):
