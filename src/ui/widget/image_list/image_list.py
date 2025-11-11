@@ -766,6 +766,9 @@ class ImageListView(QListView):
         # 隐藏并销毁进度对话框
         progress_dialog.close()
 
+        # 处理完成后发送信号刷新canvas
+        self.sig_canvas_needs_reload.emit() # type: ignore
+
         # 显示统计信息对话框
         if not canceled:
             msg = f"处理完成\n\n总数: {total_count}\n成功: {success_count}\n错误: {error_count}"

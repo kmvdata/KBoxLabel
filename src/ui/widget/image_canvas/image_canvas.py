@@ -173,12 +173,12 @@ class ImageCanvas(QGraphicsView):
             if isinstance(item, AnnotationView):
                 item.set_selected_flag_internal(False)
 
-    def load_image(self, image_path: Path):
+    def load_image(self, image_path: Path, reload = False):
         """加载指定路径的图片，并显示到画布上"""
         # 加载图片
         if not image_path.exists():
             raise FileNotFoundError(f"图片文件不存在: {image_path}")
-        if image_path == self.current_image_path:
+        if not reload and image_path == self.current_image_path:
             print("图片已加载，无需重复加载")
             return
         pixmap = QPixmap(str(image_path))
@@ -1200,10 +1200,7 @@ class ImageCanvas(QGraphicsView):
 
     def reload_image(self):
         """重新加载当前显示的图片（如果存在）"""
-        # 检查当前是否有图片路径，即是否有图片正在显示
-        if self.current_image_path is not None:
-            # 调用已有的load_image方法重新加载当前图片
-            self.load_image(self.current_image_path)
+        self.load_image(self.current_image_path, reload=True)
 
     def _connect_model_signals(self):
         """连接模型加载相关的信号"""
