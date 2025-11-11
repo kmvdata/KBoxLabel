@@ -200,27 +200,34 @@ class ProjectDomain(AbsSqliteDomain):
         :param img_name: 图片名称
         """
 
-        try:
-            # 创建数据库会话
-            with self.db_session() as session:
-                # 删除image_name为img_name的所有行
-                deleted_count = session.query(KoloItem).filter(KoloItem.image_name == img_name).delete()
-                session.commit()  # 确保提交事务
-                print(f"从数据库删除了 {deleted_count} 个Kolo项目")
-                session.expire_all()
-        except Exception as e:
-            print(f"从数据库删除Kolo项目时出错: {str(e)}")
+        def transaction_func(session):
+            # 删除现有记录
+            deleted_count = session.query(KoloItem).filter(KoloItem.image_name == img_name).delete()
+
+            # 为每个新对象生成新的 kid，避免主键冲突
+            # 同时创建新的对象实例，避免会话绑定问题
+            new_kolo_items = []
+            for item in kolo_items:
+                new_item = KoloItem()
+                new_item.kid = KSnowflake().gen_kid()
+                new_item.image_name = item.image_name
+                new_item.class_name = item.class_name
+                new_item.x_center = item.x_center
+                new_item.y_center = item.y_center
+                new_item.width = item.width
+                new_item.height = item.height
+                new_kolo_items.append(new_item)
+
+            # 批量插入新对象
+            session.add_all(new_kolo_items)
+            session.flush()  # 强制检查约束违规
+            print(f"删除: {deleted_count}, 保存:  {len(new_kolo_items)} 个Kolo项目到数据库")
 
         try:
-            # 创建数据库会话
-            with self.db_session() as session:
-                # 删除image_name为img_name的所有行
-                session.add_all(kolo_items)
-                session.commit()  # 确保提交事务
-
-                # 打印每个kolo_item的kid和class_name
-                for kolo_item in kolo_items:
-                    print(f"添加的Kolo项目: {kolo_item.kid} {kolo_item.class_name}")
-                print(f"向数据库删除了 {len(kolo_items)} 个Kolo项目")
+            self.execute_in_transaction(transaction_func)
+            print(f"保存了 {len(kolo_items)} 个Kolo项目到数据库")
         except Exception as e:
-            print(f"向数据库添加Kolo项目时出错: {str(e)}")
+            print(f"保存Kolo项目到数据库时出错: {str(e)}")
+
+
+
