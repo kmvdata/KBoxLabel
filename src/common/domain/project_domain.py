@@ -275,6 +275,17 @@ class ProjectDomain(AbsSqliteDomain):
             return []
 
     def count_image_names_from_kilo_item(self) -> int:
-        pass
-
-
+        """
+        统计kolo_item表中不重复的image_name数量
+        
+        :return: 不重复的image_name数量
+        """
+        try:
+            # 创建数据库会话
+            with self.db_session() as session:
+                # 查询所有不重复的image_name数量
+                count = session.query(KoloItem.image_name).distinct().count()
+                return count
+        except Exception as e:
+            print(f"统计数据库中image_name数量时出错: {str(e)}")
+            return 0
