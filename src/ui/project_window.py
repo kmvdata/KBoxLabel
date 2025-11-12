@@ -7,7 +7,7 @@ from typing import cast
 
 from PyQt5.QtCore import QThreadPool, QTimer, QItemSelectionModel
 from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QFileDialog
+from PyQt5.QtWidgets import QFileDialog, QProgressBar
 from PyQt5.QtWidgets import (QMainWindow, QWidget, QHBoxLayout, QVBoxLayout,
                              QSplitter, QLabel, QDialog,
                              QPushButton, QInputDialog, QDialogButtonBox,
@@ -407,25 +407,65 @@ class ProjectWindow(QMainWindow):
                 QMessageBox.information(self, "导出完成", "未找到任何图片")
                 return
 
-            # 创建进度对话框
-            progress_dialog = QProgressDialog("正在导出标注数据...", "取消", 0, total_images, self)
+            # 创建自定义进度对话框
+            progress_dialog = QDialog(self)
             progress_dialog.setWindowTitle("导出进度")
-            progress_dialog.setWindowModality(Qt.WindowModal)
-            progress_dialog.setMinimumDuration(0)
-            progress_dialog.setAutoClose(True)
+            progress_dialog.setModal(True)
+            progress_dialog.resize(400, 150)
+
+            layout = QVBoxLayout()
+
+            # 标签显示正在处理的文件
+            file_label = QLabel("正在导出标注数据...")
+            file_label.setWordWrap(True)
+            layout.addWidget(file_label)
+
+            # 进度条
+            progress_bar = QProgressBar()
+            progress_bar.setRange(0, total_images)
+            progress_bar.setValue(0)
+            layout.addWidget(progress_bar)
+
+            # 添加进度标签（显示在取消按钮上方，格式如：2/100）
+            progress_label = QLabel("0/0")
+            progress_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            layout.addWidget(progress_label)
+
+            # 取消按钮
+            cancel_button = QPushButton("取消")
+            layout.addWidget(cancel_button)
+
+            progress_dialog.setLayout(layout)
+
+            # 变量用于跟踪处理状态
+            canceled = False
+
+            # 连接取消按钮
+            def cancel_processing():
+                nonlocal canceled
+                canceled = True
+                progress_dialog.close()
+
+            cancel_button.clicked.connect(cancel_processing)
+
+            # 显示对话框
+            progress_dialog.show()
 
             # 处理每个图片
             for i, image_path in enumerate(self.image_list.model.image_paths):
                 image_name = os.path.basename(image_path)
 
                 # 检查是否取消
-                if progress_dialog.wasCanceled():
+                if canceled:
                     QMessageBox.information(self, "导出中止", "用户取消了导出操作")
                     return
 
                 # 更新进度对话框
-                progress_dialog.setValue(i)
-                progress_dialog.setLabelText(f"正在导出: {image_name}")
+                progress_bar.setValue(i)
+                file_label.setText(f"正在导出: {image_name}")
+                
+                # 更新进度标签
+                progress_label.setText(f"{i+1}/{total_images}")
 
                 # 处理事件队列，确保UI更新
                 from PyQt5.QtWidgets import QApplication
@@ -439,8 +479,20 @@ class ProjectWindow(QMainWindow):
                     # 继续处理其他图片而不是中断整个过程
 
             # 完成进度
-            progress_dialog.setValue(total_images)
+            progress_bar.setValue(total_images)
+            progress_label.setText(f"{total_images}/{total_images}")
+            QApplication.processEvents()
             
+            # 短暂延迟让用户看到完成状态
+            from PyQt5.QtCore import QTimer
+            loop = QApplication.processEvents
+            for _ in range(50):  # 约500ms延迟
+                QTimer.singleShot(10, lambda: None)
+                loop()
+            
+            # 关闭进度对话框
+            progress_dialog.close()
+
             # 调用完成回调
             if finish_callback:
                 finish_callback(progress_dialog)
@@ -490,6 +542,9 @@ class ProjectWindow(QMainWindow):
             processed_count += len(kolo_items)
 
         def finish_export(progress_dialog):
+            # 检查progress_dialog类型并相应处理
+            if hasattr(progress_dialog, 'setLabelText'):
+                progress_dialog.setLabelText("导出完成")
             QMessageBox.information(self, "导出完成", f"成功导出 {len(self.image_list.model.image_paths)} 个文件，共 {processed_count} 条标注")
 
         # 使用通用导出函数
@@ -593,7 +648,15 @@ class ProjectWindow(QMainWindow):
                 processed_count += 1
 
         def finish_export(progress_dialog):
-            progress_dialog.setLabelText("正在保存COCO文件...")
+            # 更新文件标签文本（如果progress_dialog有这个方法的话）
+            if hasattr(progress_dialog, 'setLabelText'):
+                progress_dialog.setLabelText("正在保存COCO文件...")
+            # 如果是自定义对话框，我们通过子元素查找文件标签
+            elif hasattr(progress_dialog, 'children'):
+                for child in progress_dialog.children():
+                    if isinstance(child, QLabel) and child.text().startswith("正在导出:"):
+                        child.setText("正在保存COCO文件...")
+                        break
             
             # 写入COCO格式的JSON文件
             coco_json_path = output_path / "annotations.json"
