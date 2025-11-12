@@ -446,7 +446,7 @@ class ProjectWindow(QMainWindow):
                 canceled = True
                 progress_dialog.close()
 
-            cancel_button.clicked.connect(cancel_processing)
+            cancel_button.clicked.connect(cancel_processing)  # type: ignore
 
             # 显示对话框
             progress_dialog.show()
@@ -481,6 +481,9 @@ class ProjectWindow(QMainWindow):
             # 完成进度
             progress_bar.setValue(total_images)
             progress_label.setText(f"{total_images}/{total_images}")
+            
+            # 处理事件队列，确保UI更新
+            from PyQt5.QtWidgets import QApplication
             QApplication.processEvents()
             
             # 短暂延迟让用户看到完成状态
