@@ -15,7 +15,7 @@ class ProjectDomain(AbsSqliteDomain):
     """数据库领域类"""
     def __init__(self, db_path: Path):
         super().__init__(db_path)
-    
+
     def model_path_in_db(self) -> Optional[Path]:
         """从数据库查询模型路径"""
         # 创建数据库会话
@@ -246,8 +246,35 @@ class ProjectDomain(AbsSqliteDomain):
             print(f"保存Kolo项目到数据库时出错: {str(e)}")
 
 
+    def load_images(self, page: int = 1, page_size: int = 1000) -> list[str]:
+        pass
 
+    def load_image_names_from_kilo_item(self, page: int = 1, page_size: int = 1000) -> list[str]:
+        """
+        从kolo_item表中检索出所有不重复的image_name，并按image_name排序
+        
+        :param page: 页码，从1开始
+        :param page_size: 每页大小
+        :return: image_name列表
+        """
+        try:
+            # 创建数据库会话
+            with self.db_session() as session:
+                # 查询所有不重复的image_name，并按image_name排序
+                image_names = session.query(KoloItem.image_name) \
+                    .distinct() \
+                    .order_by(KoloItem.image_name) \
+                    .offset((page - 1) * page_size) \
+                    .limit(page_size) \
+                    .all()
+                
+                # 提取image_name字符串
+                return [item[0] for item in image_names]
+        except Exception as e:
+            print(f"从数据库加载image_name列表时出错: {str(e)}")
+            return []
 
-
+    def count_image_names_from_kilo_item(self) -> int:
+        pass
 
 
