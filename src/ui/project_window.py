@@ -20,6 +20,9 @@ from src.ui.widget.image_canvas.image_canvas import ImageCanvas
 from src.ui.widget.image_list.image_list import ImageListView
 from src.ui.widget.main_menu_bar import MainMenuBar
 
+# 在文件顶部导入新创建的对话框
+from src.ui.dialog.train_yolo_dialog import TrainYoloDialog
+
 
 class ProjectWindow(QMainWindow):
 
@@ -261,11 +264,13 @@ class ProjectWindow(QMainWindow):
         self.setMenuBar(self.menu_bar)
 
         # 连接菜单栏的信号到本地处理函数
-        self.menu_bar.importImagesRequested.connect(self.handle_import_images)  # type: ignore
+        self.menu_bar.importImagesRequested.connect(self.handle_import_images)  # type line: ignore
         self.menu_bar.exportToYoloRequested.connect(self.export_project_to_yolo)  # type: ignore
         self.menu_bar.exportToCocoRequested.connect(self.export_project_to_coco)  # type: ignore
         self.menu_bar.closeRequested.connect(self.handle_close_request)  # type: ignore
         self.menu_bar.editActionRequested.connect(self.handle_edit_action)  # type: ignore
+        # 连接训练YOLO信号
+        self.menu_bar.trainYoloRequested.connect(self.handle_train_yolo)  # type: ignore
 
     def set_project_path(self, project_path: Path):
         """设置项目路径（包含验证逻辑）"""
@@ -909,3 +914,11 @@ class ProjectWindow(QMainWindow):
                                     f"成功导出COCO格式数据到: {output_path}，共处理 {processed_count} 条标注")
         except (OSError, FileNotFoundError) as e:
             QMessageBox.warning(self, "导出失败", f"保存COCO文件时出错: {str(e)}")
+
+    def handle_train_yolo(self):
+        """处理训练YOLO模型请求"""
+        try:
+            dialog = TrainYoloDialog(self)
+            dialog.exec_()
+        except Exception as e:
+            QMessageBox.critical(self, "错误", f"打开训练对话框时出错: {str(e)}")
