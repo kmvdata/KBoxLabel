@@ -2,7 +2,7 @@ from pathlib import Path
 from typing import Optional, List
 
 from src.common.domain.project_domain import ProjectDomain
-from src.core.yolo_executor import YOLOExecutor
+from src.core.yolo.yolo_executor import YOLOExecutor
 from src.models.dto.annotation_category import AnnotationCategory
 from src.common.domain.models.kolo_item import KoloItem
 
