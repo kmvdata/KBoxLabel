@@ -18,6 +18,8 @@ class MainMenuBar(QMenuBar):
     exportToCocoRequested: pyqtSignal = pyqtSignal()
     closeRequested: pyqtSignal = pyqtSignal()
     editActionRequested: pyqtSignal = pyqtSignal()
+    # 新增训练相关的信号
+    trainYoloRequested: pyqtSignal = pyqtSignal()
 
     # 最近项目列表的最大长度
     MAX_RECENT_PROJECTS = 5
@@ -43,6 +45,9 @@ class MainMenuBar(QMenuBar):
         # 导出子菜单动作
         self.yolo_action = QAction("Yolo格式", self)
         self.coco_action = QAction("Coco格式", self)
+        
+        # 训练子菜单动作
+        self.train_yolo_action = QAction("训练YOLO", self)
 
         self.create_menus()
         self.connect_signals()
@@ -64,6 +69,12 @@ class MainMenuBar(QMenuBar):
         export_menu.addAction(self.yolo_action)
         export_menu.addAction(self.coco_action)
         file_menu.addMenu(export_menu)
+        
+        # 训练子菜单
+        train_menu = QMenu("训练", self)
+        train_menu.setStyleSheet("QMenu::item { padding: 5px 20px; }")
+        train_menu.addAction(self.train_yolo_action)
+        file_menu.addMenu(train_menu)
 
         file_menu.addSeparator()
         file_menu.addAction(self.close_action)
@@ -76,6 +87,9 @@ class MainMenuBar(QMenuBar):
         self.yolo_action.triggered.connect(self.exportToYoloRequested.emit)  # type: ignore
         self.coco_action.triggered.connect(self.exportToCocoRequested.emit)  # type: ignore
         self.close_action.triggered.connect(self.closeRequested.emit)  # type: ignore
+        
+        # 连接训练相关的信号
+        self.train_yolo_action.triggered.connect(self.trainYoloRequested.emit)  # type: ignore
 
     def handle_new_project(self):
         """处理新建项目的目录选择"""
