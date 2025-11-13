@@ -184,18 +184,19 @@ class YOLOTrainer:
         logging.info("训练完成")
         return f"训练完成，结果保存在: {data_dir / 'runs' / 'train'}"
 
-    def export_model(self, model_path: Union[str, Path], format: str = "pt") -> str:
+    @staticmethod
+    def export_model(model_path: Union[str, Path], _format: str = "pt") -> str:
         """
         导出训练好的模型
         
         Args:
             model_path: 训练好的模型路径
-            format: 导出格式 (pt, onnx, etc.)
+            _format: 导出格式 (pt, onnx, etc.)
             
         Returns:
             导出模型路径
         """
         model = YOLO(str(model_path))
-        exported_path = model.export(format=format)
+        exported_path = model.export(format=_format)
         logging.info(f"模型已导出至: {exported_path}")
         return exported_path
