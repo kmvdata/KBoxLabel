@@ -99,6 +99,10 @@ class YOLOTrainer:
             target_dir: 目标目录
             image_extensions: 支持的图片扩展名集合
         """
+        # 确保目标目录存在
+        (target_dir / "images").mkdir(parents=True, exist_ok=True)
+        (target_dir / "labels").mkdir(parents=True, exist_ok=True)
+        
         for txt_file in txt_files:
             # 检查是否有对应图片文件
             stem = txt_file.stem
