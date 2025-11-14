@@ -17,6 +17,7 @@ class AnnotationDelegate(QStyledItemDelegate):
     """优化后的委托类，实现垂直居中对齐和布局调整"""
     MARGIN = 4  # 整体边距
     SPACING = 8  # 区域间间距
+    INDENT = 32  # 子项缩进像素
 
     def __init__(self, row_height=56, parent=None):
         super().__init__(parent)
@@ -35,6 +36,7 @@ class AnnotationDelegate(QStyledItemDelegate):
         category_color = index.data(Qt.UserRole)
         class_id = index.data(Qt.UserRole + 1)
         category_name = index.data(Qt.DisplayRole)
+        parent_id = index.data(Qt.UserRole + 2)  # 获取父ID
 
         if not all([category_color, category_name, class_id is not None]):
             return
@@ -47,11 +49,14 @@ class AnnotationDelegate(QStyledItemDelegate):
             painter.fillRect(option.rect, option.palette.window())
             painter.setPen(option.palette.windowText().color())
 
+        # 计算缩进
+        indent = self.INDENT if parent_id is not None else 0
+
         # 计算各区域尺寸
         # color区域：正方形，宽度和高度等于item高度
         color_size = self.row_height - 2 * self.MARGIN
         color_rect = QRect(
-            option.rect.left() + self.MARGIN,
+            option.rect.left() + self.MARGIN + indent,
             option.rect.top() + self.MARGIN,
             color_size,
             color_size
@@ -67,7 +72,7 @@ class AnnotationDelegate(QStyledItemDelegate):
 
         # name区域：可伸缩，最小宽度为高度的两倍
         name_min_width = 2 * self.row_height
-        available_width = option.rect.width() - (color_size + self.MARGIN + self.SPACING) * 2
+        available_width = option.rect.width() - (color_size + self.MARGIN + self.SPACING) * 2 - indent
         name_width = max(available_width, name_min_width)
 
         name_rect = QRect(
@@ -90,6 +95,17 @@ class AnnotationDelegate(QStyledItemDelegate):
         border_pen = QPen(option.palette.windowText().color(), 1)
         painter.setPen(border_pen)
         painter.drawRect(color_rect)
+
+        # 如果是子项，绘制一个小的指示图标
+        if parent_id is not None:
+            painter.save()
+            painter.setPen(QPen(option.palette.windowText().color(), 2))
+            # 绘制一个小的"L"形图标表示子项
+            icon_x = option.rect.left() + indent - 10
+            icon_y = option.rect.top() + self.row_height // 2
+            painter.drawLine(icon_x, icon_y, icon_x + 6, icon_y)  # 水平线
+            painter.drawLine(icon_x, icon_y, icon_x, icon_y + 6)   # 垂直线
+            painter.restore()
 
     def create_drag_pixmap(self, category: AnnotationCategory) -> QPixmap:
         """创建用于拖拽的 pixmap"""
@@ -254,33 +270,48 @@ class AnnotationListModel(QStandardItemModel):
 
     def __init__(self, parent=None):
         super().__init__(0, 1, parent)
+        self._category_items = {}  # class_id -> QStandardItem 映射
 
     def add_annotation(self, category: AnnotationCategory):
         """添加带序号的标注项"""
         item = QStandardItem(category.class_name)
         item.setData(category.color, Qt.UserRole)
         item.setData(category.class_id, Qt.UserRole + 1)
+        item.setData(category.parent_id, Qt.UserRole + 2)  # 存储父ID
         item.setEditable(True)
         self.appendRow(item)
+        self._category_items[category.class_id] = item
 
     def insert_annotation(self, category: AnnotationCategory, row: int):
         """在指定位置插入标注项"""
         item = QStandardItem(category.class_name)
         item.setData(category.color, Qt.UserRole)
         item.setData(category.class_id, Qt.UserRole + 1)
+        item.setData(category.parent_id, Qt.UserRole + 2)  # 存储父ID
         item.setEditable(True)
         self.insertRow(row, item)
+        self._category_items[category.class_id] = item
 
     def clear_annotations(self):
         """清除所有标注"""
         self.clear()
         self.setColumnCount(1)
+        self._category_items.clear()
 
     def update_from_categories(self, categories: list[AnnotationCategory]):
         """从类别列表更新模型"""
         self.clear_annotations()
         for category in categories:
             self.add_annotation(category)
+            
+    def get_item_by_class_id(self, class_id: int) -> QStandardItem:
+        """根据class_id获取对应的item"""
+        return self._category_items.get(class_id)
+        
+    def get_class_id_by_row(self, row: int) -> int:
+        """根据行号获取class_id"""
+        index = self.index(row, 0)
+        return self.data(index, Qt.UserRole + 1)
 
 
 class AnnotationList(QListView):
@@ -294,6 +325,7 @@ class AnnotationList(QListView):
         self.row_height = row_height
         self.setObjectName("YOLOAnnotationList")
         self.right_click_index = None  # 记录右键点击的索引位置
+        self.setAcceptDrops(True)  # 启用拖放
 
         # 设置最小宽度，确保能显示所有区域
         self.setMinimumWidth(self.calculate_min_width())
@@ -316,8 +348,8 @@ class AnnotationList(QListView):
         self.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectItems)
         self.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.setDragEnabled(True)
-        self.setDragDropMode(QAbstractItemView.DragDropMode.DragOnly)
-        self.setDefaultDropAction(Qt.DropAction.CopyAction)
+        self.setDragDropMode(QAbstractItemView.DragDropMode.DragDrop)  # 改为支持拖放
+        self.setDefaultDropAction(Qt.DropAction.MoveAction)  # 使用移动操作
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.setAttribute(Qt.WidgetAttribute.WA_AlwaysShowToolTips)
 
@@ -449,7 +481,8 @@ class AnnotationList(QListView):
         drag_data = {
             'class_id': category.class_id,
             'class_name': category.class_name,
-            'color': category.color.name()
+            'color': category.color.name(),
+            'parent_id': category.parent_id  # 添加父ID信息
         }
 
         mime_data = QMimeData()
@@ -464,6 +497,152 @@ class AnnotationList(QListView):
         drag.setHotSpot(pixmap.rect().center())  # 设置热点为中心点
         
         drag.exec_(supportedActions)
+
+    def dragEnterEvent(self, event):
+        """处理拖拽进入事件"""
+        if event.mimeData().hasFormat('application/x-annotation-category'):
+            event.acceptProposedAction()
+        else:
+            super().dragEnterEvent(event)
+
+    def dragMoveEvent(self, event):
+        """处理拖拽移动事件"""
+        if event.mimeData().hasFormat('application/x-annotation-category'):
+            # 获取目标位置
+            index = self.indexAt(event.pos())
+            if index.isValid():
+                # 获取被拖拽的类别ID
+                source_data = event.mimeData().data('application/x-annotation-category')
+                source_json = json.loads(bytes(source_data).decode('utf-8'))
+                dragged_class_id = source_json.get('class_id')
+                
+                # 获取目标类别ID
+                source_index = self.proxy_model.mapToSource(index)
+                target_class_id = self.source_model.data(source_index, Qt.UserRole + 1)
+                
+                # 检查是否可以放置（不能将父项拖到自己的子项上）
+                if self._can_drop_category(dragged_class_id, target_class_id):
+                    # 高亮显示放置目标
+                    self.setCurrentIndex(index)
+                    event.acceptProposedAction()
+                    return
+                    
+        event.ignore()
+
+    def dropEvent(self, event):
+        """处理放置事件"""
+        if event.mimeData().hasFormat('application/x-annotation-category'):
+            # 获取被拖拽的类别
+            source_data = event.mimeData().data('application/x-annotation-category')
+            source_json = json.loads(bytes(source_data).decode('utf-8'))
+            dragged_class_id = source_json.get('class_id')
+            
+            # 获取放置位置
+            pos = event.pos()
+            index = self.indexAt(pos)
+            
+            if index.isValid():
+                # 获取目标类别
+                source_index = self.proxy_model.mapToSource(index)
+                target_class_id = self.source_model.data(source_index, Qt.UserRole + 1)
+                
+                # 检查是否可以建立父子关系
+                if self._can_drop_category(dragged_class_id, target_class_id):
+                    # 建立父子关系
+                    self._establish_parent_child_relationship(dragged_class_id, target_class_id)
+                    event.acceptProposedAction()
+                    return
+                    
+        super().dropEvent(event)
+
+    def _can_drop_category(self, dragged_class_id: int, target_class_id: int) -> bool:
+        """检查是否可以将dragged_class拖放到target_class上"""
+        # 不能将类别拖放到自己身上
+        if dragged_class_id == target_class_id:
+            return False
+            
+        # 检查是否会形成循环引用（不能将父项拖到自己的子项上）
+        current_parent_id = target_class_id
+        while current_parent_id is not None:
+            # 查找当前parent_id对应的类别
+            parent_category = None
+            for cat in self.project_info.categories:
+                if cat.class_id == current_parent_id:
+                    parent_category = cat
+                    break
+                    
+            if parent_category is None:
+                break
+                
+            # 如果发现循环引用，返回False
+            if parent_category.parent_id == dragged_class_id:
+                return False
+                
+            current_parent_id = parent_category.parent_id
+            
+        # 检查目标是否已经是子项（只允许一级嵌套）
+        for cat in self.project_info.categories:
+            if cat.class_id == target_class_id:
+                # 目标已经是子项，不允许再作为父项
+                if cat.parent_id is not None:
+                    return False
+                break
+        
+        return True
+
+    def _establish_parent_child_relationship(self, child_id: int, parent_id: int):
+        """建立父子关系"""
+        child_category = None
+        parent_category = None
+        
+        # 查找子项和父项
+        for cat in self.project_info.categories:
+            if cat.class_id == child_id:
+                child_category = cat
+            elif cat.class_id == parent_id:
+                parent_category = cat
+                
+        if child_category is None or parent_category is None:
+            return
+            
+        # 设置父子关系
+        child_category.parent_id = parent_id
+        if child_id not in parent_category.children:
+            parent_category.children.append(child_id)
+            
+        # 更新模型中的数据
+        child_item = self.source_model.get_item_by_class_id(child_id)
+        if child_item:
+            child_item.setData(parent_id, Qt.UserRole + 2)
+            
+        # 重新排序模型以确保正确的显示顺序
+        self._reorder_model()
+        
+        # 保存更改
+        self.save_categories()
+
+    def _reorder_model(self):
+        """重新排序模型以正确显示父子关系"""
+        # 先清空模型
+        self.source_model.clear_annotations()
+        
+        # 按照父子关系重新添加项目
+        # 先添加顶级项目
+        top_level_categories = [cat for cat in self.project_info.categories if cat.parent_id is None]
+        child_categories = [cat for cat in self.project_info.categories if cat.parent_id is not None]
+        
+        # 按照原始顺序添加顶级项目和其子项目
+        ordered_categories = []
+        for cat in self.project_info.categories:
+            if cat.parent_id is None:
+                ordered_categories.append(cat)
+                # 添加其子项目
+                for child_cat in self.project_info.categories:
+                    if child_cat.parent_id == cat.class_id:
+                        ordered_categories.append(child_cat)
+                        
+        # 更新模型
+        self.source_model.update_from_categories(ordered_categories)
 
     def _handle_item_click(self, clicked_index):
         """处理点击事件 - 保持单选状态"""

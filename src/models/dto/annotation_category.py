@@ -1,4 +1,5 @@
 import hashlib
+from typing import List, Optional
 
 from PyQt5.QtGui import QColor
 
@@ -8,10 +9,14 @@ class AnnotationCategory:
     class_id: int
     class_name: str
     color: QColor
+    parent_id: Optional[int]  # 父类别的ID，None表示顶级类别
+    children: List[int]  # 子类别的ID列表
 
-    def __init__(self, class_id: int, class_name: str):
+    def __init__(self, class_id: int, class_name: str, parent_id: Optional[int] = None):
         self.class_id = class_id
         self.class_name = class_name
+        self.parent_id = parent_id
+        self.children = []
         self.color = self.gen_color()
 
     @staticmethod
@@ -23,6 +28,9 @@ class AnnotationCategory:
         if cat1.class_id == cat2.class_id and cat1.class_name == cat2.class_name:
             merged_cat = AnnotationCategory(class_id=cat1.class_id, class_name=cat1.class_name)
             merged_cat.color = merged_cat.gen_color()  # 使用新的颜色生成方法
+            # 合并父子关系
+            merged_cat.parent_id = cat1.parent_id or cat2.parent_id
+            merged_cat.children = list(set(cat1.children + cat2.children))
             return merged_cat
         return None
 
@@ -79,18 +87,33 @@ class AnnotationCategory:
         """
         将当前对象转换为 JSON 兼容的字典。
         """
-        return {
+        result = {
             "class_id": self.class_id,
             "class_name": self.class_name,
             "color": {"r": self.color.red(), "g": self.color.green(), "b": self.color.blue()}
         }
+        
+        # 添加父子关系信息
+        if self.parent_id is not None:
+            result["parent_id"] = self.parent_id
+            
+        if self.children:
+            result["children"] = self.children
+            
+        return result
 
     @classmethod
     def from_json(cls, data: dict):
         """
         从 JSON 兼容的字典创建 AnnotationCategory 实例。
         """
-        category = cls(class_id=data["class_id"], class_name=data["class_name"])
+        category = cls(class_id=data["class_id"], 
+                      class_name=data["class_name"],
+                      parent_id=data.get("parent_id"))
+        
+        if "children" in data:
+            category.children = data["children"]
+            
         if "color" in data and isinstance(data["color"], dict):
             color_data = data["color"]
             category.color = QColor(color_data.get("r", 0),
