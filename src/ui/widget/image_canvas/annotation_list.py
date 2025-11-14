@@ -3,10 +3,10 @@ import json
 from typing import Tuple
 
 from PyQt5.QtCore import Qt, QSize, QRect, QItemSelectionModel, QMimeData, \
-    QSortFilterProxyModel
+    QSortFilterProxyModel, QPoint, QModelIndex
 from PyQt5.QtGui import QStandardItemModel, QStandardItem, QPen, QDrag, QColor, QPainter, QPixmap
 from PyQt5.QtWidgets import QLineEdit, QSpinBox, QListView, QStyledItemDelegate, QAbstractItemView, \
-    QStyle, QToolBar, QWidget, QHBoxLayout, QMenu, QAction
+    QStyle, QToolBar, QWidget, QHBoxLayout, QMenu, QAction, QApplication
 from ultralytics import YOLO
 
 from src.models.dto.annotation_category import AnnotationCategory
@@ -22,9 +22,14 @@ class AnnotationDelegate(QStyledItemDelegate):
     def __init__(self, row_height=56, parent=None):
         super().__init__(parent)
         self.row_height = row_height
+        self.hovered_index = None  # 用于高亮显示的索引
 
     def set_row_height(self, height: int):
         self.row_height = height
+
+    def set_hovered_index(self, index):
+        """设置悬停索引以进行高亮显示"""
+        self.hovered_index = index
 
     def sizeHint(self, option, index):
         # 计算最小宽度：color区域 + name最小区域 + id区域 + 间距和边距
@@ -41,10 +46,17 @@ class AnnotationDelegate(QStyledItemDelegate):
         if not all([category_color, category_name, class_id is not None]):
             return
 
-        # 处理选中状态
+        # 处理选中状态和悬停状态
+        is_hovered = self.hovered_index and self.hovered_index == index
         if option.state & QStyle.State_Selected:
             painter.fillRect(option.rect, option.palette.highlight())
             painter.setPen(option.palette.highlightedText().color())
+        elif is_hovered:
+            # 悬停状态使用特殊颜色
+            hover_color = QColor(option.palette.highlight().color())
+            hover_color.setAlpha(100)  # 半透明
+            painter.fillRect(option.rect, hover_color)
+            painter.setPen(option.palette.windowText().color())
         else:
             painter.fillRect(option.rect, option.palette.window())
             painter.setPen(option.palette.windowText().color())
@@ -317,6 +329,7 @@ class AnnotationListModel(QStandardItemModel):
 class AnnotationList(QListView):
     # 可配置的工具栏高度变量（默认56px）
     TOOLBAR_HEIGHT = 56
+    DROP_INDICATOR_HEIGHT = 2  # 拖拽指示器高度
 
     def __init__(self, project_info: ProjectInfo, row_height=56):
         super().__init__()
@@ -326,6 +339,12 @@ class AnnotationList(QListView):
         self.setObjectName("YOLOAnnotationList")
         self.right_click_index = None  # 记录右键点击的索引位置
         self.setAcceptDrops(True)  # 启用拖放
+
+        # 拖拽相关属性
+        self.drag_target_row = -1  # 拖拽目标行
+        self.drop_indicator_pos = QPoint()  # 拖拽指示器位置
+        self.is_dragging_child_to_gap = False  # 是否是子项拖拽到间隙
+        self.drag_hover_index = None  # 拖拽悬停索引
 
         # 设置最小宽度，确保能显示所有区域
         self.setMinimumWidth(self.calculate_min_width())
@@ -496,6 +515,9 @@ class AnnotationList(QListView):
         drag.setPixmap(pixmap)
         drag.setHotSpot(pixmap.rect().center())  # 设置热点为中心点
         
+        # 取消当前选中项的选中状态
+        self.selectionModel().clearSelection()
+        
         drag.exec_(supportedActions)
 
     def dragEnterEvent(self, event):
@@ -508,26 +530,159 @@ class AnnotationList(QListView):
     def dragMoveEvent(self, event):
         """处理拖拽移动事件"""
         if event.mimeData().hasFormat('application/x-annotation-category'):
-            # 获取目标位置
-            index = self.indexAt(event.pos())
+            pos = event.pos()
+            index = self.indexAt(pos)
+            
+            # 更新拖拽悬停索引
+            self.drag_hover_index = index
+            self.delegate.set_hovered_index(index if index.isValid() else None)
+            
+            # 获取被拖拽的类别ID
+            source_data = event.mimeData().data('application/x-annotation-category')
+            source_json = json.loads(bytes(source_data).decode('utf-8'))
+            dragged_class_id = source_json.get('class_id')
+            dragged_parent_id = source_json.get('parent_id')
+            
+            # 清除当前选中状态
+            self.setCurrentIndex(QModelIndex())
+            
             if index.isValid():
-                # 获取被拖拽的类别ID
-                source_data = event.mimeData().data('application/x-annotation-category')
-                source_json = json.loads(bytes(source_data).decode('utf-8'))
-                dragged_class_id = source_json.get('class_id')
-                
                 # 获取目标类别ID
                 source_index = self.proxy_model.mapToSource(index)
                 target_class_id = self.source_model.data(source_index, Qt.UserRole + 1)
                 
-                # 检查是否可以放置（不能将父项拖到自己的子项上）
-                if self._can_drop_category(dragged_class_id, target_class_id):
-                    # 高亮显示放置目标
-                    self.setCurrentIndex(index)
-                    event.acceptProposedAction()
-                    return
+                # 计算放置位置（上方1/4、中间2/4、下方1/4）
+                rect = self.visualRect(index)
+                y_pos_in_item = pos.y() - rect.top()
+                item_height = rect.height()
+                
+                if y_pos_in_item < item_height / 4:
+                    # 上方1/4区域 - 放置在目标项之前
+                    self._handle_drop_on_gap(event, pos, dragged_class_id, dragged_parent_id, before_row=source_index.row())
+                elif y_pos_in_item > 3 * item_height / 4:
+                    # 下方1/4区域 - 放置在目标项之后
+                    self._handle_drop_on_gap(event, pos, dragged_class_id, dragged_parent_id, before_row=source_index.row() + 1)
+                else:
+                    # 中间2/4区域 - 检查是否可以建立父子关系
+                    if self._can_drop_category(dragged_class_id, target_class_id):
+                        # 保持目标项目高亮显示，表示可以建立父子关系
+                        # 不再清除悬停索引
+                        # 重置拖拽到间隙的状态
+                        self.drag_target_row = -1
+                        self.is_dragging_child_to_gap = False
+                        event.acceptProposedAction()
+                        self.viewport().update()  # 更新视图以重新绘制
+                        return
+                    else:
+                        # 不能建立父子关系，当作放置在目标项之后处理
+                        self._handle_drop_on_gap(event, pos, dragged_class_id, dragged_parent_id, before_row=source_index.row() + 1)
+            else:
+                # 检查是否可以放置在列表开头或结尾的间隙
+                self._handle_drop_on_gap(event, pos, dragged_class_id, dragged_parent_id)
                     
         event.ignore()
+
+    def _handle_drop_on_gap(self, event, pos, dragged_class_id, dragged_parent_id, before_row=None):
+        """处理拖拽到间隙的情况"""
+        if before_row is not None:
+            # 使用指定的插入位置
+            target_row = before_row
+        else:
+            # 计算应该放置在哪个位置
+            target_row = self._get_drop_target_row(pos)
+        
+        # 确保target_row在有效范围内
+        max_row = len(self.project_info.categories)
+        if target_row > max_row:
+            target_row = max_row
+        elif target_row < 0:
+            target_row = 0
+        
+        if target_row != -1:
+            self.drag_target_row = target_row
+            self.drop_indicator_pos = self._get_drop_indicator_position(target_row)
+            
+            # 检查是否是子项拖拽到间隙（需要变为一级项）
+            self.is_dragging_child_to_gap = dragged_parent_id is not None
+            
+            event.acceptProposedAction()
+            self.viewport().update()  # 更新视图以重新绘制
+        else:
+            self.drag_target_row = -1
+            self.is_dragging_child_to_gap = False
+            event.ignore()
+
+    def _get_drop_target_row(self, pos):
+        """计算拖拽目标行"""
+        if self.model().rowCount() == 0:
+            return 0  # 空列表时插入到开头
+            
+        # 查找最近的项目
+        for row in range(self.model().rowCount()):
+            index = self.model().index(row, 0)
+            rect = self.visualRect(index)
+            
+            # 检查是否在项目上半部分（在该项目之前插入）
+            if pos.y() <= rect.top() + rect.height() / 4:
+                # 需要将代理模型的行号转换为源模型的行号
+                source_index = self.proxy_model.mapToSource(index)
+                return source_index.row()
+                
+            # 检查是否在项目下半部分（在该项目之后插入）
+            if pos.y() > rect.top() + 3 * rect.height() / 4 and pos.y() <= rect.bottom():
+                # 需要将代理模型的行号转换为源模型的行号
+                source_index = self.proxy_model.mapToSource(index)
+                return source_index.row() + 1
+                
+        # 如果在所有项目之后，插入到末尾
+        return len(self.project_info.categories)
+
+    def _get_drop_indicator_position(self, target_row):
+        """获取拖拽指示器的位置"""
+        # 确保target_row在有效范围内
+        max_row = len(self.project_info.categories)
+        if target_row > max_row:
+            target_row = max_row
+            
+        if target_row == 0 and max_row > 0:
+            # 插入到开头
+            first_index = self.proxy_model.mapFromSource(self.source_model.index(0, 0))
+            if first_index.isValid():
+                first_rect = self.visualRect(first_index)
+                return QPoint(first_rect.left(), first_rect.top())
+        elif target_row >= max_row and max_row > 0:
+            # 插入到末尾
+            last_index = self.proxy_model.mapFromSource(self.source_model.index(max_row - 1, 0))
+            if last_index.isValid():
+                last_rect = self.visualRect(last_index)
+                return QPoint(last_rect.left(), last_rect.bottom())
+        elif 0 < target_row <= max_row:
+            # 插入到中间
+            prev_source_index = self.source_model.index(target_row - 1, 0)
+            next_source_index = self.source_model.index(target_row, 0)
+            
+            prev_index = self.proxy_model.mapFromSource(prev_source_index)
+            next_index = self.proxy_model.mapFromSource(next_source_index)
+            
+            if prev_index.isValid() and next_index.isValid():
+                prev_rect = self.visualRect(prev_index)
+                next_rect = self.visualRect(next_index)
+                y_pos = (prev_rect.bottom() + next_rect.top()) // 2
+                return QPoint(prev_rect.left(), y_pos)
+            elif prev_index.isValid():
+                # 只有前一个有效
+                prev_rect = self.visualRect(prev_index)
+                return QPoint(prev_rect.left(), prev_rect.bottom())
+            elif next_index.isValid():
+                # 只有后一个有效
+                next_rect = self.visualRect(next_index)
+                return QPoint(next_rect.left(), next_rect.top())
+        else:
+            # 默认位置
+            return QPoint(0, 0)
+            
+        # 如果无法确定位置，返回默认值
+        return QPoint(0, 0)
 
     def dropEvent(self, event):
         """处理放置事件"""
@@ -536,12 +691,14 @@ class AnnotationList(QListView):
             source_data = event.mimeData().data('application/x-annotation-category')
             source_json = json.loads(bytes(source_data).decode('utf-8'))
             dragged_class_id = source_json.get('class_id')
+            dragged_parent_id = source_json.get('parent_id')  # 获取拖拽项的父ID
             
             # 获取放置位置
             pos = event.pos()
             index = self.indexAt(pos)
             
-            if index.isValid():
+            # 如果放置在项目上，建立父子关系
+            if index.isValid() and self.drag_target_row == -1:
                 # 获取目标类别
                 source_index = self.proxy_model.mapToSource(index)
                 target_class_id = self.source_model.data(source_index, Qt.UserRole + 1)
@@ -551,9 +708,83 @@ class AnnotationList(QListView):
                     # 建立父子关系
                     self._establish_parent_child_relationship(dragged_class_id, target_class_id)
                     event.acceptProposedAction()
+                    # 重置拖拽状态
+                    self.drag_target_row = -1
+                    self.is_dragging_child_to_gap = False
+                    self.drag_hover_index = None
+                    self.delegate.set_hovered_index(None)
+                    self.viewport().update()
                     return
+            elif self.drag_target_row != -1:
+                # 放置在间隙，重新排序
+                self._reorder_items(dragged_class_id, dragged_parent_id)
+                event.acceptProposedAction()
+                # 重置拖拽状态
+                self.drag_target_row = -1
+                self.is_dragging_child_to_gap = False
+                self.drag_hover_index = None
+                self.delegate.set_hovered_index(None)
+                self.viewport().update()
+                return
                     
         super().dropEvent(event)
+        # 重置拖拽状态
+        self.drag_target_row = -1
+        self.is_dragging_child_to_gap = False
+        self.drag_hover_index = None
+        self.delegate.set_hovered_index(None)
+        self.viewport().update()
+
+    def _reorder_items(self, dragged_class_id, dragged_parent_id=None):
+        """重新排序项目"""
+        if self.drag_target_row == -1:
+            return
+            
+        # 找到被拖拽的项目在当前列表中的位置
+        dragged_row = -1
+        for i, cat in enumerate(self.project_info.categories):
+            if cat.class_id == dragged_class_id:
+                dragged_row = i
+                break
+                
+        if dragged_row == -1:
+            return
+            
+        # 获取被拖拽的类别
+        dragged_category = self.project_info.categories[dragged_row]
+        
+        # 如果是从子项变为一级项，更新其属性
+        if self.is_dragging_child_to_gap and dragged_category.parent_id is not None:
+            # 从原父项的children列表中移除
+            original_parent_id = dragged_category.parent_id
+            for cat in self.project_info.categories:
+                if cat.class_id == original_parent_id and dragged_class_id in cat.children:
+                    cat.children.remove(dragged_class_id)
+                    break
+            # 设置为一级项
+            dragged_category.parent_id = None
+            
+            # 更新模型中的数据
+            dragged_item = self.source_model.get_item_by_class_id(dragged_class_id)
+            if dragged_item:
+                dragged_item.setData(None, Qt.UserRole + 2)
+        
+        # 从原位置移除
+        removed_category = self.project_info.categories.pop(dragged_row)
+        
+        # 计算插入位置（如果原位置在目标位置之前，目标位置需要减1）
+        insert_row = self.drag_target_row
+        if dragged_row < insert_row:
+            insert_row -= 1
+            
+        # 插入到新位置
+        self.project_info.categories.insert(insert_row, removed_category)
+        
+        # 更新模型
+        self.source_model.update_from_categories(self.project_info.categories)
+        
+        # 保存更改
+        self.save_categories()
 
     def _can_drop_category(self, dragged_class_id: int, target_class_id: int) -> bool:
         """检查是否可以将dragged_class拖放到target_class上"""
@@ -629,17 +860,26 @@ class AnnotationList(QListView):
         # 按照父子关系重新添加项目
         # 先添加顶级项目
         top_level_categories = [cat for cat in self.project_info.categories if cat.parent_id is None]
-        child_categories = [cat for cat in self.project_info.categories if cat.parent_id is not None]
         
         # 按照原始顺序添加顶级项目和其子项目
         ordered_categories = []
+        added_categories = set()  # 跟踪已添加的类别
+        
+        # 首先按照project_info.categories中的顺序添加顶级项目及其子项目
         for cat in self.project_info.categories:
-            if cat.parent_id is None:
+            if cat.parent_id is None and cat.class_id not in added_categories:
                 ordered_categories.append(cat)
+                added_categories.add(cat.class_id)
                 # 添加其子项目
                 for child_cat in self.project_info.categories:
-                    if child_cat.parent_id == cat.class_id:
+                    if child_cat.parent_id == cat.class_id and child_cat.class_id not in added_categories:
                         ordered_categories.append(child_cat)
+                        added_categories.add(child_cat.class_id)
+                        
+        # 添加剩余未处理的项目（处理可能的顺序问题）
+        for cat in self.project_info.categories:
+            if cat.class_id not in added_categories:
+                ordered_categories.append(cat)
                         
         # 更新模型
         self.source_model.update_from_categories(ordered_categories)
@@ -953,3 +1193,74 @@ class AnnotationList(QListView):
                 self.scrollTo(proxy_index)
                 return True
         return False
+
+    def paintEvent(self, event):
+        """重写绘制事件以添加拖拽指示器"""
+        # 绘制基础视图
+        super().paintEvent(event)
+        
+        # 绘制拖拽指示器
+        if self.drag_target_row != -1:
+            painter = QPainter(self.viewport())
+            pen = QPen()
+            
+            # 根据是否是子项拖拽到间隙设置不同的颜色
+            if self.is_dragging_child_to_gap:
+                pen.setColor(QColor(255, 165, 0))  # 橙色表示子项变为一级项
+                pen.setWidth(3)
+            else:
+                pen.setColor(QColor(0, 191, 255))  # 蓝色表示普通重排
+                pen.setWidth(2)
+                
+            painter.setPen(pen)
+            
+            # 绘制指示线
+            if self.model().rowCount() > 0:
+                indicator_width = self.viewport().width() - 20
+                painter.drawLine(
+                    self.drop_indicator_pos.x() + 10, 
+                    self.drop_indicator_pos.y(),
+                    self.drop_indicator_pos.x() + indicator_width, 
+                    self.drop_indicator_pos.y()
+                )
+            
+                # 添加箭头指示当前拖拽操作类型
+                if self.is_dragging_child_to_gap:
+                    # 绘制向上箭头表示子项提升为一级项
+                    arrow_size = 6
+                    painter.drawLine(
+                        self.drop_indicator_pos.x() + indicator_width // 2, 
+                        self.drop_indicator_pos.y(),
+                        self.drop_indicator_pos.x() + indicator_width // 2 - arrow_size, 
+                        self.drop_indicator_pos.y() - arrow_size
+                    )
+                    painter.drawLine(
+                        self.drop_indicator_pos.x() + indicator_width // 2, 
+                        self.drop_indicator_pos.y(),
+                        self.drop_indicator_pos.x() + indicator_width // 2 + arrow_size, 
+                        self.drop_indicator_pos.y() - arrow_size
+                    )
+            elif self.model().rowCount() == 0:
+                # 空列表时绘制指示器
+                indicator_width = self.viewport().width() - 20
+                center_y = self.viewport().height() // 2
+                painter.drawLine(
+                    10, 
+                    center_y,
+                    indicator_width, 
+                    center_y
+                )
+            
+            painter.end()
+
+    def dragLeaveEvent(self, event):
+        """处理拖拽离开事件"""
+        super().dragLeaveEvent(event)
+        # 重置拖拽状态
+        self.drag_target_row = -1
+        self.is_dragging_child_to_gap = False
+        self.drag_hover_index = None
+        self.delegate.set_hovered_index(None)
+        self.viewport().update()
+        # 清除当前选中状态
+        self.setCurrentIndex(QModelIndex())
