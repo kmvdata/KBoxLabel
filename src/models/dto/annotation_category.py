@@ -1,5 +1,5 @@
 import hashlib
-from typing import List, Optional
+from typing import Optional
 
 from PyQt5.QtGui import QColor
 
@@ -9,15 +9,17 @@ class AnnotationCategory:
     class_id: int
     class_name: str
     color: QColor
-    _parent_name: Optional[str]  # 父类别的ID，None表示顶级类别
-    children: list[str]  # 子类别的ID列表
+    parent_name: Optional[str]  # 父类别的ID，None表示顶级类别
+    children: list[str]
+    order: int
 
-    def __init__(self, class_id: int, class_name: str):
+    def __init__(self, class_id: int, class_name: str, parent_name: Optional[str] = None):
         self.class_id = class_id
         self.class_name = class_name
-        self.parent_name = None
+        self.parent_name = parent_name
         self.children = []
         self.color = self.gen_color()
+        self.order = 0
 
     @staticmethod
     def merge_and_regenerate_color(cat1, cat2):
@@ -95,11 +97,9 @@ class AnnotationCategory:
         
         # 添加父子关系信息
         if self.parent_name is not None:
-            result["parent_id"] = self.parent_name
+            result["parent_name"] = self.parent_name
             
-        if self.children:
-            result["children"] = self.children
-            
+
         return result
 
     @classmethod
@@ -109,7 +109,7 @@ class AnnotationCategory:
         """
         category = cls(class_id=data["class_id"],
                        class_name=data["class_name"],
-                       parent_name=data.get("parent_id"))
+                       parent_name=data.get("parent_name"))
         
         if "children" in data:
             category.children = data["children"]

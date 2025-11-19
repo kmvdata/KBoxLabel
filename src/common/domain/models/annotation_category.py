@@ -18,6 +18,8 @@ class AnnotationCategory(KOrmBase):
     color_r = Column(INTEGER, nullable=False, unique=False, comment='颜色R值')
     color_g = Column(INTEGER, nullable=False, unique=False, comment='颜色G值')
     color_b = Column(INTEGER, nullable=False, unique=False, comment='颜色B值')
+    parent_name = Column(String(64), nullable=True, unique=False, comment='父级类别名称')
+    order = Column(INTEGER, nullable=False, unique=False, comment='排序')
     
     create_time = Column(DateTime, nullable=False, server_default=text("CURRENT_TIMESTAMP"), comment='创建时间')
     update_time = Column(DateTime,
