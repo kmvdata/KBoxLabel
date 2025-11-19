@@ -703,7 +703,7 @@ class AnnotationList(QListView):
                         
         # 添加剩余未处理的项目（处理可能的顺序问题）
         for cat in self.project_info.categories:
-            if cat.class_id not in added_categories:
+            if cat.class_name not in added_categories:
                 ordered_categories.append(cat)
                         
         # 更新模型
