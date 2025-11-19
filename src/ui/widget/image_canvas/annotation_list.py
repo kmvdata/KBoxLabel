@@ -299,7 +299,8 @@ class AnnotationListModel(QStandardItemModel):
         item = QStandardItem(category.class_name)
         item.setData(category.color, Qt.UserRole)
         item.setData(category.class_id, Qt.UserRole + 1)
-        item.setData(category.parent_name, Qt.UserRole + 2)  # 存储父ID
+        item.setData(category.class_name, Qt.UserRole + 2)  # 存储父ID
+        item.setData(category.parent_name, Qt.UserRole + 3)  # 存储父ID
         item.setEditable(True)
         self.insertRow(row, item)
         self._category_items[category.class_name] = item
@@ -488,14 +489,19 @@ class AnnotationList(QListView):
     def startDrag(self, supportedActions):
         """重写拖拽开始事件"""
         current_index = self.currentIndex()
+        print(f"[Drag] Start dragging, current index: {current_index}")
         if not current_index.isValid():
+            print("[Drag] Current index is invalid, aborting drag")
             return
 
         source_index = self.proxy_model.mapToSource(current_index)
+        print(f"[Drag] Source index row: {source_index.row()}, categories count: {len(self.project_info.categories)}")
         if not (0 <= source_index.row() < len(self.project_info.categories)):
+            print("[Drag] Source index out of range, aborting drag")
             return
 
         category = self.project_info.categories[source_index.row()]
+        print(f"[Drag] Dragging category: id={category.class_id}, name={category.class_name}, parent={category.parent_name}")
 
         drag_data = {
             'class_id': category.class_id,
@@ -517,21 +523,28 @@ class AnnotationList(QListView):
         
         # 取消当前选中项的选中状态
         self.selectionModel().clearSelection()
+        print("[Drag] Cleared selection, starting drag operation")
         
-        drag.exec_(supportedActions)
+        result = drag.exec_(supportedActions)
+        print(f"[Drag] Drag operation finished with result: {result}")
 
     def dragEnterEvent(self, event):
         """处理拖拽进入事件"""
+        print(f"[Drag] Drag enter event, mime data formats: {event.mimeData().formats()}")
         if event.mimeData().hasFormat('application/x-annotation-category'):
+            print("[Drag] Accepting drag enter event for annotation category")
             event.acceptProposedAction()
         else:
+            print("[Drag] Ignoring drag enter event, unsupported format")
             super().dragEnterEvent(event)
 
     def dragMoveEvent(self, event):
         """处理拖拽移动事件"""
+        print(f"[Drag] Drag move event at position: {event.pos()}")
         if event.mimeData().hasFormat('application/x-annotation-category'):
             pos = event.pos()
             index = self.indexAt(pos)
+            print(f"[Drag] Item index at position: {index}")
             
             # 更新拖拽悬停索引
             self.drag_hover_index = index
@@ -542,29 +555,37 @@ class AnnotationList(QListView):
             source_json = json.loads(bytes(source_data).decode('utf-8'))
             dragged_class_name = source_json.get('class_name')
             dragged_parent_name = source_json.get('parent_name')
+            print(f"[Drag] Dragged item: name={dragged_class_name}, parent={dragged_parent_name}")
             
             # 清除当前选中状态
             self.setCurrentIndex(QModelIndex())
             
             if index.isValid():
+                print("[Drag] Index is valid, processing drop targets")
                 # 获取目标类别ID
                 source_index = self.proxy_model.mapToSource(index)
-                target_class_name = self.source_model.data(source_index, Qt.UserRole)
+                target_class_name = self.source_model.data(source_index, Qt.UserRole + 2)
+                print(f"[Drag] Target item name: {target_class_name}")
                 
                 # 计算放置位置（上方1/4、中间2/4、下方1/4）
                 rect = self.visualRect(index)
                 y_pos_in_item = pos.y() - rect.top()
                 item_height = rect.height()
+                print(f"[Drag] Position in item: y={y_pos_in_item}, item height: {item_height}")
                 
                 if y_pos_in_item < item_height / 4:
                     # 上方1/4区域 - 放置在目标项之前
+                    print("[Drag] Drop position: top quarter, placing before target")
                     self._handle_drop_on_gap(event, pos, dragged_class_name, dragged_parent_name, before_row=source_index.row())
                 elif y_pos_in_item > 3 * item_height / 4:
                     # 下方1/4区域 - 放置在目标项之后
+                    print("[Drag] Drop position: bottom quarter, placing after target")
                     self._handle_drop_on_gap(event, pos, dragged_class_name, dragged_parent_name, before_row=source_index.row() + 1)
                 else:
                     # 中间2/4区域 - 检查是否可以建立父子关系
+                    print("[Drag] Drop position: middle half, checking parent-child relationship")
                     if self._can_drop_category(dragged_class_name, target_class_name):
+                        print("[Drag] Parent-child relationship allowed")
                         # 保持目标项目高亮显示，表示可以建立父子关系
                         # 不再清除悬停索引
                         # 重置拖拽到间隙的状态
@@ -574,43 +595,57 @@ class AnnotationList(QListView):
                         self.viewport().update()  # 更新视图以重新绘制
                         return
                     else:
+                        print("[Drag] Parent-child relationship not allowed, placing after target")
                         # 不能建立父子关系，当作放置在目标项之后处理
                         self._handle_drop_on_gap(event, pos, dragged_class_name, dragged_parent_name, before_row=source_index.row() + 1)
             else:
+                print("[Drag] Index is not valid, handling gap drop at list edges")
                 # 检查是否可以放置在列表开头或结尾的间隙
                 self._handle_drop_on_gap(event, pos, dragged_class_name, dragged_parent_name)
                     
-        event.ignore()
+        else:
+            print("[Drag] Event ignored, wrong mime type")
+            event.ignore()
 
     def _handle_drop_on_gap(self, event, pos, dragged_class_name: str, dragged_parent_name: Optional[str], before_row=None):
         """处理拖拽到间隙的情况"""
+        print(f"[Drag] Handling drop on gap, dragged item: {dragged_class_name}, parent: {dragged_parent_name}")
         if before_row is not None:
             # 使用指定的插入位置
             target_row = before_row
+            print(f"[Drag] Using specified row: {before_row}")
         else:
             # 计算应该放置在哪个位置
             target_row = self._get_drop_target_row(pos)
+            print(f"[Drag] Calculated target row: {target_row}")
         
         # 确保target_row在有效范围内
         max_row = len(self.project_info.categories)
+        print(f"[Drag] Max row: {max_row}")
         if target_row > max_row:
             target_row = max_row
         elif target_row < 0:
             target_row = 0
         
+        print(f"[Drag] Final target row: {target_row}")
         # 即使target_row为-1，我们也接受这个放置操作
         self.drag_target_row = target_row
         self.drop_indicator_pos = self._get_drop_indicator_position(target_row)
+        print(f"[Drag] Drop indicator position: {self.drop_indicator_pos}")
         
         # 检查是否是子项拖拽到间隙（需要变为一级项）
         self.is_dragging_child_to_gap = dragged_parent_name is not None
+        print(f"[Drag] Is dragging child to gap: {self.is_dragging_child_to_gap}")
         
         event.acceptProposedAction()
         self.viewport().update()  # 更新视图以重新绘制
+        print("[Drag] Accepted proposed action and updated viewport")
 
     def _get_drop_target_row(self, pos):
         """计算拖拽目标行"""
+        print(f"[Drag] Calculating drop target row for position: {pos}")
         if self.model().rowCount() == 0:
+            print("[Drag] Model is empty, target row is 0")
             return 0  # 空列表时插入到开头
             
         # 查找最近的项目
@@ -622,19 +657,23 @@ class AnnotationList(QListView):
             if pos.y() <= rect.top() + rect.height() / 4:
                 # 需要将代理模型的行号转换为源模型的行号
                 source_index = self.proxy_model.mapToSource(index)
+                print(f"[Drag] Position in top quarter of row {row}, inserting before. Source row: {source_index.row()}")
                 return source_index.row()
                 
             # 检查是否在项目下半部分（在该项目之后插入）
             if rect.top() + 3 * rect.height() / 4 < pos.y() <= rect.bottom():
                 # 需要将代理模型的行号转换为源模型的行号
                 source_index = self.proxy_model.mapToSource(index)
+                print(f"[Drag] Position in bottom quarter of row {row}, inserting after. Source row: {source_index.row() + 1}")
                 return source_index.row() + 1
                 
         # 如果在所有项目之后，插入到末尾
+        print("[Drag] Position after all items, inserting at end")
         return len(self.project_info.categories)
 
     def _get_drop_indicator_position(self, target_row):
         """获取拖拽指示器的位置"""
+        print(f"[Drag] Getting drop indicator position for target row: {target_row}")
         # 确保target_row在有效范围内
         max_row = len(self.project_info.categories)
         if target_row > max_row:
@@ -645,13 +684,17 @@ class AnnotationList(QListView):
             first_index = self.proxy_model.mapFromSource(self.source_model.index(0, 0))
             if first_index.isValid():
                 first_rect = self.visualRect(first_index)
-                return QPoint(first_rect.left(), first_rect.top())
+                pos = QPoint(first_rect.left(), first_rect.top())
+                print(f"[Drag] Indicator position for start of list: {pos}")
+                return pos
         elif target_row >= max_row > 0:
             # 插入到末尾
             last_index = self.proxy_model.mapFromSource(self.source_model.index(max_row - 1, 0))
             if last_index.isValid():
                 last_rect = self.visualRect(last_index)
-                return QPoint(last_rect.left(), last_rect.bottom())
+                pos = QPoint(last_rect.left(), last_rect.bottom())
+                print(f"[Drag] Indicator position for end of list: {pos}")
+                return pos
         elif 0 < target_row <= max_row:
             # 插入到中间
             prev_source_index = self.source_model.index(target_row - 1, 0)
@@ -664,48 +707,62 @@ class AnnotationList(QListView):
                 prev_rect = self.visualRect(prev_index)
                 next_rect = self.visualRect(next_index)
                 y_pos = (prev_rect.bottom() + next_rect.top()) // 2
-                return QPoint(prev_rect.left(), y_pos)
+                pos = QPoint(prev_rect.left(), y_pos)
+                print(f"[Drag] Indicator position between items: {pos}")
+                return pos
             elif prev_index.isValid():
                 # 只有前一个有效
                 prev_rect = self.visualRect(prev_index)
-                return QPoint(prev_rect.left(), prev_rect.bottom())
+                pos = QPoint(prev_rect.left(), prev_rect.bottom())
+                print(f"[Drag] Indicator position after previous item: {pos}")
+                return pos
             elif next_index.isValid():
                 # 只有后一个有效
                 next_rect = self.visualRect(next_index)
-                return QPoint(next_rect.left(), next_rect.top())
+                pos = QPoint(next_rect.left(), next_rect.top())
+                print(f"[Drag] Indicator position before next item: {pos}")
+                return pos
         else:
             # 默认位置
+            print("[Drag] Using default position (0, 0)")
             return QPoint(0, 0)
             
         # 如果无法确定位置，返回默认值
+        print("[Drag] Unable to determine position, using default (0, 0)")
         return QPoint(0, 0)
 
     def dropEvent(self, event):
         """处理放置事件"""
+        print(f"[Drag] Drop event at position: {event.pos()}")
         if event.mimeData().hasFormat('application/x-annotation-category'):
             # 获取被拖拽的类别
             source_data = event.mimeData().data('application/x-annotation-category')
             source_json = json.loads(bytes(source_data).decode('utf-8'))
             dragged_class_name = source_json.get('class_name')
             dragged_parent_name = source_json.get('parent_name')  # 获取拖拽项的父ID
+            print(f"[Drag] Dropped item: name={dragged_class_name}, parent={dragged_parent_name}")
             
             # 获取放置位置
             pos = event.pos()
             index = self.indexAt(pos)
+            print(f"[Drag] Drop index: valid={index.isValid()}")
             
             # 如果放置在项目上，建立父子关系
             if index.isValid() and self.drag_target_row == -1:
+                print("[Drag] Drop on item, attempting to establish parent-child relationship")
                 # 获取目标类别
                 source_index = self.proxy_model.mapToSource(index)
-                target_class_name = self.source_model.data(source_index, Qt.UserRole)
+                target_class_name = self.source_model.data(source_index, Qt.UserRole + 2)
+                print(f"[Drag] Target item name: {target_class_name}")
                 
                 # 检查是否可以建立父子关系
                 if self._can_drop_category(dragged_class_name, target_class_name):
+                    print(f"[Drag] Parent-child relationship allowed, establishing relationship: {dragged_class_name} - {target_class_name}")
                     # 建立父子关系
                     # 检查是否需要在特定子项之后插入
-                    insert_after_child_id = None
+                    insert_after_child_name: Optional[str] = None
                     # 这里可以根据需要添加逻辑来确定在哪个子项之后插入
-                    self._establish_parent_child_relationship(dragged_class_name, target_class_name, insert_after_child_id)
+                    self._establish_parent_child_relationship(dragged_class_name, target_class_name, insert_after_child_name)
                     event.acceptProposedAction()
                     # 重置拖拽状态
                     self.drag_target_row = -1
@@ -713,8 +770,12 @@ class AnnotationList(QListView):
                     self.drag_hover_index = None
                     self.delegate.set_hovered_index(None)
                     self.viewport().update()
+                    print("[Drag] Parent-child relationship established")
                     return
+                else:
+                    print("[Drag] Parent-child relationship not allowed")
             elif self.drag_target_row != -1:
+                print(f"[Drag] Drop on gap, reordering items. Target row: {self.drag_target_row}")
                 # 放置在间隙，重新排序
                 self._reorder_items(dragged_class_name, dragged_parent_name)
                 event.acceptProposedAction()
@@ -724,10 +785,12 @@ class AnnotationList(QListView):
                 self.drag_hover_index = None
                 self.delegate.set_hovered_index(None)
                 self.viewport().update()
+                print("[Drag] Items reordered")
                 return
             else:
                 # 特殊情况处理：即使drag_target_row为-1，也要处理重新排序
                 # 这种情况可能发生在直接拖拽到列表末尾等场景
+                print("[Drag] Special case: reordering items with target row -1")
                 self._reorder_items(dragged_class_name, dragged_parent_name)
                 event.acceptProposedAction()
                 # 重置拖拽状态
@@ -736,8 +799,10 @@ class AnnotationList(QListView):
                 self.drag_hover_index = None
                 self.delegate.set_hovered_index(None)
                 self.viewport().update()
+                print("[Drag] Items reordered (special case)")
                 return
                     
+        print("[Drag] Calling super().dropEvent()")
         super().dropEvent(event)
         # 重置拖拽状态
         self.drag_target_row = -1
@@ -745,42 +810,51 @@ class AnnotationList(QListView):
         self.drag_hover_index = None
         self.delegate.set_hovered_index(None)
         self.viewport().update()
+        print("[Drag] Drop event finished, state reset")
 
-    def _reorder_items(self, dragged_class_id, dragged_parent_id=None):
+    def _reorder_items(self, dragged_class_name, dragged_parent_name=None):
         """重新排序项目"""
+        print(f"[Drag] Reordering items, dragged class name: {dragged_class_name}, parent name: {dragged_parent_name}")
             
         # 找到被拖拽的项目在当前列表中的位置
         dragged_row = -1
         for i, cat in enumerate(self.project_info.categories):
-            if cat.class_id == dragged_class_id:
+            if cat.class_name == dragged_class_name:
                 dragged_row = i
                 break
                 
         if dragged_row == -1:
+            print(f"[Drag] Dragged item not found in categories, aborting reorder")
             return
             
+        print(f"[Drag] Dragged item found at row: {dragged_row}")
         # 获取被拖拽的类别
         dragged_category = self.project_info.categories[dragged_row]
+        print(f"[Drag] Dragged category details: name={dragged_category.class_name}, parent={dragged_category.parent_name}")
         
         # 如果是从子项变为一级项，更新其属性
         if self.is_dragging_child_to_gap and dragged_category.parent_name is not None:
+            print("[Drag] Converting child item to top-level item")
             # 从原父项的children列表中移除
             original_parent_id = dragged_category.parent_name
             for cat in self.project_info.categories:
                 if cat.class_id == original_parent_id:
-                    if dragged_class_id in cat.children:
-                        cat.children.remove(dragged_class_id)
+                    if dragged_class_name in cat.children:
+                        cat.children.remove(dragged_class_name)
+                        print(f"[Drag] Removed {dragged_class_name} from parent {original_parent_id}'s children list")
                     break
             # 设置为一级项
             dragged_category.parent_name = None
+            print("[Drag] Set item as top-level (parent=None)")
             
             # 更新模型中的数据
-            dragged_item = self.source_model.get_item_by_class_name(dragged_class_id)
+            dragged_item = self.source_model.get_item_by_class_name(dragged_class_name)
             if dragged_item:
                 dragged_item.setData(None, Qt.UserRole + 2)
         
         # 从原位置移除
         removed_category = self.project_info.categories.pop(dragged_row)
+        print(f"[Drag] Removed category from row {dragged_row}")
         
         # 计算插入位置（如果原位置在目标位置之前，目标位置需要减1）
         # 如果 drag_target_row 为 -1，则插入到末尾
@@ -791,14 +865,18 @@ class AnnotationList(QListView):
             if dragged_row < insert_row:
                 insert_row -= 1
             
+        print(f"[Drag] Inserting category at row: {insert_row}")
         # 插入到新位置
         self.project_info.categories.insert(insert_row, removed_category)
+        print(f"[Drag] Category inserted")
         
         # 更新模型
         self.source_model.update_from_categories(self.project_info.categories)
+        print("[Drag] Model updated with new category order")
         
         # 保存更改
         self.save_categories()
+        print("[Drag] Categories saved")
 
     def _can_drop_category(self, dragged_class_id: int, target_class_id: int) -> bool:
         """检查是否可以将dragged_class拖放到target_class上"""
@@ -837,6 +915,7 @@ class AnnotationList(QListView):
 
     def _establish_parent_child_relationship(self, child_name: str, parent_name: str, insert_after_child_name: Optional[str] = None):
         """建立父子关系，可选择在指定子项之后插入"""
+        print(f"[Drag] Establishing parent-child relationship: child={child_name}, parent={parent_name}, insert_after={insert_after_child_name}")
         child_category = None
         parent_category = None
         
@@ -848,13 +927,19 @@ class AnnotationList(QListView):
                 parent_category = cat
                 
         if child_category is None or parent_category is None:
+            print(f"[Drag] Child or parent category not found, aborting. Child: {child_category}, Parent: {parent_category}")
             return
+            
+        print(f"[Drag] Found child category: id={child_category.class_id}, parent={child_category.parent_name}")
+        print(f"[Drag] Found parent category: id={parent_category.class_id}, parent={parent_category.parent_name}")
             
         # 设置父子关系
         child_category.parent_name = parent_name
+        print(f"[Drag] Set child's parent to: {parent_name}")
         
         # 如果指定了在某个子项之后插入，则调整children列表的顺序
         if insert_after_child_name is not None and insert_after_child_name in parent_category.children:
+            print(f"[Drag] Inserting child after specific child: {insert_after_child_name}")
             # 先确保child_id在children列表中
             if child_name not in parent_category.children:
                 parent_category.children.append(child_name)
@@ -868,21 +953,28 @@ class AnnotationList(QListView):
             
             # 在指定位置插入child_id
             parent_category.children.insert(insert_index, child_name)
+            print(f"[Drag] Inserted child at index {insert_index} in parent's children list")
         else:
             # 默认添加到children列表末尾
             if child_name not in parent_category.children:
                 parent_category.children.append(child_name)
+                print("[Drag] Appended child to end of parent's children list")
+            else:
+                print("[Drag] Child already in parent's children list")
             
         # 更新模型中的数据
         child_item = self.source_model.get_item_by_class_name(child_name)
         if child_item:
             child_item.setData(parent_name, Qt.UserRole + 2)
+            print("[Drag] Updated model data for child item")
             
         # 重新排序模型以确保正确的显示顺序
         self._reorder_model()
+        print("[Drag] Reordered model")
         
         # 保存更改
         self.save_categories()
+        print("[Drag] Categories saved")
 
     def _reorder_model(self):
         """重新排序模型以正确显示父子关系"""
@@ -893,7 +985,7 @@ class AnnotationList(QListView):
         # 先添加顶级项目
         top_level_categories = [cat for cat in self.project_info.categories if cat.parent_name is None]
         
-        # 按照原始顺序添加顶级项目和其子项目
+        # 按照原始顺序添加顶级项目及其子项目
         ordered_categories = []
         added_categories = set()  # 跟踪已添加的类别
         
@@ -1252,6 +1344,7 @@ class AnnotationList(QListView):
 
     def dragLeaveEvent(self, event):
         """处理拖拽离开事件"""
+        print("[Drag] Drag leave event")
         super().dragLeaveEvent(event)
         # 重置拖拽状态
         self.drag_target_row = -1
@@ -1261,6 +1354,7 @@ class AnnotationList(QListView):
         self.viewport().update()
         # 清除当前选中状态
         self.setCurrentIndex(QModelIndex())
+        print("[Drag] Drag leave event handled, state reset")
 
     def move_item_as_child_after(self, child_id: int, parent_id: int, after_child_id: int = None):
         """
