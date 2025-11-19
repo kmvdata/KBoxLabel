@@ -88,6 +88,7 @@ class ProjectDomain(AbsSqliteDomain):
                 sql_category.color_r = category.color.red()
                 sql_category.color_g = category.color.green()
                 sql_category.color_b = category.color.blue()
+                sql_category.parent_name = category.parent_name
                 sql_category.order = category.order
                 session.add(sql_category)
 

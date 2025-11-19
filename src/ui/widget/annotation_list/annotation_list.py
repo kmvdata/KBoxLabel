@@ -470,6 +470,8 @@ class AnnotationList(QListView):
                     self.delegate.set_hovered_index(None)
                     self.viewport().update()
                     print("[Drag] Parent-child relationship established")
+                    # 确保保存到数据库
+                    self.save_categories()
                     return
                 else:
                     print("[Drag] Parent-child relationship not allowed")
@@ -511,6 +513,8 @@ class AnnotationList(QListView):
         self.delegate.set_drag_target_index(None)
         self.viewport().update()
         print("[Drag] Drop event finished, state reset")
+        # 确保保存到数据库
+        self.save_categories()
 
     def _reorder_items(self, dragged_class_name, dragged_parent_name=None):
         """重新排序项目"""
