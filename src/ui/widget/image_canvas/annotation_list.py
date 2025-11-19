@@ -333,6 +333,9 @@ class AnnotationListModel(QStandardItemModel):
         index = self.index(row, 0)
         return self.data(index, Qt.UserRole + 2)
 
+    def set_color(self, index: QModelIndex, color: QColor):
+        self.setData(index, color, Qt.UserRole)
+
 
 class AnnotationList(QListView):
     # 可配置的工具栏高度变量（默认56px）
@@ -1049,7 +1052,7 @@ class AnnotationList(QListView):
                     # 根据新名称重新生成颜色
                     self.project_info.categories[row].color = self.project_info.categories[row].gen_color()
                     # 更新模型中的颜色数据
-                    self.source_model.setData(source_index, self.project_info.categories[row].color, Qt.UserRole)
+                    self.source_model.set_color(source_index, self.project_info.categories[row].color)
 
     def get_selected_category(self):
         """获取当前选中的完整类别对象"""
@@ -1450,7 +1453,7 @@ class AnnotationList(QListView):
         # 更新模型中的数据
         child_item = self.source_model.get_item_by_class_name(child_name)
         if child_item:
-            child_item.setData(parent_name, Qt.UserRole + 3)
+            child_item.set_parent_name(parent_name)
             
         # 重新排序模型以确保正确的显示顺序
         self._reorder_model()
