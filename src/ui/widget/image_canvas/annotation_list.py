@@ -31,6 +31,14 @@ class AnnotationDelegate(QStyledItemDelegate):
     def set_hovered_index(self, index):
         """设置悬停索引以进行高亮显示"""
         self.hovered_index = index
+        
+    def set_drag_target_index(self, index):
+        """设置拖拽目标索引以进行高亮显示"""
+        self.drag_target_index = index
+        
+    def set_drag_target_index(self, index):
+        """设置拖拽目标索引以进行高亮显示"""
+        self.drag_target_index = index
 
     def sizeHint(self, option, index):
         # 计算最小宽度：color区域 + name最小区域 + id区域 + 间距和边距
@@ -49,8 +57,16 @@ class AnnotationDelegate(QStyledItemDelegate):
 
         # 处理选中状态和悬停状态
         is_hovered = self.hovered_index and self.hovered_index == index
+        # 检查是否是拖拽目标（用于建立父子关系的视觉反馈）
+        is_drag_target = getattr(self, 'drag_target_index', None) and self.drag_target_index == index
         if option.state & QStyle.State_Selected:
             painter.fillRect(option.rect, option.palette.highlight())
+            painter.setPen(option.palette.highlightedText().color())
+        elif is_drag_target:
+            # 拖拽目标高亮（建立父子关系时）- 使用更强的高亮
+            hover_color = QColor(option.palette.highlight().color())
+            hover_color.setAlpha(180)  # 更明显的高亮
+            painter.fillRect(option.rect, hover_color)
             painter.setPen(option.palette.highlightedText().color())
         elif is_hovered:
             # 悬停状态使用特殊颜色
@@ -587,18 +603,22 @@ class AnnotationList(QListView):
                 if y_pos_in_item < item_height / 4:
                     # 上方1/4区域 - 放置在目标项之前
                     print("[Drag] Drop position: top quarter, placing before target")
+                    # 清除拖拽目标高亮
+                    self.delegate.set_drag_target_index(None)
                     self._handle_drop_on_gap(event, pos, dragged_class_name, dragged_parent_name, before_row=source_index.row())
                 elif y_pos_in_item > 3 * item_height / 4:
                     # 下方1/4区域 - 放置在目标项之后
                     print("[Drag] Drop position: bottom quarter, placing after target")
+                    # 清除拖拽目标高亮
+                    self.delegate.set_drag_target_index(None)
                     self._handle_drop_on_gap(event, pos, dragged_class_name, dragged_parent_name, before_row=source_index.row() + 1)
                 else:
                     # 中间2/4区域 - 检查是否可以建立父子关系
                     print("[Drag] Drop position: middle half, checking parent-child relationship")
                     if self._can_drop_category(dragged_class_name, target_class_name):
                         print("[Drag] Parent-child relationship allowed")
-                        # 保持目标项目高亮显示，表示可以建立父子关系
-                        # 不再清除悬停索引
+                        # 高亮整个目标项目，表示可以建立父子关系
+                        self.delegate.set_drag_target_index(index)
                         # 重置拖拽到间隙的状态
                         self.drag_target_row = -1
                         self.is_dragging_child_to_gap = False
@@ -608,10 +628,14 @@ class AnnotationList(QListView):
                     else:
                         print("[Drag] Parent-child relationship not allowed, placing after target")
                         # 不能建立父子关系，当作放置在目标项之后处理
+                        # 清除拖拽目标高亮
+                        self.delegate.set_drag_target_index(None)
                         self._handle_drop_on_gap(event, pos, dragged_class_name, dragged_parent_name, before_row=source_index.row() + 1)
             else:
                 print("[Drag] Index is not valid, handling gap drop at list edges")
                 # 检查是否可以放置在列表开头或结尾的间隙
+                # 清除拖拽目标高亮
+                self.delegate.set_drag_target_index(None)
                 self._handle_drop_on_gap(event, pos, dragged_class_name, dragged_parent_name)
                     
         else:
@@ -820,6 +844,7 @@ class AnnotationList(QListView):
         self.is_dragging_child_to_gap = False
         self.drag_hover_index = None
         self.delegate.set_hovered_index(None)
+        self.delegate.set_drag_target_index(None)
         self.viewport().update()
         print("[Drag] Drop event finished, state reset")
 
@@ -1309,7 +1334,7 @@ class AnnotationList(QListView):
                 pen.setColor(QColor(255, 165, 0))  # 橙色表示子项变为一级项
                 pen.setWidth(3)
             else:
-                pen.setColor(QColor(0, 191, 255))  # 蓝色表示普通重排
+                pen.setColor(QColor(255, 165, 0))  # 橙色表示重新排序
                 pen.setWidth(2)
                 
             painter.setPen(pen)
@@ -1317,12 +1342,14 @@ class AnnotationList(QListView):
             # 绘制指示线
             if self.model().rowCount() > 0:
                 indicator_width = self.viewport().width() - 20
-                painter.drawLine(
-                    self.drop_indicator_pos.x() + 10, 
-                    self.drop_indicator_pos.y(),
-                    self.drop_indicator_pos.x() + indicator_width, 
-                    self.drop_indicator_pos.y()
-                )
+                # 只在重新排序时绘制指示线
+                if not (hasattr(self.delegate, 'drag_target_index') and self.delegate.drag_target_index):
+                    painter.drawLine(
+                        self.drop_indicator_pos.x() + 10, 
+                        self.drop_indicator_pos.y(),
+                        self.drop_indicator_pos.x() + indicator_width, 
+                        self.drop_indicator_pos.y()
+                    )
             
                 # 添加箭头指示当前拖拽操作类型
                 if self.is_dragging_child_to_gap:
@@ -1362,6 +1389,7 @@ class AnnotationList(QListView):
         self.is_dragging_child_to_gap = False
         self.drag_hover_index = None
         self.delegate.set_hovered_index(None)
+        self.delegate.set_drag_target_index(None)
         self.viewport().update()
         # 清除当前选中状态
         self.setCurrentIndex(QModelIndex())
