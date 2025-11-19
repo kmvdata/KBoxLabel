@@ -42,7 +42,7 @@ class AnnotationDelegate(QStyledItemDelegate):
         category_color = index.data(Qt.UserRole)
         class_id = index.data(Qt.UserRole + 1)
         category_name = index.data(Qt.DisplayRole)
-        parent_name = index.data(Qt.UserRole + 2)  # 获取父ID
+        parent_name = index.data(Qt.UserRole + 3)  # 获取父ID
 
         if not all([category_color, category_name, class_id is not None]):
             return
