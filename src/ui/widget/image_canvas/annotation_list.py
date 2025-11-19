@@ -1,16 +1,17 @@
 # annotation_list.py
 import json
-from typing import Tuple, Optional
+from typing import Tuple, Optional, Union
 
+from PyQt5 import QtCore
 from PyQt5.QtCore import Qt, QSize, QRect, QItemSelectionModel, QMimeData, \
     QSortFilterProxyModel, QPoint, QModelIndex
 from PyQt5.QtGui import QStandardItemModel, QStandardItem, QPen, QDrag, QColor, QPainter, QPixmap
 from PyQt5.QtWidgets import QLineEdit, QSpinBox, QListView, QStyledItemDelegate, QAbstractItemView, \
-    QStyle, QToolBar, QWidget, QHBoxLayout, QMenu, QAction, QApplication
+    QStyle, QToolBar, QWidget, QHBoxLayout, QMenu, QAction
 from ultralytics import YOLO
 
-from src.models.dto.annotation_category import AnnotationCategory
 from src.core.project_info import ProjectInfo
+from src.models.dto.annotation_category import AnnotationCategory
 
 
 class AnnotationDelegate(QStyledItemDelegate):
@@ -496,7 +497,7 @@ class AnnotationList(QListView):
 
         return toolbar
 
-    def startDrag(self, supportedActions):
+    def startDrag(self, supported_actions: Union[QtCore.Qt.DropActions, QtCore.Qt.DropAction]):
         """重写拖拽开始事件"""
         current_index = self.currentIndex()
         print(f"[Drag] Start dragging, current index: {current_index}")
@@ -535,7 +536,7 @@ class AnnotationList(QListView):
         self.selectionModel().clearSelection()
         print("[Drag] Cleared selection, starting drag operation")
         
-        result = drag.exec_(supportedActions)
+        result = drag.exec_(supported_actions)
         print(f"[Drag] Drag operation finished with result: {result}")
 
     def dragEnterEvent(self, event):
