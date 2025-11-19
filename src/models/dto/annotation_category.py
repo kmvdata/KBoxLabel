@@ -9,13 +9,13 @@ class AnnotationCategory:
     class_id: int
     class_name: str
     color: QColor
-    parent_id: Optional[int]  # 父类别的ID，None表示顶级类别
-    children: List[int]  # 子类别的ID列表
+    _parent_name: Optional[str]  # 父类别的ID，None表示顶级类别
+    children: list[str]  # 子类别的ID列表
 
-    def __init__(self, class_id: int, class_name: str, parent_id: Optional[int] = None):
+    def __init__(self, class_id: int, class_name: str):
         self.class_id = class_id
         self.class_name = class_name
-        self.parent_id = parent_id
+        self.parent_name = None
         self.children = []
         self.color = self.gen_color()
 
@@ -29,7 +29,7 @@ class AnnotationCategory:
             merged_cat = AnnotationCategory(class_id=cat1.class_id, class_name=cat1.class_name)
             merged_cat.color = merged_cat.gen_color()  # 使用新的颜色生成方法
             # 合并父子关系
-            merged_cat.parent_id = cat1.parent_id or cat2.parent_id
+            merged_cat.parent_name = cat1.parent_name or cat2.parent_name
             merged_cat.children = list(set(cat1.children + cat2.children))
             return merged_cat
         return None
@@ -94,8 +94,8 @@ class AnnotationCategory:
         }
         
         # 添加父子关系信息
-        if self.parent_id is not None:
-            result["parent_id"] = self.parent_id
+        if self.parent_name is not None:
+            result["parent_id"] = self.parent_name
             
         if self.children:
             result["children"] = self.children
@@ -107,9 +107,9 @@ class AnnotationCategory:
         """
         从 JSON 兼容的字典创建 AnnotationCategory 实例。
         """
-        category = cls(class_id=data["class_id"], 
-                      class_name=data["class_name"],
-                      parent_id=data.get("parent_id"))
+        category = cls(class_id=data["class_id"],
+                       class_name=data["class_name"],
+                       parent_name=data.get("parent_id"))
         
         if "children" in data:
             category.children = data["children"]
