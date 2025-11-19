@@ -320,10 +320,10 @@ class AnnotationListModel(QStandardItemModel):
         """根据class_id获取对应的item"""
         return self._category_items.get(class_name)
         
-    def get_class_id_by_row(self, row: int) -> int:
-        """根据行号获取class_id"""
+    def get_class_name_by_row(self, row: int) -> int:
+        """根据行号获取class_name"""
         index = self.index(row, 0)
-        return self.data(index, Qt.UserRole + 1)
+        return self.data(index, Qt.UserRole + 2)
 
 
 class AnnotationList(QListView):
@@ -549,7 +549,7 @@ class AnnotationList(QListView):
             if index.isValid():
                 # 获取目标类别ID
                 source_index = self.proxy_model.mapToSource(index)
-                target_class_id = self.source_model.data(source_index, Qt.UserRole + 1)
+                target_class_name = self.source_model.data(source_index, Qt.UserRole)
                 
                 # 计算放置位置（上方1/4、中间2/4、下方1/4）
                 rect = self.visualRect(index)
@@ -564,7 +564,7 @@ class AnnotationList(QListView):
                     self._handle_drop_on_gap(event, pos, dragged_class_name, dragged_parent_name, before_row=source_index.row() + 1)
                 else:
                     # 中间2/4区域 - 检查是否可以建立父子关系
-                    if self._can_drop_category(dragged_class_name, target_class_id):
+                    if self._can_drop_category(dragged_class_name, target_class_name):
                         # 保持目标项目高亮显示，表示可以建立父子关系
                         # 不再清除悬停索引
                         # 重置拖拽到间隙的状态
@@ -582,7 +582,7 @@ class AnnotationList(QListView):
                     
         event.ignore()
 
-    def _handle_drop_on_gap(self, event, pos, dragged_class_id, dragged_parent_id, before_row=None):
+    def _handle_drop_on_gap(self, event, pos, dragged_class_name: str, dragged_parent_name: Optional[str], before_row=None):
         """处理拖拽到间隙的情况"""
         if before_row is not None:
             # 使用指定的插入位置
@@ -603,7 +603,7 @@ class AnnotationList(QListView):
         self.drop_indicator_pos = self._get_drop_indicator_position(target_row)
         
         # 检查是否是子项拖拽到间隙（需要变为一级项）
-        self.is_dragging_child_to_gap = dragged_parent_id is not None
+        self.is_dragging_child_to_gap = dragged_parent_name is not None
         
         event.acceptProposedAction()
         self.viewport().update()  # 更新视图以重新绘制
@@ -625,7 +625,7 @@ class AnnotationList(QListView):
                 return source_index.row()
                 
             # 检查是否在项目下半部分（在该项目之后插入）
-            if pos.y() > rect.top() + 3 * rect.height() / 4 and pos.y() <= rect.bottom():
+            if rect.top() + 3 * rect.height() / 4 < pos.y() <= rect.bottom():
                 # 需要将代理模型的行号转换为源模型的行号
                 source_index = self.proxy_model.mapToSource(index)
                 return source_index.row() + 1
@@ -646,7 +646,7 @@ class AnnotationList(QListView):
             if first_index.isValid():
                 first_rect = self.visualRect(first_index)
                 return QPoint(first_rect.left(), first_rect.top())
-        elif target_row >= max_row and max_row > 0:
+        elif target_row >= max_row > 0:
             # 插入到末尾
             last_index = self.proxy_model.mapFromSource(self.source_model.index(max_row - 1, 0))
             if last_index.isValid():
@@ -697,15 +697,15 @@ class AnnotationList(QListView):
             if index.isValid() and self.drag_target_row == -1:
                 # 获取目标类别
                 source_index = self.proxy_model.mapToSource(index)
-                target_class_id = self.source_model.data(source_index, Qt.UserRole + 1)
+                target_class_name = self.source_model.data(source_index, Qt.UserRole)
                 
                 # 检查是否可以建立父子关系
-                if self._can_drop_category(dragged_class_name, target_class_id):
+                if self._can_drop_category(dragged_class_name, target_class_name):
                     # 建立父子关系
                     # 检查是否需要在特定子项之后插入
                     insert_after_child_id = None
                     # 这里可以根据需要添加逻辑来确定在哪个子项之后插入
-                    self._establish_parent_child_relationship(dragged_class_name, target_class_id, insert_after_child_id)
+                    self._establish_parent_child_relationship(dragged_class_name, target_class_name, insert_after_child_id)
                     event.acceptProposedAction()
                     # 重置拖拽状态
                     self.drag_target_row = -1
