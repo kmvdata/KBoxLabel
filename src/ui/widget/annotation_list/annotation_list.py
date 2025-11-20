@@ -468,12 +468,13 @@ class AnnotationList(QListView):
                     self.is_dragging_child_to_gap = False
                     self.drag_hover_index = None
                     self.delegate.set_hovered_index(None)
+                    self.delegate.set_hovered_index(None)
                     self.viewport().update()
                     print("[Drag] Parent-child relationship established")
                     # 确保保存到数据库
                     self.save_categories()
-                    # 重新加载数据以确保正确排序
-                    self.load_categories()
+                    # 不再重新加载数据，避免覆盖内存中的更改
+                    # self.load_categories()
                     return
                 else:
                     print("[Drag] Parent-child relationship not allowed")
@@ -489,8 +490,8 @@ class AnnotationList(QListView):
                 self.delegate.set_hovered_index(None)
                 self.viewport().update()
                 print("[Drag] Items reordered")
-                # 重新加载数据以确保正确排序
-                self.load_categories()
+                # 不再重新加载数据，避免覆盖内存中的更改
+                # self.load_categories()
                 return
             else:
                 # 特殊情况处理：即使drag_target_row为-1，也要处理重新排序
@@ -505,8 +506,8 @@ class AnnotationList(QListView):
                 self.delegate.set_hovered_index(None)
                 self.viewport().update()
                 print("[Drag] Items reordered (special case)")
-                # 重新加载数据以确保正确排序
-                self.load_categories()
+                # 不再重新加载数据，避免覆盖内存中的更改
+                # self.load_categories()
                 return
                     
         print("[Drag] Calling super().dropEvent()")
@@ -521,8 +522,8 @@ class AnnotationList(QListView):
         print("[Drag] Drop event finished, state reset")
         # 确保保存到数据库
         self.save_categories()
-        # 重新加载数据以确保正确排序
-        self.load_categories()
+        # 不再重新加载数据，避免覆盖内存中的更改
+        # self.load_categories()
 
     def _reorder_items(self, dragged_class_name, dragged_parent_name=None):
         """重新排序项目"""
@@ -640,6 +641,11 @@ class AnnotationList(QListView):
         # 设置父子关系
         child_category.parent_name = parent_name
         print(f"[Drag] Set child's parent to: {parent_name}")
+        
+        # 同时更新模型中的数据
+        child_item = self.source_model.get_item_by_class_name(child_name)
+        if child_item:
+            child_item.set_parent_name(parent_name)
         
         # 重新排序整个列表以确保正确的显示顺序
         self._reorder_entire_list()
@@ -928,6 +934,8 @@ class AnnotationList(QListView):
                 existing_cat = existing_map[key]
                 merged_cat = AnnotationCategory(class_id=new_cat.class_id, class_name=new_cat.class_name)
                 merged_cat.color = merged_cat.gen_color()  # 重新生成颜色
+                # 保留现有的parent_name，避免被数据库中的旧数据覆盖
+                merged_cat.parent_name = existing_cat.parent_name or new_cat.parent_name
                 updated_categories.append(merged_cat)
                 # 从 existing_map 中移除，表示已处理
                 del existing_map[key]
@@ -935,8 +943,18 @@ class AnnotationList(QListView):
                 # 新类别，直接加入
                 updated_categories.append(new_cat)
 
-        # 3. 加入所有未被合并的旧类别
-        updated_categories.extend(existing_map.values())
+        # 3. 加入所有未被合并的旧类别（这些是刚刚设置了父子关系但在数据库中还没保存的类别）
+        for category in existing_map.values():
+            # 检查是否在new_categories中存在但parent_name不同
+            found = False
+            for new_cat in new_categories:
+                if category.key() == new_cat.key() and category.parent_name != new_cat.parent_name:
+                    # 使用内存中的parent_name而不是数据库中的
+                    updated_categories.append(category)
+                    found = True
+                    break
+            if not found:
+                updated_categories.append(category)
 
         # 4. 保持加载顺序
         self.project_info.categories = updated_categories
