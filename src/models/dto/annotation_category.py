@@ -10,14 +10,12 @@ class AnnotationCategory:
     class_name: str
     color: QColor
     parent_name: Optional[str]  # 父类别的ID，None表示顶级类别
-    children: list[str]
     order: int
 
     def __init__(self, class_id: int, class_name: str, parent_name: Optional[str] = None):
         self.class_id = class_id
         self.class_name = class_name
         self.parent_name = parent_name
-        self.children = []
         self.color = self.gen_color()
         self.order = 0
 
@@ -32,7 +30,6 @@ class AnnotationCategory:
             merged_cat.color = merged_cat.gen_color()  # 使用新的颜色生成方法
             # 合并父子关系
             merged_cat.parent_name = cat1.parent_name or cat2.parent_name
-            merged_cat.children = list(set(cat1.children + cat2.children))
             return merged_cat
         return None
 
@@ -92,7 +89,8 @@ class AnnotationCategory:
         result = {
             "class_id": self.class_id,
             "class_name": self.class_name,
-            "color": {"r": self.color.red(), "g": self.color.green(), "b": self.color.blue()}
+            "color": {"r": self.color.red(), "g": self.color.green(), "b": self.color.blue()},
+            "order": self.order
         }
         
         # 添加父子关系信息
@@ -111,8 +109,8 @@ class AnnotationCategory:
                        class_name=data["class_name"],
                        parent_name=data.get("parent_name"))
         
-        if "children" in data:
-            category.children = data["children"]
+        if "order" in data:
+            category.order = data["order"]
             
         if "color" in data and isinstance(data["color"], dict):
             color_data = data["color"]

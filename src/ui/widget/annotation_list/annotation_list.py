@@ -472,6 +472,8 @@ class AnnotationList(QListView):
                     print("[Drag] Parent-child relationship established")
                     # 确保保存到数据库
                     self.save_categories()
+                    # 重新加载数据以确保正确排序
+                    self.load_categories()
                     return
                 else:
                     print("[Drag] Parent-child relationship not allowed")
@@ -487,6 +489,8 @@ class AnnotationList(QListView):
                 self.delegate.set_hovered_index(None)
                 self.viewport().update()
                 print("[Drag] Items reordered")
+                # 重新加载数据以确保正确排序
+                self.load_categories()
                 return
             else:
                 # 特殊情况处理：即使drag_target_row为-1，也要处理重新排序
@@ -501,6 +505,8 @@ class AnnotationList(QListView):
                 self.delegate.set_hovered_index(None)
                 self.viewport().update()
                 print("[Drag] Items reordered (special case)")
+                # 重新加载数据以确保正确排序
+                self.load_categories()
                 return
                     
         print("[Drag] Calling super().dropEvent()")
@@ -515,6 +521,8 @@ class AnnotationList(QListView):
         print("[Drag] Drop event finished, state reset")
         # 确保保存到数据库
         self.save_categories()
+        # 重新加载数据以确保正确排序
+        self.load_categories()
 
     def _reorder_items(self, dragged_class_name, dragged_parent_name=None):
         """重新排序项目"""
@@ -539,14 +547,6 @@ class AnnotationList(QListView):
         # 如果是从子项变为一级项，更新其属性
         if self.is_dragging_child_to_gap and dragged_category.parent_name is not None:
             print("[Drag] Converting child item to top-level item")
-            # 从原父项的children列表中移除
-            original_parent_name = dragged_category.parent_name
-            for cat in self.project_info.categories:
-                if cat.class_name == original_parent_name:
-                    if dragged_class_name in cat.children:
-                        cat.children.remove(dragged_class_name)
-                        print(f"[Drag] Removed {dragged_class_name} from parent {original_parent_name}'s children list")
-                    break
             # 设置为一级项
             dragged_category.parent_name = None
             print("[Drag] Set item as top-level (parent=None)")
@@ -574,9 +574,9 @@ class AnnotationList(QListView):
         self.project_info.categories.insert(insert_row, removed_category)
         print(f"[Drag] Category inserted")
         
-        # 更新模型
-        self.source_model.update_from_categories(self.project_info.categories)
-        print("[Drag] Model updated with new category order")
+        # 更新所有项的order属性
+        for index, category in enumerate(self.project_info.categories):
+            category.order = index
         
         # 保存更改
         self.save_categories()
@@ -641,75 +641,44 @@ class AnnotationList(QListView):
         child_category.parent_name = parent_name
         print(f"[Drag] Set child's parent to: {parent_name}")
         
-        # 如果指定了在某个子项之后插入，则调整children列表的顺序
-        if insert_after_child_name is not None and insert_after_child_name in parent_category.children:
-            print(f"[Drag] Inserting child after specific child: {insert_after_child_name}")
-            # 先确保child_name在children列表中
-            if child_name not in parent_category.children:
-                parent_category.children.append(child_name)
-            
-            # 调整顺序，将child_name放在insert_after_child_name之后
-            # 先移除child_name
-            parent_category.children.remove(child_name)
-            
-            # 找到insert_after_child_name的位置
-            insert_index = parent_category.children.index(insert_after_child_name) + 1
-            
-            # 在指定位置插入child_name
-            parent_category.children.insert(insert_index, child_name)
-            print(f"[Drag] Inserted child at index {insert_index} in parent's children list")
-        else:
-            # 默认添加到children列表末尾
-            if child_name not in parent_category.children:
-                parent_category.children.append(child_name)
-                print("[Drag] Appended child to end of parent's children list")
-            else:
-                print("[Drag] Child already in parent's children list")
-            
-        # 更新模型中的数据
-        child_item = self.source_model.get_item_by_class_name(child_name)
-        if child_item:
-            child_item.set_parent_name(parent_name)
-            print("[Drag] Updated model data for child item")
-            
-        # 重新排序模型以确保正确的显示顺序
-        self._reorder_model()
-        print("[Drag] Reordered model")
+        # 重新排序整个列表以确保正确的显示顺序
+        self._reorder_entire_list()
+        print("[Drag] Reordered entire list")
         
         # 保存更改
         self.save_categories()
         print("[Drag] Categories saved")
 
-    def _reorder_model(self):
-        """重新排序模型以正确显示父子关系"""
-        # 先清空模型
-        self.source_model.clear_annotations()
+    def _reorder_entire_list(self):
+        """根据parent_name和order属性重新排序整个列表"""
+        # 先按照order排序
+        sorted_categories = sorted(self.project_info.categories, key=lambda cat: cat.order)
         
-        # 按照父子关系重新添加项目
-        # 先添加顶级项目
-        top_level_categories = [cat for cat in self.project_info.categories if cat.parent_name is None]
+        # 分离顶级项目和子项目
+        top_level_categories = [cat for cat in sorted_categories if cat.parent_name is None]
+        child_categories = [cat for cat in sorted_categories if cat.parent_name is not None]
         
-        # 按照原始顺序添加顶级项目及其子项目
+        # 创建父项到子项的映射
+        parent_to_children = {}
+        for child in child_categories:
+            if child.parent_name not in parent_to_children:
+                parent_to_children[child.parent_name] = []
+            parent_to_children[child.parent_name].append(child)
+        
+        # 按照正确顺序重新排列
         ordered_categories = []
-        added_categories = set()  # 跟踪已添加的类别
+        for cat in sorted_categories:
+            if cat.parent_name is None:  # 顶级项目
+                ordered_categories.append(cat)
+                # 添加其子项目
+                if cat.class_name in parent_to_children:
+                    # 按order排序子项目
+                    sorted_children = sorted(parent_to_children[cat.class_name], key=lambda c: c.order)
+                    ordered_categories.extend(sorted_children)
         
-        # 首先按照project_info.categories中的顺序添加顶级项目及其子项目
-        for cat in self.project_info.categories:
-            if cat.parent_name is None and cat.class_name not in added_categories:
-                ordered_categories.append(cat)
-                added_categories.add(cat.class_name)
-                # 按照parent_category.children中的顺序添加其子项目
-                for child_name in cat.children:
-                    for child_cat in self.project_info.categories:
-                        if child_cat.class_name == child_name and child_cat.class_name not in added_categories:
-                            ordered_categories.append(child_cat)
-                            added_categories.add(child_cat.class_name)
-                        
-        # 添加剩余未处理的项目（处理可能的顺序问题）
-        for cat in self.project_info.categories:
-            if cat.class_name not in added_categories:
-                ordered_categories.append(cat)
-                        
+        # 更新project_info.categories
+        self.project_info.categories = ordered_categories
+        
         # 更新模型
         self.source_model.update_from_categories(ordered_categories)
 
@@ -1090,7 +1059,7 @@ class AnnotationList(QListView):
             # 查找当前parent_name对应的类别
             parent_category = None
             for cat in self.project_info.categories:
-                if cat.class_id == current_parent_name:
+                if cat.class_name == current_parent_name:
                     parent_category = cat
                     break
             if parent_category is None:
@@ -1099,7 +1068,7 @@ class AnnotationList(QListView):
             
         # 检查目标是否已经是子项（只允许一级嵌套）
         for cat in self.project_info.categories:
-            if cat.class_id == parent_name:
+            if cat.class_name == parent_name:
                 # 目标已经是子项，不允许再作为父项
                 if cat.parent_name is not None:
                     return False
@@ -1111,11 +1080,11 @@ class AnnotationList(QListView):
         after_child_category = None
         
         for cat in self.project_info.categories:
-            if cat.class_id == child_name:
+            if cat.class_name == child_name:
                 child_category = cat
-            elif cat.class_id == parent_name:
+            elif cat.class_name == parent_name:
                 parent_category = cat
-            elif after_child_name is not None and cat.class_id == after_child_name:
+            elif after_child_name is not None and cat.class_name == after_child_name:
                 after_child_category = cat
                 
         if child_category is None or parent_category is None:
@@ -1126,38 +1095,11 @@ class AnnotationList(QListView):
                                              after_child_category.parent_name != parent_name):
             return False
             
-        # 如果子项已经是该父项的子项，只需要调整顺序
-        if child_category.parent_name == parent_name:
-            # 从父项的children列表中移除该子项
-            if child_name in parent_category.children:
-                parent_category.children.remove(child_name)
-        else:
-            # 否则，需要更新子项的parent_name
-            # 如果子项之前是其他项的子项，需要从原父项的children列表中移除
-            if child_category.parent_name is not None:
-                for cat in self.project_info.categories:
-                    if cat.class_id == child_category.parent_name and child_name in cat.children:
-                        cat.children.remove(child_name)
-                        break
-            # 设置新的父项
-            child_category.parent_name = parent_name
+        # 更新子项的parent_name
+        child_category.parent_name = parent_name
             
-        # 将子项添加到父项的children列表中
-        if after_child_name is not None:
-            # 插入到指定子项之后
-            insert_index = parent_category.children.index(after_child_name) + 1
-            parent_category.children.insert(insert_index, child_name)
-        else:
-            # 添加到末尾
-            parent_category.children.append(child_name)
-            
-        # 更新模型中的数据
-        child_item = self.source_model.get_item_by_class_name(child_name)
-        if child_item:
-            child_item.set_parent_name(parent_name)
-            
-        # 重新排序模型以确保正确的显示顺序
-        self._reorder_model()
+        # 重新排序整个列表
+        self._reorder_entire_list()
         
         # 保存更改
         self.save_categories()
