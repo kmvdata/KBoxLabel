@@ -118,6 +118,7 @@ class ProjectDomain(AbsSqliteDomain):
                     class_name=sql_cat.class_name
                 )
                 category.color = QColor(sql_cat.color_r, sql_cat.color_g, sql_cat.color_b)
+                category.parent_name = sql_cat.parent_name  # 添加加载parent_name字段
                 categories.append(category)
         except Exception as e:
             print(f"加载类别列表失败: {str(e)}")
@@ -291,3 +292,5 @@ class ProjectDomain(AbsSqliteDomain):
         except Exception as e:
             print(f"统计数据库中image_name数量时出错: {str(e)}")
             return 0
+
+

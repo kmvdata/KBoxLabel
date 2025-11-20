@@ -877,6 +877,7 @@ class AnnotationList(QListView):
         # 按照列表当前显示顺序，重新整理order属性，从0开始编号
         for index, category in enumerate(self.project_info.categories):
             category.order = index
+            print(f"{category.class_name} - {category.parent_name}")
             
         self.project_info.save_categories()
 
