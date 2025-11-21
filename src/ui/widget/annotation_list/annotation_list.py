@@ -684,6 +684,9 @@ class AnnotationList(QListView):
         print(f"[Drag] Found child category: id={child_category.class_id}, parent={child_category.parent_name}")
         print(f"[Drag] Found parent category: id={parent_category.class_id}, parent={parent_category.parent_name}")
             
+        # 保存原始的父级信息，用于后续处理子项
+        original_child_parent = child_category.parent_name
+            
         # 设置父子关系
         child_category.parent_name = parent_name
         print(f"[Drag] Set child's parent to: {parent_name}")
@@ -692,6 +695,20 @@ class AnnotationList(QListView):
         child_item = self.source_model.get_item_by_class_name(child_name)
         if child_item:
             child_item.set_parent_name(parent_name)
+        
+        # 查找并移动所有child的子项也作为parent的子项
+        child_items_to_move = []
+        for cat in self.project_info.categories:
+            if cat.parent_name == child_name:
+                child_items_to_move.append(cat)
+        
+        # 将child的所有子项也设置为parent的子项
+        for child_item in child_items_to_move:
+            child_item.parent_name = parent_name
+            item_in_model = self.source_model.get_item_by_class_name(child_item.class_name)
+            if item_in_model:
+                item_in_model.set_parent_name(parent_name)
+            print(f"[Drag] Moved grandchild '{child_item.class_name}' to be child of '{parent_name}'")
         
         # 重新排序整个列表以确保正确的显示顺序
         self._reorder_entire_list()
@@ -762,7 +779,11 @@ class AnnotationList(QListView):
                     break
             
             # 为子项目设置顺序，从父级order开始，间隔为1
-            for index, child in enumerate(children):
+            # 首先对子项目进行排序
+            sorted_children = sorted(children, key=lambda c: c.order)
+            
+            # 然后更新它们的order值
+            for index, child in enumerate(sorted_children):
                 child.order = parent_order + index + 1
 
     def _handle_item_click(self, clicked_index):
