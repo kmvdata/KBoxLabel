@@ -256,7 +256,8 @@ class AnnotationList(QListView):
                 # 获取目标类别ID
                 source_index = self.proxy_model.mapToSource(index)
                 target_class_name = self.source_model.data(source_index, Qt.UserRole + 2)
-                print(f"[Drag] Target item name: {target_class_name}")
+                target_parent_name = self.source_model.data(source_index, Qt.UserRole + 3)  # 获取目标的父级
+                print(f"[Drag] Target item name: {target_class_name}, parent: {target_parent_name}")
                 
                 # 计算放置位置（上方1/4、中间2/4、下方1/4）
                 rect = self.visualRect(index)
@@ -279,7 +280,18 @@ class AnnotationList(QListView):
                 else:
                     # 中间2/4区域 - 检查是否可以建立父子关系
                     print("[Drag] Drop position: middle half, checking parent-child relationship")
-                    if self._can_drop_category(dragged_class_name, target_class_name):
+                    # 如果目标已经是子项，则将拖拽项设置为与目标相同的父级
+                    if target_parent_name is not None:
+                        print(f"[Drag] Target is already a child, setting dragged item to same parent: {target_parent_name}")
+                        # 高亮整个目标项目，表示可以建立父子关系
+                        self.delegate.set_drag_target_index(index)
+                        # 重置拖拽到间隙的状态
+                        self.drag_target_row = -1
+                        self.is_dragging_child_to_gap = False
+                        event.acceptProposedAction()
+                        self.viewport().update()  # 更新视图以重新绘制
+                        return
+                    elif self._can_drop_category(dragged_class_name, target_class_name):
                         print("[Drag] Parent-child relationship allowed")
                         # 高亮整个目标项目，表示可以建立父子关系
                         self.delegate.set_drag_target_index(index)
@@ -452,10 +464,42 @@ class AnnotationList(QListView):
                 # 获取目标类别
                 source_index = self.proxy_model.mapToSource(index)
                 target_class_name = self.source_model.data(source_index, Qt.UserRole + 2)
-                print(f"[Drag] Target item name: {target_class_name}")
+                target_parent_name = self.source_model.data(source_index, Qt.UserRole + 3)  # 获取目标的父级
+                print(f"[Drag] Target item name: {target_class_name}, parent: {target_parent_name}")
                 
+                # 如果目标已经是子项，则将拖拽项设置为与目标相同的父级
+                if target_parent_name is not None:
+                    print(f"[Drag] Target is already a child, setting dragged item to same parent: {target_parent_name}")
+                    # 计算放置位置（上方1/4、中间2/4、下方1/4）
+                    rect = self.visualRect(index)
+                    y_pos_in_item = pos.y() - rect.top()
+                    item_height = rect.height()
+                    print(f"[Drag] Position in item: y={y_pos_in_item}, item height: {item_height}")
+                    
+                    # 根据释放位置决定放置在目标项的上方还是下方
+                    if y_pos_in_item < item_height / 2:
+                        # 上半部分 - 放置在目标项之前
+                        print("[Drag] Drop position: upper half, placing before target")
+                        self._move_item_with_same_parent_before(dragged_class_name, target_class_name)
+                    else:
+                        # 下半部分 - 放置在目标项之后
+                        print("[Drag] Drop position: lower half, placing after target")
+                        self._move_item_with_same_parent_after(dragged_class_name, target_class_name)
+                        
+                    event.acceptProposedAction()
+                    # 重置拖拽状态
+                    self.drag_target_row = -1
+                    self.is_dragging_child_to_gap = False
+                    self.drag_hover_index = None
+                    self.delegate.set_hovered_index(None)
+                    self.delegate.set_hovered_index(None)
+                    self.viewport().update()
+                    print("[Drag] Item moved with same parent")
+                    # 确保保存到数据库
+                    self.save_categories()
+                    return
                 # 检查是否可以建立父子关系
-                if self._can_drop_category(dragged_class_name, target_class_name):
+                elif self._can_drop_category(dragged_class_name, target_class_name):
                     print(f"[Drag] Parent-child relationship allowed, establishing relationship: {dragged_class_name} - {target_class_name}")
                     # 建立父子关系
                     # 检查是否需要在特定子项之后插入
@@ -673,14 +717,13 @@ class AnnotationList(QListView):
         
         # 按照正确顺序重新排列
         ordered_categories = []
-        for cat in sorted_categories:
-            if cat.parent_name is None:  # 顶级项目
-                ordered_categories.append(cat)
-                # 添加其子项目
-                if cat.class_name in parent_to_children:
-                    # 按order排序子项目
-                    sorted_children = sorted(parent_to_children[cat.class_name], key=lambda c: c.order)
-                    ordered_categories.extend(sorted_children)
+        for cat in top_level_categories:  # 只处理顶级项目
+            ordered_categories.append(cat)
+            # 添加其子项目
+            if cat.class_name in parent_to_children:
+                # 按order排序子项目
+                sorted_children = sorted(parent_to_children[cat.class_name], key=lambda c: c.order)
+                ordered_categories.extend(sorted_children)
         
         # 更新project_info.categories
         self.project_info.categories = ordered_categories
@@ -1124,3 +1167,132 @@ class AnnotationList(QListView):
         self.save_categories()
         
         return True
+        
+    def _move_item_with_same_parent_before(self, moved_class_name: str, target_class_name: str):
+        """将拖拽项设置为与目标项相同的父级，并放置在目标项之前"""
+        print(f"[Drag] Moving item '{moved_class_name}' to same parent as '{target_class_name}', placing before target")
+        
+        # 查找目标项以获取其父级
+        target_category = None
+        moved_category = None
+        
+        for cat in self.project_info.categories:
+            if cat.class_name == target_class_name:
+                target_category = cat
+            elif cat.class_name == moved_class_name:
+                moved_category = cat
+                
+        if target_category is None or moved_category is None:
+            print("[Drag] Target or moved category not found")
+            return
+            
+        # 获取目标的父级
+        target_parent_name = target_category.parent_name
+        print(f"[Drag] Target parent name: {target_parent_name}")
+        
+        # 设置拖拽项的父级与目标项相同
+        moved_category.parent_name = target_parent_name
+        
+        # 更新模型中的数据
+        moved_item = self.source_model.get_item_by_class_name(moved_class_name)
+        if moved_item:
+            moved_item.set_parent_name(target_parent_name)
+            
+        # 重新排序整个列表
+        self._reorder_entire_list()
+        
+        # 保存更改
+        self.save_categories()
+        
+    def _move_item_with_same_parent_after(self, moved_class_name: str, target_class_name: str):
+        """将拖拽项设置为与目标项相同的父级，并放置在目标项之后"""
+        print(f"[Drag] Moving item '{moved_class_name}' to same parent as '{target_class_name}', placing after target")
+        
+        # 查找目标项以获取其父级
+        target_category = None
+        moved_category = None
+        
+        for cat in self.project_info.categories:
+            if cat.class_name == target_class_name:
+                target_category = cat
+            elif cat.class_name == moved_class_name:
+                moved_category = cat
+                
+        if target_category is None or moved_category is None:
+            print("[Drag] Target or moved category not found")
+            return
+            
+        # 获取目标的父级
+        target_parent_name = target_category.parent_name
+        print(f"[Drag] Target parent name: {target_parent_name}")
+        
+        # 设置拖拽项的父级与目标项相同
+        moved_category.parent_name = target_parent_name
+        
+        # 更新模型中的数据
+        moved_item = self.source_model.get_item_by_class_name(moved_class_name)
+        if moved_item:
+            moved_item.set_parent_name(target_parent_name)
+            
+        # 重新排序整个列表，确保拖拽项在目标项之后
+        self._reorder_with_moved_item_after_target(moved_class_name, target_class_name)
+        
+        # 保存更改
+        self.save_categories()
+        
+    def _reorder_with_moved_item_after_target(self, moved_class_name: str, target_class_name: str):
+        """重新排序列表，确保移动的项在目标项之后"""
+        # 先按照order排序
+        sorted_categories = sorted(self.project_info.categories, key=lambda cat: cat.order)
+        
+        # 分离顶级项目和子项目
+        top_level_categories = [cat for cat in sorted_categories if cat.parent_name is None]
+        child_categories = [cat for cat in sorted_categories if cat.parent_name is not None]
+        
+        # 创建父项到子项的映射
+        parent_to_children = {}
+        for child in child_categories:
+            if child.parent_name not in parent_to_children:
+                parent_to_children[child.parent_name] = []
+            parent_to_children[child.parent_name].append(child)
+        
+        # 按照正确顺序重新排列
+        ordered_categories = []
+        for cat in top_level_categories:  # 只处理顶级项目
+            ordered_categories.append(cat)
+            # 添加其子项目
+            if cat.class_name in parent_to_children:
+                # 按order排序子项目
+                sorted_children = sorted(parent_to_children[cat.class_name], key=lambda c: c.order)
+                # 确保moved_class_name在target_class_name之后
+                self._ensure_order(sorted_children, target_class_name, moved_class_name)
+                ordered_categories.extend(sorted_children)
+        
+        # 更新project_info.categories
+        self.project_info.categories = ordered_categories
+        
+        # 更新模型
+        self.source_model.update_from_categories(ordered_categories)
+        
+    def _ensure_order(self, children_list, target_name, moved_name):
+        """确保在children_list中moved_name在target_name之后"""
+        target_index = -1
+        moved_index = -1
+        
+        # 找到target_name和moved_name的索引
+        for i, child in enumerate(children_list):
+            if child.class_name == target_name:
+                target_index = i
+            elif child.class_name == moved_name:
+                moved_index = i
+                
+        # 如果都找到了且moved_index在target_index之前，则调整顺序
+        if target_index != -1 and moved_index != -1 and moved_index < target_index:
+            # 移除moved_item
+            moved_item = children_list.pop(moved_index)
+            # 在target_item之后插入
+            children_list.insert(target_index, moved_item)
+            
+            # 更新order属性
+            for i, child in enumerate(children_list):
+                child.order = i
