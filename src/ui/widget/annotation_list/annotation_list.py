@@ -619,9 +619,9 @@ class AnnotationList(QListView):
         self.project_info.categories.insert(insert_row, removed_category)
         print(f"[Drag] Category inserted")
         
-        # 更新所有项的order属性
+        # 更新所有项的order属性，使用100的间隔，从100开始
         for index, category in enumerate(self.project_info.categories):
-            category.order = index
+            category.order = (index + 1) * 100
         
         # 保存更改
         self.save_categories()
@@ -730,6 +730,10 @@ class AnnotationList(QListView):
         
         # 更新模型
         self.source_model.update_from_categories(ordered_categories)
+        
+        # 更新order值，确保使用100的间隔，从100开始
+        for index, category in enumerate(self.project_info.categories):
+            category.order = (index + 1) * 100
 
     def _handle_item_click(self, clicked_index):
         """处理点击事件 - 保持单选状态"""
@@ -810,6 +814,10 @@ class AnnotationList(QListView):
         else:
             self.project_info.categories.append(new_category)
             self.source_model.add_annotation(new_category)
+
+        # 更新所有项的order属性，使用100的间隔，从100开始
+        for index, category in enumerate(self.project_info.categories):
+            category.order = (index + 1) * 100
 
         # 获取新添加项的索引
         if position is not None:
@@ -921,11 +929,11 @@ class AnnotationList(QListView):
     def save_categories(self):
         """
         使用每个 AnnotationCategory 对象的 to_json 方法保存 categories 列表到指定文件。
-        按照列表当前显示顺序保存，并重新整理order属性值，从0开始编号
+        按照列表当前显示顺序保存，并重新整理order属性值，从100开始，使用100的间隔
         """
-        # 按照列表当前显示顺序，重新整理order属性，从0开始编号
+        # 按照列表当前显示顺序，重新整理order属性，使用100的间隔，从100开始
         for index, category in enumerate(self.project_info.categories):
-            category.order = index
+            category.order = (index + 1) * 100
             print(f"{category.class_name} - {category.parent_name}")
             
         self.project_info.save_categories()
@@ -1004,6 +1012,10 @@ class AnnotationList(QListView):
 
         # 5. 同步到模型（关键修复：确保模型与categories一致）
         self.source_model.update_from_categories(self.project_info.categories)
+        
+        # 6. 更新order值，确保使用100的间隔，从100开始
+        for index, category in enumerate(self.project_info.categories):
+            category.order = (index + 1) * 100
 
     def select_category_by_name(self, class_name: str):
         """根据类别名称选中对应的列表项"""
@@ -1274,6 +1286,10 @@ class AnnotationList(QListView):
         # 更新模型
         self.source_model.update_from_categories(ordered_categories)
         
+        # 更新order值，确保使用100的间隔，从100开始
+        for index, category in enumerate(self.project_info.categories):
+            category.order = (index + 1) * 100
+            
     def _ensure_order(self, children_list, target_name, moved_name):
         """确保在children_list中moved_name在target_name之后"""
         target_index = -1

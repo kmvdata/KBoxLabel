@@ -17,7 +17,7 @@ class AnnotationCategory:
         self.class_name = class_name
         self.parent_name = parent_name
         self.color = self.gen_color()
-        self.order = 0
+        self.order = 100
 
     @staticmethod
     def merge_and_regenerate_color(cat1, cat2):
@@ -111,6 +111,9 @@ class AnnotationCategory:
         
         if "order" in data:
             category.order = data["order"]
+        else:
+            # 如果没有order字段，使用默认值
+            category.order = 100
             
         if "color" in data and isinstance(data["color"], dict):
             color_data = data["color"]
