@@ -128,7 +128,8 @@ class AnnotationDelegate(QStyledItemDelegate):
             painter.drawLine(icon_x, icon_y, icon_x, icon_y + 6)  # 垂直线
             painter.restore()
 
-    def create_drag_pixmap(self, category: AnnotationCategory) -> QPixmap:
+    @staticmethod
+    def create_drag_pixmap(category: AnnotationCategory) -> QPixmap:
         """创建用于拖拽的 pixmap"""
         # 创建一个适当大小的 pixmap
         width = 200
