@@ -1257,12 +1257,106 @@ class AnnotationList(QListView):
         if moved_item:
             moved_item.set_parent_name(target_parent_name)
             
+        # 查找moved_category的所有子项
+        moved_children = []
+        for cat in self.project_info.categories:
+            if cat.parent_name == moved_class_name:
+                moved_children.append(cat)
+                
+        # 更新所有子项的父级为target_parent_name
+        for child in moved_children:
+            child.parent_name = target_parent_name
+            child_item = self.source_model.get_item_by_class_name(child.class_name)
+            if child_item:
+                child_item.set_parent_name(target_parent_name)
+            print(f"[Drag] Updated child '{child.class_name}' parent to '{target_parent_name}'")
+            
         # 重新排序整个列表
-        self._reorder_entire_list()
+        self._reorder_with_moved_item_before_target_and_children(moved_class_name, target_class_name, moved_children)
         
         # 保存更改
         self.save_categories()
         
+    def _reorder_with_moved_item_before_target_and_children(self, moved_class_name: str, target_class_name: str, moved_children: list):
+        """重新排序列表，确保移动的项及其子项在目标项之前"""
+        # 先按照order排序
+        sorted_categories = sorted(self.project_info.categories, key=lambda cat: cat.order)
+        
+        # 分离顶级项目和子项目
+        top_level_categories = [cat for cat in sorted_categories if cat.parent_name is None]
+        child_categories = [cat for cat in sorted_categories if cat.parent_name is not None]
+        
+        # 创建父项到子项的映射
+        parent_to_children = {}
+        for child in child_categories:
+            if child.parent_name not in parent_to_children:
+                parent_to_children[child.parent_name] = []
+            parent_to_children[child.parent_name].append(child)
+        
+        # 按照正确顺序重新排列
+        ordered_categories = []
+        for cat in top_level_categories:  # 只处理顶级项目
+            ordered_categories.append(cat)
+            # 添加其子项目
+            if cat.class_name in parent_to_children:
+                # 按order排序子项目
+                sorted_children = sorted(parent_to_children[cat.class_name], key=lambda c: c.order)
+                # 确保moved_class_name在target_class_name之前，并且其子项紧跟在后面
+                self._ensure_order_before_with_children(sorted_children, target_class_name, moved_class_name, moved_children)
+                ordered_categories.extend(sorted_children)
+        
+        # 更新project_info.categories
+        self.project_info.categories = ordered_categories
+        
+        # 更新模型
+        self.source_model.update_from_categories(ordered_categories)
+        
+        # 更新order值
+        self._update_category_orders()
+            
+    def _ensure_order_before_with_children(self, children_list, target_name, moved_name, moved_children):
+        """确保在children_list中moved_name及其子项在target_name之前"""
+        target_index = -1
+        moved_index = -1
+        
+        # 找到target_name和moved_name的索引
+        for i, child in enumerate(children_list):
+            if child.class_name == target_name:
+                target_index = i
+            elif child.class_name == moved_name:
+                moved_index = i
+                
+        # 如果都找到了且moved_index在target_index之后，则调整顺序
+        if target_index != -1 and moved_index != -1 and moved_index > target_index:
+            # 先移动所有子项
+            moved_child_items = []
+            for child in moved_children:
+                # 查找子项在列表中的位置
+                child_index = -1
+                for i, c in enumerate(children_list):
+                    if c.class_name == child.class_name:
+                        child_index = i
+                        break
+                        
+                if child_index != -1:
+                    # 移除子项
+                    child_item = children_list.pop(child_index)
+                    moved_child_items.append(child_item)
+                    # 如果子项在moved_item之前被移除，需要调整moved_index和target_index
+                    if child_index < moved_index:
+                        moved_index -= 1
+                    if child_index < target_index:
+                        target_index -= 1
+            
+            # 移除moved_item
+            moved_item = children_list.pop(moved_index)
+            # 在target_item之前插入moved_item
+            children_list.insert(target_index, moved_item)
+            
+            # 将子项插入到moved_item之后
+            for i, child_item in enumerate(moved_child_items):
+                children_list.insert(target_index + 1 + i, child_item)
+                
     def _move_item_with_same_parent_after(self, moved_class_name: str, target_class_name: str):
         """将拖拽项设置为与目标项相同的父级，并放置在目标项之后"""
         print(f"[Drag] Moving item '{moved_class_name}' to same parent as '{target_class_name}', placing after target")
@@ -1293,14 +1387,28 @@ class AnnotationList(QListView):
         if moved_item:
             moved_item.set_parent_name(target_parent_name)
             
+        # 查找moved_category的所有子项
+        moved_children = []
+        for cat in self.project_info.categories:
+            if cat.parent_name == moved_class_name:
+                moved_children.append(cat)
+                
+        # 更新所有子项的父级为target_parent_name
+        for child in moved_children:
+            child.parent_name = target_parent_name
+            child_item = self.source_model.get_item_by_class_name(child.class_name)
+            if child_item:
+                child_item.set_parent_name(target_parent_name)
+            print(f"[Drag] Updated child '{child.class_name}' parent to '{target_parent_name}'")
+            
         # 重新排序整个列表，确保拖拽项在目标项之后
-        self._reorder_with_moved_item_after_target(moved_class_name, target_class_name)
+        self._reorder_with_moved_item_after_target_and_children(moved_class_name, target_class_name, moved_children)
         
         # 保存更改
         self.save_categories()
         
-    def _reorder_with_moved_item_after_target(self, moved_class_name: str, target_class_name: str):
-        """重新排序列表，确保移动的项在目标项之后"""
+    def _reorder_with_moved_item_after_target_and_children(self, moved_class_name: str, target_class_name: str, moved_children: list):
+        """重新排序列表，确保移动的项及其子项在目标项之后"""
         # 先按照order排序
         sorted_categories = sorted(self.project_info.categories, key=lambda cat: cat.order)
         
@@ -1323,8 +1431,8 @@ class AnnotationList(QListView):
             if cat.class_name in parent_to_children:
                 # 按order排序子项目
                 sorted_children = sorted(parent_to_children[cat.class_name], key=lambda c: c.order)
-                # 确保moved_class_name在target_class_name之后
-                self._ensure_order(sorted_children, target_class_name, moved_class_name)
+                # 确保moved_class_name在target_class_name之后，并且其子项紧跟在后面
+                self._ensure_order_with_children(sorted_children, target_class_name, moved_class_name, moved_children)
                 ordered_categories.extend(sorted_children)
         
         # 更新project_info.categories
@@ -1336,8 +1444,8 @@ class AnnotationList(QListView):
         # 更新order值
         self._update_category_orders()
             
-    def _ensure_order(self, children_list, target_name, moved_name):
-        """确保在children_list中moved_name在target_name之后"""
+    def _ensure_order_with_children(self, children_list, target_name, moved_name, moved_children):
+        """确保在children_list中moved_name及其子项在target_name之后"""
         target_index = -1
         moved_index = -1
         
@@ -1354,3 +1462,24 @@ class AnnotationList(QListView):
             moved_item = children_list.pop(moved_index)
             # 在target_item之后插入
             children_list.insert(target_index, moved_item)
+            
+            # 同时移动所有子项到moved_item之后
+            inserted_count = 0
+            for child in moved_children:
+                # 查找子项在列表中的位置
+                child_index = -1
+                for i, c in enumerate(children_list):
+                    if c.class_name == child.class_name:
+                        child_index = i
+                        break
+                        
+                if child_index != -1:
+                    # 移除子项
+                    child_item = children_list.pop(child_index)
+                    # 如果子项在moved_item之前被移除，需要调整target_index
+                    if child_index < target_index:
+                        target_index -= 1
+                    # 在moved_item之后插入子项
+                    target_index += 1
+                    children_list.insert(target_index, child_item)
+                    inserted_count += 1
