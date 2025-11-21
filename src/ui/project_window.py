@@ -515,7 +515,23 @@ class ProjectWindow(QMainWindow):
         """
         # 创建类别名称到ID的映射
         class_name_to_id = {category.class_name: category.class_id for category in self.project_info.categories}
-
+        
+        # 构建类别层级映射
+        # 创建从子类到父类的映射
+        child_to_parent_map = {}
+        # 获取顶层类别（没有父类的类别）
+        top_level_classes = {}
+        class_name_to_category = {}
+        
+        for category in self.project_info.categories:
+            class_name_to_category[category.class_name] = category
+            if category.parent_name is None:
+                # 顶层类别
+                top_level_classes[category.class_name] = category.class_id
+            else:
+                # 子类别
+                child_to_parent_map[category.class_name] = category.parent_name
+        
         # 获取总图片数
         total_images = self.project_info.domain.count_image_names_from_kilo_item()
         
@@ -540,10 +556,16 @@ class ProjectWindow(QMainWindow):
             # 写入YOLO格式的txt文件
             with open(txt_path, 'w', encoding='utf-8') as txt_file:
                 for item in kolo_items:
-                    # 获取类别ID
-                    class_id = class_name_to_id.get(item.class_name, -1)
+                    # 处理类别层级映射
+                    class_name = item.class_name
+                    # 如果这是一个子类别，映射到父类别
+                    if class_name in child_to_parent_map:
+                        class_name = child_to_parent_map[class_name]
+                    
+                    # 获取类别ID（使用映射后的类别名称）
+                    class_id = top_level_classes.get(class_name, -1)
                     if class_id == -1:
-                        print(f"警告: 未找到类别 '{item.class_name}' 的ID，跳过该标注")
+                        print(f"警告: 未找到类别 '{class_name}' 的ID，跳过该标注")
                         continue
 
                     # 写入YOLO格式: class_id x_center y_center width height

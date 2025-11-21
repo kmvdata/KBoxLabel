@@ -126,7 +126,7 @@ class TrainingThread(QThread):
     progress_updated = pyqtSignal(str)
     training_finished = pyqtSignal(bool, str)
 
-    def __init__(self, trainer, source_dir, model_name, epochs, imgsz, batch_size, data_dir, class_names):
+    def __init__(self, trainer, source_dir, model_name, epochs, imgsz, batch_size, data_dir, categories):
         super().__init__()
         self.trainer = trainer
         self.source_dir = source_dir
@@ -135,11 +135,13 @@ class TrainingThread(QThread):
         self.imgsz = imgsz
         self.batch_size = batch_size
         self.data_dir = data_dir
-        self.class_names = class_names
+        self.categories = categories
 
     def run(self):
         try:
             self.progress_updated.emit("开始训练...")
+            # 从categories中提取类别名称
+            class_names = [category.class_name for category in self.categories]
             result = self.trainer.train(
                 source_dir=self.source_dir,
                 model_name=self.model_name,
@@ -147,7 +149,8 @@ class TrainingThread(QThread):
                 imgsz=self.imgsz,
                 batch_size=self.batch_size,
                 data_dir=self.data_dir,
-                class_names=self.class_names
+                class_names=class_names,
+                categories=self.categories
             )
             self.training_finished.emit(True, result)
         except Exception as e:
@@ -233,8 +236,9 @@ class TrainYoloDialog(QDialog):
             self.progress_bar.setFormat("正在准备训练数据...")
             self.log_text_edit.append("正在准备训练数据...")
             
-            # 获取类别名称
-            class_names = [category.class_name for category in self.project_window.project_info.categories]
+            # 获取类别列表和类别名称
+            categories = self.project_window.project_info.categories
+            class_names = [category.class_name for category in categories]
             
             # 创建训练器
             trainer = YOLOTrainer()
@@ -245,7 +249,7 @@ class TrainYoloDialog(QDialog):
             self.log_text_edit.append("正在组织训练数据...")
             # 确保训练数据目录存在
             self.train_data_dir.mkdir(parents=True, exist_ok=True)
-            trainer.organize_training_data(source_dir, self.train_data_dir)
+            trainer.organize_training_data(source_dir, self.train_data_dir, categories=categories)
             
             # 显示配置对话框
             self.progress_bar.setValue(50)
