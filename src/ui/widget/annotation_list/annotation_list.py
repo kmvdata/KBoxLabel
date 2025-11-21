@@ -619,9 +619,8 @@ class AnnotationList(QListView):
         self.project_info.categories.insert(insert_row, removed_category)
         print(f"[Drag] Category inserted")
         
-        # 更新所有项的order属性，使用100的间隔，从100开始
-        for index, category in enumerate(self.project_info.categories):
-            category.order = (index + 1) * 100
+        # 更新所有项的order属性
+        self._update_category_orders()
         
         # 保存更改
         self.save_categories()
@@ -731,9 +730,37 @@ class AnnotationList(QListView):
         # 更新模型
         self.source_model.update_from_categories(ordered_categories)
         
-        # 更新order值，确保使用100的间隔，从100开始
-        for index, category in enumerate(self.project_info.categories):
+        # 更新order值，一级项目使用100的间隔，二级项目使用1的间隔
+        self._update_category_orders()
+
+    def _update_category_orders(self):
+        """更新类别顺序，一级项目间隔100，二级项目间隔1"""
+        # 先处理一级项目
+        top_level_categories = [cat for cat in self.project_info.categories if cat.parent_name is None]
+        for index, category in enumerate(top_level_categories):
             category.order = (index + 1) * 100
+            
+        # 再处理二级项目
+        # 首先为每个父级项目创建子项目列表
+        parent_to_children = {}
+        for category in self.project_info.categories:
+            if category.parent_name is not None:
+                if category.parent_name not in parent_to_children:
+                    parent_to_children[category.parent_name] = []
+                parent_to_children[category.parent_name].append(category)
+        
+        # 为每个父级的子项目设置顺序
+        for parent_name, children in parent_to_children.items():
+            # 找到父级项目的order值
+            parent_order = 0
+            for cat in self.project_info.categories:
+                if cat.class_name == parent_name:
+                    parent_order = cat.order
+                    break
+            
+            # 为子项目设置顺序，从父级order开始，间隔为1
+            for index, child in enumerate(children):
+                child.order = parent_order + index + 1
 
     def _handle_item_click(self, clicked_index):
         """处理点击事件 - 保持单选状态"""
@@ -815,9 +842,8 @@ class AnnotationList(QListView):
             self.project_info.categories.append(new_category)
             self.source_model.add_annotation(new_category)
 
-        # 更新所有项的order属性，使用100的间隔，从100开始
-        for index, category in enumerate(self.project_info.categories):
-            category.order = (index + 1) * 100
+        # 更新所有项的order属性
+        self._update_category_orders()
 
         # 获取新添加项的索引
         if position is not None:
@@ -929,12 +955,10 @@ class AnnotationList(QListView):
     def save_categories(self):
         """
         使用每个 AnnotationCategory 对象的 to_json 方法保存 categories 列表到指定文件。
-        按照列表当前显示顺序保存，并重新整理order属性值，从100开始，使用100的间隔
+        按照列表当前显示顺序保存，并重新整理order属性值
         """
-        # 按照列表当前显示顺序，重新整理order属性，使用100的间隔，从100开始
-        for index, category in enumerate(self.project_info.categories):
-            category.order = (index + 1) * 100
-            print(f"{category.class_name} - {category.parent_name}")
+        # 按照列表当前显示顺序，重新整理order属性
+        self._update_category_orders()
             
         self.project_info.save_categories()
 
@@ -1013,9 +1037,8 @@ class AnnotationList(QListView):
         # 5. 同步到模型（关键修复：确保模型与categories一致）
         self.source_model.update_from_categories(self.project_info.categories)
         
-        # 6. 更新order值，确保使用100的间隔，从100开始
-        for index, category in enumerate(self.project_info.categories):
-            category.order = (index + 1) * 100
+        # 6. 更新order值
+        self._update_category_orders()
 
     def select_category_by_name(self, class_name: str):
         """根据类别名称选中对应的列表项"""
@@ -1286,9 +1309,8 @@ class AnnotationList(QListView):
         # 更新模型
         self.source_model.update_from_categories(ordered_categories)
         
-        # 更新order值，确保使用100的间隔，从100开始
-        for index, category in enumerate(self.project_info.categories):
-            category.order = (index + 1) * 100
+        # 更新order值
+        self._update_category_orders()
             
     def _ensure_order(self, children_list, target_name, moved_name):
         """确保在children_list中moved_name在target_name之后"""
@@ -1308,7 +1330,3 @@ class AnnotationList(QListView):
             moved_item = children_list.pop(moved_index)
             # 在target_item之后插入
             children_list.insert(target_index, moved_item)
-            
-            # 更新order属性
-            for i, child in enumerate(children_list):
-                child.order = i
