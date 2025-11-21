@@ -1323,8 +1323,8 @@ class AnnotationList(QListView):
             if cat.class_name in parent_to_children:
                 # 按order排序子项目
                 sorted_children = sorted(parent_to_children[cat.class_name], key=lambda c: c.order)
-                # 确保moved_name在target_name之后
-                self._ensure_order(sorted_children, target_class_name, moved_name)
+                # 确保moved_class_name在target_class_name之后
+                self._ensure_order(sorted_children, target_class_name, moved_class_name)
                 ordered_categories.extend(sorted_children)
         
         # 更新project_info.categories
