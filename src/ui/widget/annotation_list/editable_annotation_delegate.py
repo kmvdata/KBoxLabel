@@ -114,6 +114,18 @@ class EditableAnnotationDelegate(AnnotationDelegate):
             class_id = editor.value()
             if class_id > 0:
                 success = model.setData(index, class_id, Qt.UserRole + 1)
+                
+                # 如果是修改ID，同时更新project_info.categories中的对应项
+                if success:
+                    view = self.parent()
+                    if view is not None and hasattr(view, 'project_info'):
+                        # 获取修改项的class_name
+                        class_name = model.data(index, Qt.UserRole + 2)
+                        # 在project_info.categories中找到对应的类别并更新class_id
+                        for category in view.project_info.categories:
+                            if category.class_name == class_name:
+                                category.class_id = class_id
+                                break
 
         # 只有在设置数据成功时才保存
         if success:
