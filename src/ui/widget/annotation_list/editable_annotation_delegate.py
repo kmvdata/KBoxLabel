@@ -1,7 +1,7 @@
 # annotation_list.py
 
 from PyQt5.QtCore import Qt, QRect
-from PyQt5.QtWidgets import QLineEdit, QSpinBox, QWidget
+from PyQt5.QtWidgets import QLineEdit, QSpinBox, QWidget, QMessageBox, QProgressDialog
 from ultralytics import YOLO
 
 from src.ui.widget.annotation_list.annotation_delegate import AnnotationDelegate
@@ -99,13 +99,50 @@ class EditableAnnotationDelegate(AnnotationDelegate):
                                 break
 
                 if not is_duplicate:
+                    # 获取视图和原始类别名称
+                    view = self.parent()
+                    old_class_name = model.data(index, Qt.UserRole + 2)  # 原始class_name
+                    
+                    # 先更新模型数据
                     success = model.setData(index, category_name, Qt.DisplayRole)
+                    
+                    # 如果更新成功，继续更新数据库
+                    if success and view is not None and hasattr(view, 'project_info'):
+                        try:
+                            # 显示进度对话框
+                            progress = QProgressDialog("正在更新类别名称...", "取消", 0, 2, view)
+                            progress.setWindowModality(Qt.WindowModal)
+                            progress.setWindowTitle("请稍候")
+                            progress.show()
+                            progress.setValue(0)
+                            
+                            # 更新project_info.categories中的对应项
+                            for category in view.project_info.categories:
+                                if category.class_name == old_class_name:
+                                    category.class_name = category_name
+                                    break
+                            
+                            progress.setValue(1)
+                            
+                            # 更新数据库中annotation_category表和kolo_item表
+                            view.project_info.domain.rename_category_for_kolo_item(old_class_name, category_name)
+                            
+                            progress.setValue(2)
+                            
+                            # 显示成功消息
+                            QMessageBox.information(view, "成功", f"类别名称已从 '{old_class_name}' 更新为 '{category_name}'")
+                            
+                        except Exception as e:
+                            # 发生异常时显示错误消息
+                            QMessageBox.critical(view, "错误", f"更新类别名称失败: {str(e)}")
+                            # 回滚模型数据更改
+                            model.setData(index, old_class_name, Qt.DisplayRole)
+                            success = False
                 else:
                     # 名称重复，显示警告对话框
-                    from PyQt5.QtWidgets import QMessageBox
                     view = self.parent()
                     if view is not None:
-                        QMessageBox.warning(QWidget(view), "重命名失败",
+                        QMessageBox.warning(view, "重命名失败",
                                             f"名称 '{category_name}' 已存在，请使用其他名称。")
                     # 名称重复，不保存更改
                     pass

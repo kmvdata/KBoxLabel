@@ -150,6 +150,31 @@ class ProjectDomain(AbsSqliteDomain):
             # 关闭会话
             session.close()
             
+    def rename_category_for_kolo_item(self, old_class_name: str, new_class_name: str):
+        """
+        在数据库中，把kolo_item表中class_name=old_class_name的项目，全部改成class_name=new_class_name
+        :param old_class_name: 旧类别名称
+        :param new_class_name: 新类别名称
+        """
+        # 获取数据库会话
+        session = self.db_session()
+        try:
+            # 更新kolo_item表中所有class_name等于old_class_name的记录为new_class_name
+            updated_count = session.query(KoloItem).filter(KoloItem.class_name == old_class_name).update(
+                {KoloItem.class_name: new_class_name}
+            )
+            # 提交事务
+            session.commit()
+            print(f"成功更新 {updated_count} 条kolo_item记录，类别名称从 '{old_class_name}' 改为 '{new_class_name}'")
+        except Exception as e:
+            # 回滚事务
+            session.rollback()
+            print(f"重命名类别关联的kolo_item记录失败: {str(e)}")
+            raise e
+        finally:
+            # 关闭会话
+            session.close()
+            
     def load_kolo_items_for_image(self, img_name: str) -> list[KoloItem]:
         """
         从数据库加载指定图片的kolo项
@@ -292,5 +317,7 @@ class ProjectDomain(AbsSqliteDomain):
         except Exception as e:
             print(f"统计数据库中image_name数量时出错: {str(e)}")
             return 0
+
+
 
 
