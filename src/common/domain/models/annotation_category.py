@@ -6,8 +6,9 @@ from src.common.god.korm_base import KOrmBase
 class AnnotationCategory(KOrmBase):
     __tablename__ = 'annotation_category'
     __table_args__ = (
-        Index('idx_class_id', 'class_id'),
-        Index('idx_class_name', 'class_name'),
+        Index('annotation_category_idx_class_id', 'class_id'),
+        Index('annotation_category_idx_class_name', 'class_name'),
+        Index('annotation_category_idx_parent_name', 'parent_name'),
         {'comment': '标注类别表'}
     )
 
