@@ -4,7 +4,7 @@ from typing import Optional
 from PyQt5.QtGui import QColor
 
 
-class AnnotationCategory:
+class AnnotationCategoryDTO:
     """存储标注类别的数据结构"""
     class_id: int
     class_name: str
@@ -26,7 +26,7 @@ class AnnotationCategory:
         返回合并后的对象。
         """
         if cat1.class_id == cat2.class_id and cat1.class_name == cat2.class_name:
-            merged_cat = AnnotationCategory(class_id=cat1.class_id, class_name=cat1.class_name)
+            merged_cat = AnnotationCategoryDTO(class_id=cat1.class_id, class_name=cat1.class_name)
             merged_cat.color = merged_cat.gen_color()  # 使用新的颜色生成方法
             # 合并父子关系
             merged_cat.parent_name = cat1.parent_name or cat2.parent_name
@@ -130,6 +130,6 @@ class AnnotationCategory:
         return hash(self.key())
 
     def __eq__(self, other):
-        if not isinstance(other, AnnotationCategory):
+        if not isinstance(other, AnnotationCategoryDTO):
             return False
         return self.key() == other.key()

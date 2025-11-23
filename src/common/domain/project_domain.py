@@ -5,7 +5,7 @@ from PyQt5.QtGui import QColor
 
 from src.common.god.ksnowflake import KSnowflake
 from src.common.domain.abs_sqlite_domain import AbsSqliteDomain
-from src.models.dto.annotation_category import AnnotationCategory
+from src.models.dto.annotation_category_dto import AnnotationCategoryDTO
 from src.common.domain.models.annotation_category import AnnotationCategory as SQLAnnotationCategory
 from src.common.domain.models.kolo_item import KoloItem
 from src.common.domain.models.kv_config import KVConfig
@@ -70,7 +70,7 @@ class ProjectDomain(AbsSqliteDomain):
         finally:
             session.close()
             
-    def save_categories(self, categories: List[AnnotationCategory]):
+    def save_categories(self, categories: List[AnnotationCategoryDTO]):
         """
         将类别列表保存到数据库中
         """
@@ -101,7 +101,7 @@ class ProjectDomain(AbsSqliteDomain):
         finally:
             session.close()
             
-    def load_categories(self) -> List[AnnotationCategory]:
+    def load_categories(self) -> List[AnnotationCategoryDTO]:
         """
         从数据库加载类别列表
         """
@@ -113,7 +113,7 @@ class ProjectDomain(AbsSqliteDomain):
             # 查询所有类别
             sql_categories = session.query(SQLAnnotationCategory).all()
             for sql_cat in sql_categories:
-                category = AnnotationCategory(
+                category = AnnotationCategoryDTO(
                     class_id=sql_cat.class_id,
                     class_name=sql_cat.class_name
                 )

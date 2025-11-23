@@ -6,7 +6,7 @@ from PyQt5.QtWidgets import QStyledItemDelegate, QStyle
 from ultralytics import YOLO
 from ultralytics import YOLO
 
-from src.models.dto.annotation_category import AnnotationCategory
+from src.models.dto.annotation_category_dto import AnnotationCategoryDTO
 
 
 class AnnotationDelegate(QStyledItemDelegate):
@@ -129,7 +129,7 @@ class AnnotationDelegate(QStyledItemDelegate):
             painter.restore()
 
     @staticmethod
-    def create_drag_pixmap(category: AnnotationCategory) -> QPixmap:
+    def create_drag_pixmap(category: AnnotationCategoryDTO) -> QPixmap:
         """创建用于拖拽的 pixmap"""
         # 创建一个适当大小的 pixmap
         width = 200

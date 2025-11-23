@@ -10,7 +10,7 @@ from PyQt5.QtWidgets import (QGraphicsView, QGraphicsScene, QGraphicsPixmapItem,
                              QToolBar, QSizePolicy, QMenu, QFileDialog, QMessageBox, QToolButton, QGraphicsItem)
 
 from src.common.god.korm_base import KOrmBase
-from src.models.dto.annotation_category import AnnotationCategory
+from src.models.dto.annotation_category_dto import AnnotationCategoryDTO
 from src.core.project_info import ProjectInfo
 from src.common.domain.models.kolo_item import KoloItem
 from src.ui.widget.annotation_list.annotation_list import AnnotationList
@@ -207,7 +207,7 @@ class ImageCanvas(QGraphicsView):
 
 
     @property
-    def categories(self) -> list[AnnotationCategory]:
+    def categories(self) -> list[AnnotationCategoryDTO]:
         return self.project_info.categories
 
     def load_annotations_on_image(self, image_path: Path, img_width: int, img_height: int):
@@ -234,7 +234,7 @@ class ImageCanvas(QGraphicsView):
                 category = class_name_map.get(class_name)
                 if not category:
                     # 动态创建新类别
-                    new_category = AnnotationCategory(
+                    new_category = AnnotationCategoryDTO(
                         class_id=len(self.category_map) + 1,
                         class_name=class_name,
                     )
@@ -299,7 +299,7 @@ class ImageCanvas(QGraphicsView):
             category = self.category_map.get(class_name)
             if not category:
                 # 创建新类别
-                new_category = AnnotationCategory(
+                new_category = AnnotationCategoryDTO(
                     class_id=len(self.category_map) + 1,
                     class_name=class_name,
                 )
@@ -329,7 +329,7 @@ class ImageCanvas(QGraphicsView):
             return False
 
     @property
-    def current_category(self) -> Optional[AnnotationCategory]:
+    def current_category(self) -> Optional[AnnotationCategoryDTO]:
         """获取当前要绘制的标注类别，从annotation list中获取当前选中item对应的category，如果没有选中任何item，则返回none"""
         if self.annotation_list:
             return self.annotation_list.get_selected_category()

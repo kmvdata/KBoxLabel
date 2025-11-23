@@ -3,7 +3,7 @@ from typing import Optional, List
 
 from src.common.domain.project_domain import ProjectDomain
 from src.core.yolo.yolo_executor import YOLOExecutor
-from src.models.dto.annotation_category import AnnotationCategory
+from src.models.dto.annotation_category_dto import AnnotationCategoryDTO
 from src.common.domain.models.kolo_item import KoloItem
 
 
@@ -13,7 +13,7 @@ class ProjectInfo:
     def __init__(self, path: Path|str):
         self.path: Path = Path(path)  # 可变属性
         self.yolo_executor = YOLOExecutor(self)  # 将自身作为parent传递给YOLOExecutor
-        self.categories: list[AnnotationCategory] = []
+        self.categories: list[AnnotationCategoryDTO] = []
 
         # 初始化数据库
         self.domain: ProjectDomain = ProjectDomain(self._db_path)
@@ -103,7 +103,7 @@ class ProjectInfo:
         """
         self.domain.save_categories(self.categories)
 
-    def load_categories(self) -> List[AnnotationCategory]:
+    def load_categories(self) -> List[AnnotationCategoryDTO]:
         """
         从数据库加载类别列表
         """
@@ -111,14 +111,14 @@ class ProjectInfo:
         return self.categories
 
 
-    def find_annotation_by_name(self, name: str) -> Optional[AnnotationCategory]:
+    def find_annotation_by_name(self, name: str) -> Optional[AnnotationCategoryDTO]:
         """根据类别名称查找标注类别"""
         for category in self.categories:
             if category.class_name == name:
                 return category
         return None  # 未找到时返回None
 
-    def find_annotation_by_id(self, class_id: int) -> Optional[AnnotationCategory]:
+    def find_annotation_by_id(self, class_id: int) -> Optional[AnnotationCategoryDTO]:
         """根据类别ID查找标注类别"""
         # 注意：原方法定义的参数名有误，已更正为class_id（原参数名name不合理）
         for category in self.categories:

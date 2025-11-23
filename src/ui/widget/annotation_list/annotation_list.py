@@ -12,7 +12,7 @@ from PyQt5.QtWidgets import QLineEdit, QListView, QAbstractItemView, \
 from ultralytics import YOLO
 
 from src.core.project_info import ProjectInfo
-from src.models.dto.annotation_category import AnnotationCategory
+from src.models.dto.annotation_category_dto import AnnotationCategoryDTO
 from src.ui.widget.annotation_list.annotation_delegate import AnnotationDelegate
 from src.ui.widget.annotation_list.annotation_list_model import AnnotationListModel
 from src.ui.widget.annotation_list.editable_annotation_delegate import EditableAnnotationDelegate
@@ -828,7 +828,7 @@ class AnnotationList(QListView):
             source_index = self.proxy_model.mapToSource(selected[0])
             class_id = self.source_model.data(source_index, Qt.UserRole + 1)
             class_name = self.source_model.data(source_index, Qt.DisplayRole)
-            return AnnotationCategory(class_id, class_name)
+            return AnnotationCategoryDTO(class_id, class_name)
         return None
 
     def _handle_search_text_changed(self, search_text):
@@ -853,7 +853,7 @@ class AnnotationList(QListView):
         else:
             new_name = default_name
 
-        new_category = AnnotationCategory(
+        new_category = AnnotationCategoryDTO(
             class_id=new_id,
             class_name=new_name
         )
@@ -1002,7 +1002,7 @@ class AnnotationList(QListView):
             class_dict = model.names  # {0: 'person', 1: 'car', ...}
 
             new_categories = [
-                AnnotationCategory(class_id=i, class_name=name)
+                AnnotationCategoryDTO(class_id=i, class_name=name)
                 for i, name in class_dict.items()
             ]
         except Exception as e:
@@ -1012,7 +1012,7 @@ class AnnotationList(QListView):
         self._merge_and_update_categories(new_categories)
         return True
 
-    def _merge_and_update_categories(self, new_categories: list[AnnotationCategory]):
+    def _merge_and_update_categories(self, new_categories: list[AnnotationCategoryDTO]):
         """
         核心合并逻辑：将 new_categories 与 self.project_info.categories 合并。
         - 如果 (class_id, class_name) 相同 → 合并并重新生成颜色
@@ -1020,7 +1020,7 @@ class AnnotationList(QListView):
         使用字典索引，时间复杂度 O(n + m)
         """
         # 1. 构建现有类别的索引：key -> category
-        existing_map: dict[Tuple[int, str], AnnotationCategory] = {
+        existing_map: dict[Tuple[int, str], AnnotationCategoryDTO] = {
             cat.key(): cat for cat in self.project_info.categories
         }
 
@@ -1031,7 +1031,7 @@ class AnnotationList(QListView):
             if key in existing_map:
                 # 已存在：合并（重新生成颜色）
                 existing_cat = existing_map[key]
-                merged_cat = AnnotationCategory(class_id=new_cat.class_id, class_name=new_cat.class_name)
+                merged_cat = AnnotationCategoryDTO(class_id=new_cat.class_id, class_name=new_cat.class_name)
                 merged_cat.color = merged_cat.gen_color()  # 重新生成颜色
                 # 保留现有的parent_name，避免被数据库中的旧数据覆盖
                 merged_cat.parent_name = existing_cat.parent_name or new_cat.parent_name

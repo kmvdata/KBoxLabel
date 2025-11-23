@@ -9,7 +9,7 @@ from PyQt5.QtGui import QPen, QPainter, QBrush, QColor
 from PyQt5.QtWidgets import QGraphicsRectItem, QGraphicsItem, QStyle
 
 from src.core.utils.string_util import StringUtil
-from src.models.dto.annotation_category import AnnotationCategory
+from src.models.dto.annotation_category_dto import AnnotationCategoryDTO
 
 
 class AnnotationView(QGraphicsRectItem):
@@ -34,7 +34,7 @@ class AnnotationView(QGraphicsRectItem):
     BOTTOM_LEFT = 7
     LEFT_MIDDLE = 8
 
-    def __init__(self, x: Decimal, y: Decimal, width: Decimal, height: Decimal, category: AnnotationCategory, parent: any):
+    def __init__(self, x: Decimal, y: Decimal, width: Decimal, height: Decimal, category: AnnotationCategoryDTO, parent: any):
         super().__init__(float(x), float(y), float(width), float(height))
         self.opposite_color = None
         self.current_color = None
@@ -83,7 +83,7 @@ class AnnotationView(QGraphicsRectItem):
             color.alpha()  # 保持透明度不变
         )
 
-    def set_category(self, category: AnnotationCategory):
+    def set_category(self, category: AnnotationCategoryDTO):
         self.category = category
         # 保存当前颜色和相反颜色供绘制使用
         self.current_color = self.category.color
@@ -569,8 +569,8 @@ class AnnotationView(QGraphicsRectItem):
             category_data = json.loads(json_data)
 
             # 创建AnnotationCategory对象
-            from src.models.dto.annotation_category import AnnotationCategory
-            dropped_category = AnnotationCategory(
+            from src.models.dto.annotation_category_dto import AnnotationCategoryDTO
+            dropped_category = AnnotationCategoryDTO(
                 class_id=category_data['class_id'],
                 class_name=category_data['class_name']
             )

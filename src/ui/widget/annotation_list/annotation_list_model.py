@@ -5,7 +5,7 @@ from PyQt5.QtGui import QStandardItemModel, QColor
 from ultralytics import YOLO
 from ultralytics import YOLO
 
-from src.models.dto.annotation_category import AnnotationCategory
+from src.models.dto.annotation_category_dto import AnnotationCategoryDTO
 from src.ui.widget.annotation_list.annotation_item import AnnotationItem
 
 
@@ -16,13 +16,13 @@ class AnnotationListModel(QStandardItemModel):
         super().__init__(0, 1, parent)
         self._category_items = {}  # class_name -> QStandardItem 映射
 
-    def add_annotation(self, category: AnnotationCategory):
+    def add_annotation(self, category: AnnotationCategoryDTO):
         """添加带序号的标注项"""
         item = AnnotationItem(category)
         self.appendRow(item)
         self._category_items[category.class_name] = item
 
-    def insert_annotation(self, category: AnnotationCategory, row: int):
+    def insert_annotation(self, category: AnnotationCategoryDTO, row: int):
         """在指定位置插入标注项"""
         item = AnnotationItem(category)
         self.insertRow(row, item)
@@ -34,7 +34,7 @@ class AnnotationListModel(QStandardItemModel):
         self.setColumnCount(1)
         self._category_items.clear()
 
-    def update_from_categories(self, categories: list[AnnotationCategory]):
+    def update_from_categories(self, categories: list[AnnotationCategoryDTO]):
         """从类别列表更新模型"""
         self.clear_annotations()
         for category in categories:
