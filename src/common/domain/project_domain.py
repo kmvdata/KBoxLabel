@@ -6,7 +6,7 @@ from PyQt5.QtGui import QColor
 from src.common.god.ksnowflake import KSnowflake
 from src.common.domain.abs_sqlite_domain import AbsSqliteDomain
 from src.models.dto.annotation_category_dto import AnnotationCategoryDTO
-from src.common.domain.models.annotation_category import AnnotationCategory as SQLAnnotationCategory
+from src.common.domain.models.annotation_category import AnnotationCategory as SQLAnnotationCategory, AnnotationCategory
 from src.common.domain.models.kolo_item import KoloItem
 from src.common.domain.models.kv_config import KVConfig
 
@@ -150,22 +150,35 @@ class ProjectDomain(AbsSqliteDomain):
             # 关闭会话
             session.close()
             
-    def rename_category_for_kolo_item(self, old_class_name: str, new_class_name: str):
+    def rename_category(self, old_class_name: str, new_class_name: str):
         """
-        在数据库中，把kolo_item表中class_name=old_class_name的项目，全部改成class_name=new_class_name
+        在数据库中，把kolo_item表中class_name=old_class_name的项目，全部改成class_name=new_class_name。
+        注意：执行完这个方法后，应该立即更新project_info中的categories，防止旧数据被保存。
         :param old_class_name: 旧类别名称
         :param new_class_name: 新类别名称
         """
         # 获取数据库会话
         session = self.db_session()
         try:
-            # 更新kolo_item表中所有class_name等于old_class_name的记录为new_class_name
-            updated_count = session.query(KoloItem).filter(KoloItem.class_name == old_class_name).update(
-                {KoloItem.class_name: new_class_name}
-            )
-            # 提交事务
+            # 第一次事务：更新 class_name（独立事务）
+            updated_count_class = session.query(AnnotationCategory).filter(
+                AnnotationCategory.class_name == old_class_name
+            ).update({AnnotationCategory.class_name: new_class_name})
+            print(f"第一次事务：因 class_name 匹配更新 {updated_count_class} 条 AnnotationCategory 记录")
+
+            # 第二次事务：更新 parent_name（独立事务，避免自引用冲突）
+            updated_count_parent = session.query(AnnotationCategory).filter(
+                AnnotationCategory.parent_name == old_class_name
+            ).update({AnnotationCategory.parent_name: new_class_name})
+            print(f"第二次事务：因 parent_name 匹配更新 {updated_count_parent} 条 AnnotationCategory 记录")
+
+            # 第三次事务：更新 KoloItem（如果需要，也可独立，但通常无冲突）
+            kolo_updated = session.query(KoloItem).filter(
+                KoloItem.class_name == old_class_name
+            ).update({KoloItem.class_name: new_class_name})
+            print(f"第三次事务：因 class_name 匹配更新 {kolo_updated} 条 KoloItem 记录")
             session.commit()
-            print(f"成功更新 {updated_count} 条kolo_item记录，类别名称从 '{old_class_name}' 改为 '{new_class_name}'")
+            print('事务执行完成')
         except Exception as e:
             # 回滚事务
             session.rollback()

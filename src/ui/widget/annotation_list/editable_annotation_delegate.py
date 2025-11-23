@@ -125,7 +125,8 @@ class EditableAnnotationDelegate(AnnotationDelegate):
                             progress.setValue(1)
                             
                             # 更新数据库中annotation_category表和kolo_item表
-                            view.project_info.domain.rename_category_for_kolo_item(old_class_name, category_name)
+                            view.project_info.domain.rename_category(old_class_name, category_name)
+                            view.project_info.load_categories()
                             
                             progress.setValue(2)
                             
