@@ -626,14 +626,9 @@ class AnnotationList(QListView):
             if dragged_row < insert_row:
                 insert_row -= 1
             
-        print(f"[Drag] Inserting category at row: {insert_row}")
         # 插入到新位置
         self.project_info.categories.insert(insert_row, removed_category)
-        print(f"[Drag] Category inserted")
-        
-        # 更新所有项的order属性
-        self._update_category_orders()
-        
+
         # 重新排序整个列表以确保正确的显示顺序
         self._reorder_entire_list()
         
@@ -732,71 +727,9 @@ class AnnotationList(QListView):
 
     def _reorder_entire_list(self):
         """根据parent_name和order属性重新排序整个列表"""
-        # 先按照order排序
-        sorted_categories = sorted(self.project_info.categories, key=lambda cat: cat.order)
-        
-        # 分离顶级项目和子项目
-        top_level_categories = [cat for cat in sorted_categories if cat.parent_name is None]
-        child_categories = [cat for cat in sorted_categories if cat.parent_name is not None]
-        
-        # 创建父项到子项的映射
-        parent_to_children = {}
-        for child in child_categories:
-            if child.parent_name not in parent_to_children:
-                parent_to_children[child.parent_name] = []
-            parent_to_children[child.parent_name].append(child)
-        
-        # 按照正确顺序重新排列
-        ordered_categories = []
-        for cat in top_level_categories:  # 只处理顶级项目
-            ordered_categories.append(cat)
-            # 添加其子项目
-            if cat.class_name in parent_to_children:
-                # 按order排序子项目
-                sorted_children = sorted(parent_to_children[cat.class_name], key=lambda c: c.order)
-                ordered_categories.extend(sorted_children)
-        
-        # 更新project_info.categories
-        self.project_info.categories = ordered_categories
-        
+        self.project_info.domain.refresh_order_entire_list()
         # 更新模型
-        self.source_model.update_from_categories(ordered_categories)
-        
-        # 更新order值，一级项目使用100的间隔，二级项目使用1的间隔
-        self._update_category_orders()
-
-    def _update_category_orders(self):
-        """更新类别顺序，一级项目间隔100，二级项目间隔1"""
-        # 先处理一级项目
-        top_level_categories = [cat for cat in self.project_info.categories if cat.parent_name is None]
-        for index, category in enumerate(top_level_categories):
-            category.order = (index + 1) * 100
-            
-        # 再处理二级项目
-        # 首先为每个父级项目创建子项目列表
-        parent_to_children = {}
-        for category in self.project_info.categories:
-            if category.parent_name is not None:
-                if category.parent_name not in parent_to_children:
-                    parent_to_children[category.parent_name] = []
-                parent_to_children[category.parent_name].append(category)
-        
-        # 为每个父级的子项目设置顺序
-        for parent_name, children in parent_to_children.items():
-            # 找到父级项目的order值
-            parent_order = 0
-            for cat in self.project_info.categories:
-                if cat.class_name == parent_name:
-                    parent_order = cat.order
-                    break
-            
-            # 为子项目设置顺序，从父级order开始，间隔为1
-            # 首先对子项目进行排序
-            sorted_children = sorted(children, key=lambda c: c.order)
-            
-            # 然后更新它们的order值
-            for index, child in enumerate(sorted_children):
-                child.order = parent_order + index + 1
+        self.source_model.update_from_categories(self.project_info.categories )
 
     def _handle_item_click(self, clicked_index):
         """处理点击事件 - 保持单选状态"""
@@ -878,9 +811,6 @@ class AnnotationList(QListView):
             self.project_info.categories.append(new_category)
             self.source_model.add_annotation(new_category)
 
-        # 更新所有项的order属性
-        self._update_category_orders()
-
         # 获取新添加项的索引
         if position is not None:
             proxy_index = self.proxy_model.mapFromSource(self.source_model.index(position, 0))
@@ -896,7 +826,7 @@ class AnnotationList(QListView):
             QItemSelectionModel.SelectionFlag.ClearAndSelect
         )
 
-        self.project_info.domain.save_categories()
+        self.project_info.domain.refresh_order_entire_list()
 
     def _handle_rename(self):
         """处理重命名操作"""
@@ -1281,11 +1211,8 @@ class AnnotationList(QListView):
         self.project_info.categories = ordered_categories
         
         # 更新模型
-        self.source_model.update_from_categories(ordered_categories)
-        
-        # 更新order值
-        self._update_category_orders()
-            
+        self.source_model.update_from_categories(self.project_info.categories)
+
     def _ensure_order_before_with_children(self, children_list, target_name, moved_name, moved_children):
         """确保在children_list中moved_name及其子项在target_name之前"""
         target_index = -1
@@ -1412,9 +1339,7 @@ class AnnotationList(QListView):
         
         # 更新模型
         self.source_model.update_from_categories(ordered_categories)
-        
-        # 更新order值
-        self._update_category_orders()
+
             
     def _ensure_order_with_children(self, children_list, target_name, moved_name, moved_children):
         """确保在children_list中moved_name及其子项在target_name之后"""

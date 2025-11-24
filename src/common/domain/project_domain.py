@@ -27,7 +27,7 @@ class ProjectDomain(AbsSqliteDomain):
     def categories(self, value: list[AnnotationCategoryDTO]):
         """设置类别列表"""
         self._categories = value
-        self.save_categories()
+        self.refresh_order_entire_list()
 
     def model_path_in_db(self) -> Optional[Path]:
         """从数据库查询模型路径"""
