@@ -35,7 +35,6 @@ class ImageCanvas(QGraphicsView):
         # 初始化annotation list
         self.annotation_list = AnnotationList(self.project_info)
         self.annotation_list.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
-        self.annotation_list.load_categories()
 
         # 按钮引用
         self.delete_toolbar_action = None
@@ -191,7 +190,7 @@ class ImageCanvas(QGraphicsView):
         self.current_scale = 1.0
 
         # 保存标注类别信息
-        self.category_map = {category.class_name: category for category in self.categories}
+        self.category_map = {category.class_name: category for category in self.project_info.categories}
 
         # 添加图片到场景
         self.image_item = self.scene.addPixmap(pixmap)
@@ -206,23 +205,17 @@ class ImageCanvas(QGraphicsView):
         self.load_annotations_on_image(image_path, pixmap.width(), pixmap.height())
 
 
-    @property
-    def categories(self) -> list[AnnotationCategoryDTO]:
-        return self.project_info.categories
+    # @property
+    # def categories(self) -> list[AnnotationCategoryDTO]:
+    #     return self.project_info.categories
 
     def load_annotations_on_image(self, image_path: Path, img_width: int, img_height: int):
         """从SQLite数据库加载与图片同名的kolo_item记录"""
-        # 获取图片文件名作为查询key
-        image_name = image_path.name
-
         # 创建类名到类别的映射字典
         class_name_map = {category.class_name: category for category in self.category_map.values()}
 
         # 从数据库中查询所有匹配image_name的KoloItem对象
         try:
-
-            self.project_info.load_categories()
-
             # 执行查询
             kolo_items = self.project_info.domain.load_kolo_items_for_image(image_path.name)
 
@@ -243,14 +236,7 @@ class ImageCanvas(QGraphicsView):
                     class_name_map[class_name] = new_category
                     category = new_category
                     print(f"信息: 数据库中类别 '{class_name}' 未定义，已创建新类别（ID={new_category.class_id}）")
-                    
-                    # 将新创建的类别保存到数据库并刷新annotation_list
-                    # 添加到project_info.categories中
-                    self.project_info.categories.append(new_category)
-                    # 保存到数据库
-                    self.project_info.save_categories()
-                    # 刷新annotation_list显示
-                    self.annotation_list.load_categories()
+
 
                 # 从KoloItem获取归一化坐标
                 x_center = Decimal(kolo_item.x_center)
@@ -267,6 +253,11 @@ class ImageCanvas(QGraphicsView):
                 # 创建AnnotationView并添加到场景
                 item = AnnotationView(x1, y1, rect_width, rect_height, category, self)
                 self.scene.addItem(item)
+
+                # 把category_map转换为数组，调用 self.project_info.domain.add_categories(new_categories)
+                # 确保新增的类别被保存到数据库中
+                new_categories = [category for category in self.category_map.values()]
+                self.project_info.domain.add_categories(new_categories)
 
         except Exception as e:
             print(f"从数据库加载标注信息错误: {e}")
@@ -311,10 +302,10 @@ class ImageCanvas(QGraphicsView):
                     reference_id=max((cat.class_id for cat in self.project_info.categories), default=0),
                     default_name=category.class_name
                 )
-                
+
                 # 将新创建的类别保存到数据库
-                self.project_info.categories.append(new_category)
-                self.project_info.save_categories()
+                self.project_info.domain.add_categories([new_category])
+
 
             # 创建并添加AnnotationView
             item = AnnotationView(x1, y1, rect_width, rect_height, category, self)

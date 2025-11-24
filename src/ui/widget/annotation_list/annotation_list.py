@@ -1,7 +1,7 @@
 # annotation_list.py
 
 import json
-from typing import Tuple, Optional, Union
+from typing import Optional, Union
 
 from PyQt5 import QtCore
 from PyQt5.QtCore import Qt, QSize, QItemSelectionModel, QMimeData, \
@@ -496,7 +496,7 @@ class AnnotationList(QListView):
                     self.viewport().update()
                     print("[Drag] Item moved with same parent")
                     # 确保保存到数据库
-                    self.save_categories()
+                    self.project_info.domain.save_categories()
                     return
                 # 检查是否可以建立父子关系
                 elif self._can_drop_category(dragged_class_name, target_class_name):
@@ -516,7 +516,7 @@ class AnnotationList(QListView):
                     self.viewport().update()
                     print("[Drag] Parent-child relationship established")
                     # 确保保存到数据库
-                    self.save_categories()
+                    self.project_info.domain.save_categories()
                     # 不再重新加载数据，避免覆盖内存中的更改
                     # self.load_categories()
                     return
@@ -565,7 +565,7 @@ class AnnotationList(QListView):
         self.viewport().update()
         print("[Drag] Drop event finished, state reset")
         # 确保保存到数据库
-        self.save_categories()
+        self.project_info.domain.save_categories()
         # 不再重新加载数据，避免覆盖内存中的更改
         # self.load_categories()
 
@@ -626,7 +626,7 @@ class AnnotationList(QListView):
         self._reorder_entire_list()
         
         # 保存更改
-        self.save_categories()
+        self.project_info.domain.save_categories()
         print("[Drag] Categories saved")
 
     def _can_drop_category(self, dragged_class_name: str, target_class_name: str) -> bool:
@@ -715,7 +715,7 @@ class AnnotationList(QListView):
         print("[Drag] Reordered entire list")
         
         # 保存更改
-        self.save_categories()
+        self.project_info.domain.save_categories()
         print("[Drag] Categories saved")
 
     def _reorder_entire_list(self):
@@ -884,7 +884,7 @@ class AnnotationList(QListView):
             QItemSelectionModel.SelectionFlag.ClearAndSelect
         )
 
-        self.save_categories()
+        self.project_info.domain.save_categories()
 
     def _handle_rename(self):
         """处理重命名操作"""
@@ -940,13 +940,11 @@ class AnnotationList(QListView):
                     return
                 
                 # 删除成功后，立即更新project_info中的categories，防止旧数据被保存
-                del self.project_info.categories[row]
                 self.source_model.removeRow(row)
-                self.project_info.load_categories()
                 self.source_model.update_from_categories(self.project_info.categories)
                 
                 # 保存更改
-                self.save_categories()
+                self.project_info.domain.save_categories()
 
     def contextMenuEvent(self, event):
         """重写右键菜单事件"""
@@ -1006,22 +1004,6 @@ class AnnotationList(QListView):
         # 调用添加方法，传递参考ID和位置
         self.handle_add_annotation(insert_position, reference_id)
 
-    def save_categories(self):
-        """
-        使用每个 AnnotationCategory 对象的 to_json 方法保存 categories 列表到指定文件。
-        按照列表当前显示顺序保存，并重新整理order属性值
-        """
-        # 按照列表当前显示顺序，重新整理order属性
-        self._update_category_orders()
-            
-        self.project_info.save_categories()
-
-    def load_categories(self):
-        """
-        从数据库加载类别，与现有类别合并（仅当 class_id 和 class_name 都相同时视为重复）。
-        重复项将重新生成颜色，最终列表按 class_id 排序。
-        """
-        self._merge_and_update_categories(self.project_info.load_categories())
 
     def load_categories_from_yolo_model(self, model_path):
         """
@@ -1035,64 +1017,12 @@ class AnnotationList(QListView):
                 AnnotationCategoryDTO(class_id=i, class_name=name)
                 for i, name in class_dict.items()
             ]
+            self.project_info.domain.add_categories(new_categories)
+            return True
         except Exception as e:
             print(f"加载YOLO模型失败: {str(e)}")
             return False
 
-        self._merge_and_update_categories(new_categories)
-        return True
-
-    def _merge_and_update_categories(self, new_categories: list[AnnotationCategoryDTO]):
-        """
-        核心合并逻辑：将 new_categories 与 self.project_info.categories 合并。
-        - 如果 (class_id, class_name) 相同 → 合并并重新生成颜色
-        - 否则添加新类别
-        使用字典索引，时间复杂度 O(n + m)
-        """
-        # 1. 构建现有类别的索引：key -> category
-        existing_map: dict[str, AnnotationCategoryDTO] = {
-            cat.class_name: cat for cat in self.project_info.categories
-        }
-
-        # 2. 遍历新类别，进行合并或添加
-        updated_categories = []
-        for new_cat in new_categories:
-            key = new_cat.class_name
-            if key in existing_map:
-                # 已存在：合并（重新生成颜色）
-                existing_cat = existing_map[key]
-                merged_cat = AnnotationCategoryDTO(class_id=new_cat.class_id, class_name=new_cat.class_name)
-                merged_cat.color = merged_cat.gen_color()  # 重新生成颜色
-                # 保留现有的parent_name，避免被数据库中的旧数据覆盖
-                merged_cat.parent_name = existing_cat.parent_name or new_cat.parent_name
-                updated_categories.append(merged_cat)
-                # 从 existing_map 中移除，表示已处理
-                del existing_map[key]
-            else:
-                # 新类别，直接加入
-                updated_categories.append(new_cat)
-
-        # 3. 加入所有未被合并的旧类别（这些是刚刚设置了父子关系但在数据库中还没保存的类别）
-        for category in existing_map.values():
-            # 检查是否在new_categories中存在但parent_name不同
-            found = False
-            for new_cat in new_categories:
-                if category.class_name == new_cat.class_name and category.parent_name != new_cat.parent_name:
-                    # 使用内存中的parent_name而不是数据库中的
-                    updated_categories.append(category)
-                    found = True
-                    break
-            if not found:
-                updated_categories.append(category)
-
-        # 4. 保持加载顺序
-        self.project_info.categories = updated_categories
-
-        # 5. 同步到模型（关键修复：确保模型与categories一致）
-        self.source_model.update_from_categories(self.project_info.categories)
-        
-        # 6. 更新order值
-        self._update_category_orders()
 
     def select_category_by_name(self, class_name: str):
         """根据类别名称选中对应的列表项"""
@@ -1253,7 +1183,7 @@ class AnnotationList(QListView):
         self._reorder_entire_list()
         
         # 保存更改
-        self.save_categories()
+        self.project_info.domain.save_categories()
         
         return True
         
@@ -1305,7 +1235,7 @@ class AnnotationList(QListView):
         self._reorder_with_moved_item_before_target_and_children(moved_class_name, target_class_name, moved_children)
         
         # 保存更改
-        self.save_categories()
+        self.project_info.domain.save_categories()
         
     def _reorder_with_moved_item_before_target_and_children(self, moved_class_name: str, target_class_name: str, moved_children: list):
         """重新排序列表，确保移动的项及其子项在目标项之前"""
@@ -1435,7 +1365,7 @@ class AnnotationList(QListView):
         self._reorder_with_moved_item_after_target_and_children(moved_class_name, target_class_name, moved_children)
         
         # 保存更改
-        self.save_categories()
+        self.project_info.domain.save_categories()
         
     def _reorder_with_moved_item_after_target_and_children(self, moved_class_name: str, target_class_name: str, moved_children: list):
         """重新排序列表，确保移动的项及其子项在目标项之后"""

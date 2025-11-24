@@ -13,10 +13,19 @@ class ProjectInfo:
     def __init__(self, path: Path|str):
         self.path: Path = Path(path)  # 可变属性
         self.yolo_executor = YOLOExecutor(self)  # 将自身作为parent传递给YOLOExecutor
-        self.categories: list[AnnotationCategoryDTO] = []
 
         # 初始化数据库
         self.domain: ProjectDomain = ProjectDomain(self._db_path)
+
+    @property
+    def categories(self) -> list[AnnotationCategoryDTO]:
+        """获取类别列表"""
+        return self.domain.categories
+
+    @categories.setter
+    def categories(self, value: list[AnnotationCategoryDTO]):
+        """设置类别列表"""
+        self.domain.categories = value
 
     def exists(self) -> bool:
         if self.path is None:
@@ -95,20 +104,6 @@ class ProjectInfo:
 
     def exec_yolo(self, img_path: Path, save_to_db: bool = False)-> list[KoloItem]:
         return self.yolo_executor.exec_yolo(img_path, save_to_db)
-
-
-    def save_categories(self):
-        """
-        将当前的 categories 列表保存到数据库中
-        """
-        self.domain.save_categories()
-
-    def load_categories(self) -> List[AnnotationCategoryDTO]:
-        """
-        从数据库加载类别列表
-        """
-        self.categories = self.domain.load_categories()
-        return self.categories
 
 
     def find_annotation_by_name(self, name: str) -> Optional[AnnotationCategoryDTO]:

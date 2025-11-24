@@ -12,13 +12,22 @@ from src.models.dto.annotation_category_dto import AnnotationCategoryDTO
 
 
 class ProjectDomain(AbsSqliteDomain):
-    categories: list[AnnotationCategoryDTO] = []
-
     """数据库领域类"""
     def __init__(self, db_path: Path):
         super().__init__(db_path)
-        self.categories: list[AnnotationCategoryDTO] = []
+        self._categories: list[AnnotationCategoryDTO] = []
         self.load_categories()
+    
+    @property
+    def categories(self) -> list[AnnotationCategoryDTO]:
+        """获取类别列表"""
+        return self._categories
+    
+    @categories.setter
+    def categories(self, value: list[AnnotationCategoryDTO]):
+        """设置类别列表"""
+        self._categories = value
+        self.save_categories()
 
     def model_path_in_db(self) -> Optional[Path]:
         """从数据库查询模型路径"""
@@ -131,6 +140,20 @@ class ProjectDomain(AbsSqliteDomain):
             print(f"加载类别列表失败: {str(e)}")
         finally:
             session.close()
+
+    def add_categories(self, new_categories: list[AnnotationCategoryDTO]):
+        # 把new_categories添加到self.categories中
+        # 获取当前已存在的类别名称集合
+        existing_names = {category.class_name for category in self.categories}
+        
+        # 添加不重复的新类别
+        for category in new_categories:
+            if category.class_name not in existing_names:
+                self.categories.append(category)
+                existing_names.add(category.class_name)
+        
+        # 重新排序
+        self.refresh_order_entire_list()
 
     def rename_image_for_kolo_item(self, old_img_name: str, new_img_name: str):
         """
@@ -410,3 +433,21 @@ class ProjectDomain(AbsSqliteDomain):
                 top_level_categories.append(cat)
 
         self.save_categories()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
