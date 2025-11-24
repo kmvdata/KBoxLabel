@@ -219,29 +219,6 @@ class ProjectDomain(AbsSqliteDomain):
         except Exception as e:
             print(f"从数据库删除Kolo项目时出错: {str(e)}")
 
-    @staticmethod
-    def _prepare_kolo_items_for_save(kolo_items: list[KoloItem]) -> list[KoloItem]:
-        """
-        准备KoloItem对象以供保存到数据库
-        为每个新对象生成新的 kid，避免主键冲突
-        同时创建新的对象实例，避免会话绑定问题
-        
-        :param kolo_items: 原始KoloItem对象列表
-        :return: 准备好的新KoloItem对象列表
-        """
-        new_kolo_items = []
-        for item in kolo_items:
-            new_item = KoloItem()
-            new_item.kid = KSnowflake().gen_kid()
-            new_item.image_name = item.image_name
-            new_item.class_name = item.class_name
-            new_item.x_center = item.x_center
-            new_item.y_center = item.y_center
-            new_item.width = item.width
-            new_item.height = item.height
-            new_kolo_items.append(new_item)
-        return new_kolo_items
-
     def restore_kolo_item_for_image(self, kolo_items: list[KoloItem], img_name: str):
         """
         从数据库删除指定图片的kolo项, 然后在同一个事务中保存kolo项到数据库
@@ -254,7 +231,17 @@ class ProjectDomain(AbsSqliteDomain):
             deleted_count = session.query(KoloItem).filter(KoloItem.image_name == img_name).delete()
 
             # 准备要保存的KoloItem对象
-            new_kolo_items = self._prepare_kolo_items_for_save(kolo_items)
+            new_kolo_items = []
+            for item in kolo_items:
+                new_item = KoloItem()
+                new_item.kid = KSnowflake().gen_kid()
+                new_item.image_name = item.image_name
+                new_item.class_name = item.class_name
+                new_item.x_center = item.x_center
+                new_item.y_center = item.y_center
+                new_item.width = item.width
+                new_item.height = item.height
+                new_kolo_items.append(new_item)
 
             # 批量插入新对象
             session.add_all(new_kolo_items)
@@ -266,9 +253,6 @@ class ProjectDomain(AbsSqliteDomain):
             print(f"保存了 {len(kolo_items)} 个Kolo项目到数据库")
         except Exception as e:
             print(f"保存Kolo项目到数据库时出错: {str(e)}")
-
-    def load_images(self, page: int = 1, page_size: int = 1000) -> list[str]:
-        pass
 
     def load_image_names_from_kilo_item(self, page: int = 1, page_size: int = 1000) -> list[str]:
         """
