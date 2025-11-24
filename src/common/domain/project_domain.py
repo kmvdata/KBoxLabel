@@ -1,14 +1,14 @@
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional
 
 from PyQt5.QtGui import QColor
 
-from src.common.god.ksnowflake import KSnowflake
 from src.common.domain.abs_sqlite_domain import AbsSqliteDomain
-from src.models.dto.annotation_category_dto import AnnotationCategoryDTO
 from src.common.domain.models.annotation_category import AnnotationCategory as SQLAnnotationCategory, AnnotationCategory
 from src.common.domain.models.kolo_item import KoloItem
 from src.common.domain.models.kv_config import KVConfig
+from src.common.god.ksnowflake import KSnowflake
+from src.models.dto.annotation_category_dto import AnnotationCategoryDTO
 
 
 class ProjectDomain(AbsSqliteDomain):
@@ -18,6 +18,7 @@ class ProjectDomain(AbsSqliteDomain):
     def __init__(self, db_path: Path):
         super().__init__(db_path)
         self.categories: list[AnnotationCategoryDTO] = []
+        self.load_categories()
 
     def model_path_in_db(self) -> Optional[Path]:
         """从数据库查询模型路径"""
