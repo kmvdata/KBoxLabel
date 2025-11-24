@@ -331,6 +331,20 @@ class ProjectDomain(AbsSqliteDomain):
             print(f"统计数据库中image_name数量时出错: {str(e)}")
             return 0
 
+    def count_kilo_items_for_category(self, category_name: str) -> int:
+        """
+        统计kolo_item表中的class_name=category_name的记录数量
+        :return: 记录数量
+        """
+        try:
+            # 创建数据库会话
+            with self.db_session() as session:
+                count = session.query(KoloItem).filter(KoloItem.class_name == category_name).count()
+                return count
+        except Exception as e:
+            print(f"统计数据库中kolo_item数量时出错: {str(e)}")
+            return 0
+
 
 
 
