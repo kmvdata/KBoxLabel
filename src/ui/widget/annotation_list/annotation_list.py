@@ -23,6 +23,15 @@ class AnnotationList(QListView):
     TOOLBAR_HEIGHT = 56
     DROP_INDICATOR_HEIGHT = 2  # 拖拽指示器高度
 
+    def load_categories(self):
+        """加载项目中的所有类别到列表中"""
+        # 清空现有模型数据
+        self.source_model.clear_annotations()
+        
+        # 从project_info获取类别并添加到模型
+        for category in self.project_info.categories:
+            self.source_model.add_annotation(category)
+
     def __init__(self, project_info: ProjectInfo, row_height=56):
         super().__init__()
         self.search_edit = None
@@ -72,6 +81,9 @@ class AnnotationList(QListView):
         self.clicked.connect(self._handle_item_click)  # type: ignore
         self.selectionModel().selectionChanged.connect(self._handle_selection_change)  # type: ignore
         self.source_model.dataChanged.connect(self._handle_model_data_changed)
+        
+        # 加载类别数据
+        self.load_categories()
 
     def calculate_min_width(self):
         """计算最小宽度"""
