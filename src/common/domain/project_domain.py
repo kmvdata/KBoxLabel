@@ -242,25 +242,6 @@ class ProjectDomain(AbsSqliteDomain):
             new_kolo_items.append(new_item)
         return new_kolo_items
 
-    def save_kolo_item_to_db(self, kolo_items: list[KoloItem]):
-        """
-        保存kolo项到数据库
-        :param kolo_items: KoloItem对象列表
-        """
-        def transaction_func(session):
-            # 准备要保存的KoloItem对象
-            new_kolo_items = self._prepare_kolo_items_for_save(kolo_items)
-            
-            # 批量插入新对象
-            session.add_all(new_kolo_items)
-            session.flush()  # 强制检查约束违规
-        
-        try:
-            self.execute_in_transaction(transaction_func)
-            print(f"保存了 {len(kolo_items)} 个Kolo项目到数据库")
-        except Exception as e:
-            print(f"保存Kolo项目到数据库时出错: {str(e)}")
-
     def restore_kolo_item_for_image(self, kolo_items: list[KoloItem], img_name: str):
         """
         从数据库删除指定图片的kolo项, 然后在同一个事务中保存kolo项到数据库
@@ -285,7 +266,6 @@ class ProjectDomain(AbsSqliteDomain):
             print(f"保存了 {len(kolo_items)} 个Kolo项目到数据库")
         except Exception as e:
             print(f"保存Kolo项目到数据库时出错: {str(e)}")
-
 
     def load_images(self, page: int = 1, page_size: int = 1000) -> list[str]:
         pass
