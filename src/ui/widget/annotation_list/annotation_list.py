@@ -1050,14 +1050,14 @@ class AnnotationList(QListView):
         使用字典索引，时间复杂度 O(n + m)
         """
         # 1. 构建现有类别的索引：key -> category
-        existing_map: dict[Tuple[int, str], AnnotationCategoryDTO] = {
-            cat.key(): cat for cat in self.project_info.categories
+        existing_map: dict[str, AnnotationCategoryDTO] = {
+            cat.class_name: cat for cat in self.project_info.categories
         }
 
         # 2. 遍历新类别，进行合并或添加
         updated_categories = []
         for new_cat in new_categories:
-            key = new_cat.key()
+            key = new_cat.class_name
             if key in existing_map:
                 # 已存在：合并（重新生成颜色）
                 existing_cat = existing_map[key]
@@ -1077,7 +1077,7 @@ class AnnotationList(QListView):
             # 检查是否在new_categories中存在但parent_name不同
             found = False
             for new_cat in new_categories:
-                if category.key() == new_cat.key() and category.parent_name != new_cat.parent_name:
+                if category.class_name == new_cat.class_name and category.parent_name != new_cat.parent_name:
                     # 使用内存中的parent_name而不是数据库中的
                     updated_categories.append(category)
                     found = True

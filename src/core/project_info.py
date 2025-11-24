@@ -101,7 +101,7 @@ class ProjectInfo:
         """
         将当前的 categories 列表保存到数据库中
         """
-        self.domain.save_categories(self.categories)
+        self.domain.save_categories()
 
     def load_categories(self) -> List[AnnotationCategoryDTO]:
         """

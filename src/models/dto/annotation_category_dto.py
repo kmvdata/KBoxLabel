@@ -82,54 +82,5 @@ class AnnotationCategoryDTO:
 
         return QColor(r, g, b)
 
-    def to_json(self) -> dict:
-        """
-        将当前对象转换为 JSON 兼容的字典。
-        """
-        result = {
-            "class_id": self.class_id,
-            "class_name": self.class_name,
-            "color": {"r": self.color.red(), "g": self.color.green(), "b": self.color.blue()},
-            "order": self.order
-        }
-        
-        # 添加父子关系信息
-        if self.parent_name is not None:
-            result["parent_name"] = self.parent_name
-            
-
-        return result
-
-    @classmethod
-    def from_json(cls, data: dict):
-        """
-        从 JSON 兼容的字典创建 AnnotationCategory 实例。
-        """
-        category = cls(class_id=data["class_id"],
-                       class_name=data["class_name"],
-                       parent_name=data.get("parent_name"))
-        
-        if "order" in data:
-            category.order = data["order"]
-        else:
-            # 如果没有order字段，使用默认值
-            category.order = 100
-            
-        if "color" in data and isinstance(data["color"], dict):
-            color_data = data["color"]
-            category.color = QColor(color_data.get("r", 0),
-                                    color_data.get("g", 0),
-                                    color_data.get("b", 0))
-        return category
-
-    def key(self) -> (int, str):
-        """返回唯一标识该类别的键"""
-        return self.class_id, self.class_name
-
     def __hash__(self):
-        return hash(self.key())
-
-    def __eq__(self, other):
-        if not isinstance(other, AnnotationCategoryDTO):
-            return False
-        return self.key() == other.key()
+        return hash(self.class_name)

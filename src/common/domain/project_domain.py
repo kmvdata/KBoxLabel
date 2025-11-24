@@ -12,9 +12,12 @@ from src.common.domain.models.kv_config import KVConfig
 
 
 class ProjectDomain(AbsSqliteDomain):
+    categories: list[AnnotationCategoryDTO] = []
+
     """数据库领域类"""
     def __init__(self, db_path: Path):
         super().__init__(db_path)
+        self.categories: list[AnnotationCategoryDTO] = []
 
     def model_path_in_db(self) -> Optional[Path]:
         """从数据库查询模型路径"""
@@ -70,7 +73,7 @@ class ProjectDomain(AbsSqliteDomain):
         finally:
             session.close()
             
-    def save_categories(self, categories: List[AnnotationCategoryDTO]):
+    def save_categories(self):
         """
         将类别列表保存到数据库中
         """
@@ -81,7 +84,7 @@ class ProjectDomain(AbsSqliteDomain):
             session.query(SQLAnnotationCategory).delete()
 
             # 添加所有当前类别
-            for category in categories:
+            for category in self.categories:
                 sql_category = SQLAnnotationCategory()
                 sql_category.class_id = category.class_id
                 sql_category.class_name = category.class_name
@@ -101,7 +104,7 @@ class ProjectDomain(AbsSqliteDomain):
         finally:
             session.close()
             
-    def load_categories(self) -> List[AnnotationCategoryDTO]:
+    def load_categories(self):
         """
         从数据库加载类别列表
         """
@@ -120,12 +123,14 @@ class ProjectDomain(AbsSqliteDomain):
                 category.color = QColor(sql_cat.color_r, sql_cat.color_g, sql_cat.color_b)
                 category.parent_name = sql_cat.parent_name  # 添加加载parent_name字段
                 categories.append(category)
+
+            self.categories = categories
+            return self.categories
         except Exception as e:
             print(f"加载类别列表失败: {str(e)}")
         finally:
             session.close()
-            return categories
-            
+
     def rename_image_for_kolo_item(self, old_img_name: str, new_img_name: str):
         """
         在数据库中，把kolo_item表中image_name=old_img_name的项目，全部改成image_name=new_img_name
@@ -187,6 +192,9 @@ class ProjectDomain(AbsSqliteDomain):
         finally:
             # 关闭会话
             session.close()
+
+        # rename执行完成后重新加载categories
+        self.load_categories()
             
     def load_kolo_items_for_image(self, img_name: str) -> list[KoloItem]:
         """
@@ -333,4 +341,71 @@ class ProjectDomain(AbsSqliteDomain):
         except Exception as e:
             print(f"删除类别 '{category_name}' 时出错: {str(e)}")
             raise
+        # 删除完成后重新加载categories
+        self.load_categories()
 
+    def refresh_order_entire_list(self):
+        """根据parent_name指向的父子关系以及整个self.categories列表当前顺序，重新设置每个category的order值"""
+        # 创建类别名称到类别对象的映射
+        category_map = {cat.class_name: cat for cat in self.categories}
+        
+        # 分离一级和二级类别
+        top_level_categories = []
+        second_level_categories = []
+        
+        for cat in self.categories:
+            if cat.parent_name is None:
+                top_level_categories.append(cat)
+            else:
+                second_level_categories.append(cat)
+        
+        # 为一级类别分配order值 (1000, 2000, 3000...)
+        order_value = 1000
+        for cat in top_level_categories:
+            cat.order = order_value
+            order_value += 1000
+        
+        # 处理二级类别
+        # 构建父类别到其子类别的映射
+        parent_to_children = {}
+        invalid_second_level = []  # 存储无效的二级类别
+        
+        for cat in second_level_categories:
+            parent_name = cat.parent_name
+            if parent_name in category_map:
+                # 有效的二级类别
+                if parent_name not in parent_to_children:
+                    parent_to_children[parent_name] = []
+                parent_to_children[parent_name].append(cat)
+            else:
+                # 无效的二级类别，清除parent_name
+                cat.parent_name = None
+                invalid_second_level.append(cat)
+        
+        # 为有效的二级类别分配order值
+        for parent_name, children in parent_to_children.items():
+            parent_category = category_map[parent_name]
+            # 从父类order+1开始，每个子类间隔为1
+            child_order = parent_category.order + 1
+            for child in children:
+                child.order = child_order
+                child_order += 1
+        
+        # 为无效的二级类别（现在是一级类别）分配order值
+        if invalid_second_level:
+            # 找到最后一个一级类别的order值，继续递增
+            last_order = 0
+            if top_level_categories:
+                last_order = top_level_categories[-1].order
+            else:
+                # 如果还没有一级类别，从1000开始
+                last_order = 0
+            
+            order_value = last_order + 1000
+            for cat in invalid_second_level:
+                cat.order = order_value
+                order_value += 1000
+                # 同时添加到一级类别列表中，保证顺序正确
+                top_level_categories.append(cat)
+
+        self.save_categories()
