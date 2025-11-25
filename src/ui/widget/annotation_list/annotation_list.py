@@ -492,11 +492,17 @@ class AnnotationList(QListView):
                     if y_pos_in_item < item_height / 2:
                         # 上半部分 - 放置在目标项之前
                         print("[Drag] Drop position: upper half, placing before target")
-                        self._move_item_with_same_parent_before(dragged_class_name, target_class_name)
+                        # 使用domain方法处理移动操作
+                        self.project_info.domain.move_category_by_name_before(dragged_class_name, target_class_name)
+                        # 更新模型
+                        self.source_model.update_from_categories(self.project_info.categories)
                     else:
                         # 下半部分 - 放置在目标项之后
                         print("[Drag] Drop position: lower half, placing after target")
-                        self._move_item_with_same_parent_after(dragged_class_name, target_class_name)
+                        # 使用domain方法处理移动操作
+                        self.project_info.domain.move_category_by_name_after(dragged_class_name, target_class_name)
+                        # 更新模型
+                        self.source_model.update_from_categories(self.project_info.categories)
                         
                     event.acceptProposedAction()
                     # 重置拖拽状态
@@ -1016,38 +1022,3 @@ class AnnotationList(QListView):
         # 清除当前选中状态
         self.setCurrentIndex(QModelIndex())
         print("[Drag] Drag leave event handled, state reset")
-
-
-    def _move_item_with_same_parent_before(self, moved_class_name: str, target_class_name: str):
-        """将拖拽项设置为与目标项相同的父级，并放置在目标项之前"""
-        print(f"[Drag] Moving item '{moved_class_name}' to same parent as '{target_class_name}', placing before target")
-        
-        try:
-            # 使用domain方法处理移动操作
-            self.project_info.domain.move_category_by_name_before(moved_class_name, target_class_name)
-            
-            # 更新模型
-            self.source_model.update_from_categories(self.project_info.categories)
-            
-            # 保存更改
-            self.project_info.domain.save_categories()
-        except ValueError as e:
-            print(f"[Drag] Error moving category: {e}")
-        
-
-    def _move_item_with_same_parent_after(self, moved_class_name: str, target_class_name: str):
-        """将拖拽项设置为与目标项相同的父级，并放置在目标项之后"""
-        print(f"[Drag] Moving item '{moved_class_name}' to same parent as '{target_class_name}', placing after target")
-        
-        try:
-            # 使用domain方法处理移动操作
-            self.project_info.domain.move_category_by_name_after(moved_class_name, target_class_name)
-            
-            # 更新模型
-            self.source_model.update_from_categories(self.project_info.categories)
-            
-            # 保存更改
-            self.project_info.domain.save_categories()
-        except ValueError as e:
-            print(f"[Drag] Error moving category: {e}")
-
