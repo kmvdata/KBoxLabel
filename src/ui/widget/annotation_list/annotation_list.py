@@ -507,8 +507,6 @@ class AnnotationList(QListView):
                     self.delegate.set_hovered_index(None)
                     self.viewport().update()
                     print("[Drag] Item moved with same parent")
-                    # 确保保存到数据库
-                    self.project_info.domain.save_categories()
                     return
                 # 检查是否可以建立父子关系
                 elif self._can_drop_category(dragged_class_name, target_class_name):
@@ -527,8 +525,6 @@ class AnnotationList(QListView):
                     self.delegate.set_hovered_index(None)
                     self.viewport().update()
                     print("[Drag] Parent-child relationship established")
-                    # 确保保存到数据库
-                    self.project_info.domain.save_categories()
                     # 不再重新加载数据，避免覆盖内存中的更改
                     # self.load_categories()
                     return
@@ -576,8 +572,6 @@ class AnnotationList(QListView):
         self.delegate.set_drag_target_index(None)
         self.viewport().update()
         print("[Drag] Drop event finished, state reset")
-        # 确保保存到数据库
-        self.project_info.domain.save_categories()
         # 不再重新加载数据，避免覆盖内存中的更改
         # self.load_categories()
 
@@ -630,7 +624,10 @@ class AnnotationList(QListView):
         self.project_info.categories.insert(insert_row, removed_category)
 
         # 重新排序整个列表以确保正确的显示顺序
-        self._reorder_entire_list()
+        self.project_info.domain.refresh_order_entire_list()
+        
+        # 更新模型
+        self.source_model.update_from_categories(self.project_info.categories)
         
         # 保存更改
         self.project_info.domain.save_categories()
@@ -674,62 +671,25 @@ class AnnotationList(QListView):
     def _establish_parent_child_relationship(self, child_name: str, parent_name: str, insert_after_child_name: Optional[str] = None):
         """建立父子关系，可选择在指定子项之后插入"""
         print(f"[Drag] Establishing parent-child relationship: child={child_name}, parent={parent_name}, insert_after={insert_after_child_name}")
-        child_category = None
-        parent_category = None
         
-        # 查找子项和父项
-        for cat in self.project_info.categories:
-            if cat.class_name == child_name:
-                child_category = cat
-            elif cat.class_name == parent_name:
-                parent_category = cat
-                
-        if child_category is None or parent_category is None:
-            print(f"[Drag] Child or parent category not found, aborting. Child: {child_category}, Parent: {parent_category}")
-            return
+        try:
+            # 使用domain方法处理父子关系
+            self.project_info.domain.move_category_as_children(parent_name, child_name)
             
-        print(f"[Drag] Found child category: id={child_category.class_id}, parent={child_category.parent_name}")
-        print(f"[Drag] Found parent category: id={parent_category.class_id}, parent={parent_category.parent_name}")
+            # 更新模型
+            self.source_model.update_from_categories(self.project_info.categories)
             
-        # 保存原始的父级信息，用于后续处理子项
-        original_child_parent = child_category.parent_name
-            
-        # 设置父子关系
-        child_category.parent_name = parent_name
-        print(f"[Drag] Set child's parent to: {parent_name}")
-        
-        # 同时更新模型中的数据
-        child_item = self.source_model.get_item_by_class_name(child_name)
-        if child_item:
-            child_item.set_parent_name(parent_name)
-        
-        # 查找并移动所有child的子项也作为parent的子项
-        child_items_to_move = []
-        for cat in self.project_info.categories:
-            if cat.parent_name == child_name:
-                child_items_to_move.append(cat)
-        
-        # 将child的所有子项也设置为parent的子项
-        for child_item in child_items_to_move:
-            child_item.parent_name = parent_name
-            item_in_model = self.source_model.get_item_by_class_name(child_item.class_name)
-            if item_in_model:
-                item_in_model.set_parent_name(parent_name)
-            print(f"[Drag] Moved grandchild '{child_item.class_name}' to be child of '{parent_name}'")
-        
-        # 重新排序整个列表以确保正确的显示顺序
-        self._reorder_entire_list()
-        print("[Drag] Reordered entire list")
-        
-        # 保存更改
-        self.project_info.domain.save_categories()
-        print("[Drag] Categories saved")
+            # 保存更改
+            self.project_info.domain.save_categories()
+            print("[Drag] Categories saved")
+        except ValueError as e:
+            print(f"[Drag] Error establishing parent-child relationship: {e}")
 
     def _reorder_entire_list(self):
         """根据parent_name和order属性重新排序整个列表"""
         self.project_info.domain.refresh_order_entire_list()
         # 更新模型
-        self.source_model.update_from_categories(self.project_info.categories )
+        self.source_model.update_from_categories(self.project_info.categories)
 
     def _handle_item_click(self, clicked_index):
         """处理点击事件 - 保持单选状态"""
@@ -1066,116 +1026,35 @@ class AnnotationList(QListView):
             parent_name: 目标父项ID
             after_child_name: 可选，放置在该子项之后
         """
-        # 验证父子关系合法性
-        if child_name == parent_name:
-            # 不能将项目设置为自己的父项
+        try:
+            # 使用domain方法处理父子关系
+            self.project_info.domain.move_category_as_children(parent_name, child_name, after_child_name)
+            
+            # 更新模型
+            self.source_model.update_from_categories(self.project_info.categories)
+            
+            # 保存更改
+            self.project_info.domain.save_categories()
+            
+            return True
+        except ValueError:
             return False
-            
-        # 检查是否会形成循环引用
-        current_parent_name = parent_name
-        while current_parent_name is not None:
-            if current_parent_name == child_name:
-                # 会形成循环引用
-                return False
-            # 查找当前parent_name对应的类别
-            parent_category = None
-            for cat in self.project_info.categories:
-                if cat.class_name == current_parent_name:
-                    parent_category = cat
-                    break
-            if parent_category is None:
-                break
-            current_parent_name = parent_category.parent_name
-            
-        # 检查目标是否已经是子项（只允许一级嵌套）
-        for cat in self.project_info.categories:
-            if cat.class_name == parent_name:
-                # 目标已经是子项，不允许再作为父项
-                if cat.parent_name is not None:
-                    return False
-                break
-        
-        # 查找要移动的子项和目标父项
-        child_category = None
-        parent_category = None
-        after_child_category = None
-        
-        for cat in self.project_info.categories:
-            if cat.class_name == child_name:
-                child_category = cat
-            elif cat.class_name == parent_name:
-                parent_category = cat
-            elif after_child_name is not None and cat.class_name == after_child_name:
-                after_child_category = cat
-                
-        if child_category is None or parent_category is None:
-            return False
-            
-        # 如果指定了after_child_name，需要确保它确实是parent_name的子项
-        if after_child_name is not None and (after_child_category is None or
-                                             after_child_category.parent_name != parent_name):
-            return False
-            
-        # 更新子项的parent_name
-        child_category.parent_name = parent_name
-            
-        # 重新排序整个列表
-        self._reorder_entire_list()
-        
-        # 保存更改
-        self.project_info.domain.save_categories()
-        
-        return True
         
     def _move_item_with_same_parent_before(self, moved_class_name: str, target_class_name: str):
         """将拖拽项设置为与目标项相同的父级，并放置在目标项之前"""
         print(f"[Drag] Moving item '{moved_class_name}' to same parent as '{target_class_name}', placing before target")
         
-        # 查找目标项以获取其父级
-        target_category = None
-        moved_category = None
-        
-        for cat in self.project_info.categories:
-            if cat.class_name == target_class_name:
-                target_category = cat
-            elif cat.class_name == moved_class_name:
-                moved_category = cat
-                
-        if target_category is None or moved_category is None:
-            print("[Drag] Target or moved category not found")
-            return
+        try:
+            # 使用domain方法处理移动操作
+            self.project_info.domain.move_category_by_name_before(moved_class_name, target_class_name)
             
-        # 获取目标的父级
-        target_parent_name = target_category.parent_name
-        print(f"[Drag] Target parent name: {target_parent_name}")
-        
-        # 设置拖拽项的父级与目标项相同
-        moved_category.parent_name = target_parent_name
-        
-        # 更新模型中的数据
-        moved_item = self.source_model.get_item_by_class_name(moved_class_name)
-        if moved_item:
-            moved_item.set_parent_name(target_parent_name)
+            # 更新模型
+            self.source_model.update_from_categories(self.project_info.categories)
             
-        # 查找moved_category的所有子项
-        moved_children = []
-        for cat in self.project_info.categories:
-            if cat.parent_name == moved_class_name:
-                moved_children.append(cat)
-                
-        # 更新所有子项的父级为target_parent_name
-        for child in moved_children:
-            child.parent_name = target_parent_name
-            child_item = self.source_model.get_item_by_class_name(child.class_name)
-            if child_item:
-                child_item.set_parent_name(target_parent_name)
-            print(f"[Drag] Updated child '{child.class_name}' parent to '{target_parent_name}'")
-            
-        # 重新排序整个列表
-        self._reorder_with_moved_item_before_target_and_children(moved_class_name, target_class_name, moved_children)
-        
-        # 保存更改
-        self.project_info.domain.save_categories()
+            # 保存更改
+            self.project_info.domain.save_categories()
+        except ValueError as e:
+            print(f"[Drag] Error moving category: {e}")
         
     def _reorder_with_moved_item_before_target_and_children(self, moved_class_name: str, target_class_name: str, moved_children: list):
         """重新排序列表，确保移动的项及其子项在目标项之前"""
@@ -1258,51 +1137,17 @@ class AnnotationList(QListView):
         """将拖拽项设置为与目标项相同的父级，并放置在目标项之后"""
         print(f"[Drag] Moving item '{moved_class_name}' to same parent as '{target_class_name}', placing after target")
         
-        # 查找目标项以获取其父级
-        target_category = None
-        moved_category = None
-        
-        for cat in self.project_info.categories:
-            if cat.class_name == target_class_name:
-                target_category = cat
-            elif cat.class_name == moved_class_name:
-                moved_category = cat
-                
-        if target_category is None or moved_category is None:
-            print("[Drag] Target or moved category not found")
-            return
+        try:
+            # 使用domain方法处理移动操作
+            self.project_info.domain.move_category_by_name_after(moved_class_name, target_class_name)
             
-        # 获取目标的父级
-        target_parent_name = target_category.parent_name
-        print(f"[Drag] Target parent name: {target_parent_name}")
-        
-        # 设置拖拽项的父级与目标项相同
-        moved_category.parent_name = target_parent_name
-        
-        # 更新模型中的数据
-        moved_item = self.source_model.get_item_by_class_name(moved_class_name)
-        if moved_item:
-            moved_item.set_parent_name(target_parent_name)
+            # 更新模型
+            self.source_model.update_from_categories(self.project_info.categories)
             
-        # 查找moved_category的所有子项
-        moved_children = []
-        for cat in self.project_info.categories:
-            if cat.parent_name == moved_class_name:
-                moved_children.append(cat)
-                
-        # 更新所有子项的父级为target_parent_name
-        for child in moved_children:
-            child.parent_name = target_parent_name
-            child_item = self.source_model.get_item_by_class_name(child.class_name)
-            if child_item:
-                child_item.set_parent_name(target_parent_name)
-            print(f"[Drag] Updated child '{child.class_name}' parent to '{target_parent_name}'")
-            
-        # 重新排序整个列表，确保拖拽项在目标项之后
-        self._reorder_with_moved_item_after_target_and_children(moved_class_name, target_class_name, moved_children)
-        
-        # 保存更改
-        self.project_info.domain.save_categories()
+            # 保存更改
+            self.project_info.domain.save_categories()
+        except ValueError as e:
+            print(f"[Drag] Error moving category: {e}")
         
     def _reorder_with_moved_item_after_target_and_children(self, moved_class_name: str, target_class_name: str, moved_children: list):
         """重新排序列表，确保移动的项及其子项在目标项之后"""

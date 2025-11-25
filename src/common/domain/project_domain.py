@@ -537,7 +537,7 @@ class ProjectDomain(AbsSqliteDomain):
         if target_index < 0 or target_index >= len(self.categories):
             raise IndexError("Target index out of range")
         
-        # 检查category是否在当前列表中，确保我们只移动已存在的类别
+        # 检查category是否在当前类别列表中，确保我们只移动已存在的类别
         if category not in self.categories:
             raise ValueError("Category not found in categories list")
         
@@ -546,6 +546,111 @@ class ProjectDomain(AbsSqliteDomain):
         self.categories.insert(target_index, category)
         
         # 重新计算并更新所有类别的顺序值以保持数据一致性
+        self.refresh_order_entire_list()
+
+    def move_category_by_name_before(self, moved_category_name: str, target_category_name: str):
+        """
+        将一个类别移动到另一个类别之前，并保持相同的父级关系
+        
+        Args:
+            moved_category_name (str): 要移动的类别名称
+            target_category_name (str): 目标类别名称（将移动到此类别之前）
+        """
+        # 查找要移动的类别和目标类别
+        moved_category = None
+        target_category = None
+        moved_index = -1
+        target_index = -1
+        
+        for i, cat in enumerate(self.categories):
+            if cat.class_name == moved_category_name:
+                moved_category = cat
+                moved_index = i
+            elif cat.class_name == target_category_name:
+                target_category = cat
+                target_index = i
+                
+        if moved_category is None or target_category is None:
+            raise ValueError("Category not found")
+            
+        if moved_index == target_index:
+            return  # 位置相同，无需移动
+            
+        # 获取目标的父级
+        target_parent_name = target_category.parent_name
+        
+        # 设置移动项的父级与目标项相同
+        moved_category.parent_name = target_parent_name
+        
+        # 更新所有子项的父级为target_parent_name
+        moved_children = []
+        for cat in self.categories:
+            if cat.parent_name == moved_category_name:
+                cat.parent_name = target_parent_name
+                moved_children.append(cat)
+        
+        # 重新排序整个列表
+        self.refresh_order_entire_list()
+
+    def move_category_by_name_after(self, moved_category_name: str, target_category_name: str):
+        """
+        将一个类别移动到另一个类别之后，并保持相同的父级关系
+        
+        Args:
+            moved_category_name (str): 要移动的类别名称
+            target_category_name (str): 目标类别名称（将移动到此类别之后）
+        """
+        # 查找要移动的类别和目标类别
+        moved_category = None
+        target_category = None
+        moved_index = -1
+        target_index = -1
+        
+        for i, cat in enumerate(self.categories):
+            if cat.class_name == moved_category_name:
+                moved_category = cat
+                moved_index = i
+            elif cat.class_name == target_category_name:
+                target_category = cat
+                target_index = i
+                
+        if moved_category is None or target_category is None:
+            raise ValueError("Category not found")
+            
+        # 获取目标的父级
+        target_parent_name = target_category.parent_name
+        
+        # 设置移动项的父级与目标项相同
+        moved_category.parent_name = target_parent_name
+        
+        # 更新所有子项的父级为target_parent_name
+        moved_children = []
+        for cat in self.categories:
+            if cat.parent_name == moved_category_name:
+                cat.parent_name = target_parent_name
+                moved_children.append(cat)
+        
+        # 调整位置 - 将移动项放在目标项之后
+        if target_index < moved_index:
+            # 如果目标在移动项之前，移动项的新位置是目标项位置
+            self.categories.remove(moved_category)
+            self.categories.insert(target_index, moved_category)
+            
+            # 同时移动所有子项
+            for child in moved_children:
+                self.categories.remove(child)
+                self.categories.insert(target_index + 1, child)
+        else:
+            # 如果目标在移动项之后，移动项的新位置是目标项位置+1
+            self.categories.remove(moved_category)
+            self.categories.insert(target_index, moved_category)
+            
+            # 同时移动所有子项
+            for child in moved_children:
+                self.categories.remove(child)
+                self.categories.insert(target_index + 1, child)
+        
+        # 重新排序整个列表
         self.refresh_order_entire_list()
 
 
