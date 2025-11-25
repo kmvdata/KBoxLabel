@@ -1058,80 +1058,22 @@ class AnnotationList(QListView):
         
     def _reorder_with_moved_item_before_target_and_children(self, moved_class_name: str, target_class_name: str, moved_children: list):
         """重新排序列表，确保移动的项及其子项在目标项之前"""
-        # 先按照order排序
-        sorted_categories = sorted(self.project_info.categories, key=lambda cat: cat.order)
-        
-        # 分离顶级项目和子项目
-        top_level_categories = [cat for cat in sorted_categories if cat.parent_name is None]
-        child_categories = [cat for cat in sorted_categories if cat.parent_name is not None]
-        
-        # 创建父项到子项的映射
-        parent_to_children = {}
-        for child in child_categories:
-            if child.parent_name not in parent_to_children:
-                parent_to_children[child.parent_name] = []
-            parent_to_children[child.parent_name].append(child)
-        
-        # 按照正确顺序重新排列
-        ordered_categories = []
-        for cat in top_level_categories:  # 只处理顶级项目
-            ordered_categories.append(cat)
-            # 添加其子项目
-            if cat.class_name in parent_to_children:
-                # 按order排序子项目
-                sorted_children = sorted(parent_to_children[cat.class_name], key=lambda c: c.order)
-                # 确保moved_class_name在target_class_name之前，并且其子项紧跟在后面
-                self._ensure_order_before_with_children(sorted_children, target_class_name, moved_class_name, moved_children)
-                ordered_categories.extend(sorted_children)
-        
-        # 更新project_info.categories
-        self.project_info.categories = ordered_categories
-        
-        # 更新模型
-        self.source_model.update_from_categories(self.project_info.categories)
+        try:
+            # 使用domain方法处理移动操作
+            self.project_info.domain.move_category_with_children_before(moved_class_name, target_class_name)
+            
+            # 更新模型
+            self.source_model.update_from_categories(self.project_info.categories)
+        except ValueError as e:
+            print(f"[Drag] Error moving category with children: {e}")
 
     def _ensure_order_before_with_children(self, children_list, target_name, moved_name, moved_children):
         """确保在children_list中moved_name及其子项在target_name之前"""
-        target_index = -1
-        moved_index = -1
+        # 使用domain方法处理排序操作
+        self.project_info.domain.ensure_order_before_with_children(target_name, moved_name)
         
-        # 找到target_name和moved_name的索引
-        for i, child in enumerate(children_list):
-            if child.class_name == target_name:
-                target_index = i
-            elif child.class_name == moved_name:
-                moved_index = i
-                
-        # 如果都找到了且moved_index在target_index之后，则调整顺序
-        if target_index != -1 and moved_index != -1 and moved_index > target_index:
-            # 先移动所有子项
-            moved_child_items = []
-            for child in moved_children:
-                # 查找子项在列表中的位置
-                child_index = -1
-                for i, c in enumerate(children_list):
-                    if c.class_name == child.class_name:
-                        child_index = i
-                        break
-                        
-                if child_index != -1:
-                    # 移除子项
-                    child_item = children_list.pop(child_index)
-                    moved_child_items.append(child_item)
-                    # 如果子项在moved_item之前被移除，需要调整moved_index和target_index
-                    if child_index < moved_index:
-                        moved_index -= 1
-                    if child_index < target_index:
-                        target_index -= 1
-            
-            # 移除moved_item
-            moved_item = children_list.pop(moved_index)
-            # 在target_item之前插入moved_item
-            children_list.insert(target_index, moved_item)
-            
-            # 将子项插入到moved_item之后
-            for i, child_item in enumerate(moved_child_items):
-                children_list.insert(target_index + 1 + i, child_item)
+        # 更新模型
+        self.source_model.update_from_categories(self.project_info.categories)
                 
     def _move_item_with_same_parent_after(self, moved_class_name: str, target_class_name: str):
         """将拖拽项设置为与目标项相同的父级，并放置在目标项之后"""
@@ -1148,78 +1090,24 @@ class AnnotationList(QListView):
             self.project_info.domain.save_categories()
         except ValueError as e:
             print(f"[Drag] Error moving category: {e}")
-        
-    def _reorder_with_moved_item_after_target_and_children(self, moved_class_name: str, target_class_name: str, moved_children: list):
-        """重新排序列表，确保移动的项及其子项在目标项之后"""
-        # 先按照order排序
-        sorted_categories = sorted(self.project_info.categories, key=lambda cat: cat.order)
-        
-        # 分离顶级项目和子项目
-        top_level_categories = [cat for cat in sorted_categories if cat.parent_name is None]
-        child_categories = [cat for cat in sorted_categories if cat.parent_name is not None]
-        
-        # 创建父项到子项的映射
-        parent_to_children = {}
-        for child in child_categories:
-            if child.parent_name not in parent_to_children:
-                parent_to_children[child.parent_name] = []
-            parent_to_children[child.parent_name].append(child)
-        
-        # 按照正确顺序重新排列
-        ordered_categories = []
-        for cat in top_level_categories:  # 只处理顶级项目
-            ordered_categories.append(cat)
-            # 添加其子项目
-            if cat.class_name in parent_to_children:
-                # 按order排序子项目
-                sorted_children = sorted(parent_to_children[cat.class_name], key=lambda c: c.order)
-                # 确保moved_class_name在target_class_name之后，并且其子项紧跟在后面
-                self._ensure_order_with_children(sorted_children, target_class_name, moved_class_name, moved_children)
-                ordered_categories.extend(sorted_children)
-        
-        # 更新project_info.categories
-        self.project_info.categories = ordered_categories
-        
-        # 更新模型
-        self.source_model.update_from_categories(ordered_categories)
 
-            
+
     def _ensure_order_with_children(self, children_list, target_name, moved_name, moved_children):
         """确保在children_list中moved_name及其子项在target_name之后"""
-        target_index = -1
-        moved_index = -1
+        # 使用domain方法处理排序操作
+        self.project_info.domain.ensure_order_with_children(target_name, moved_name)
         
-        # 找到target_name和moved_name的索引
-        for i, child in enumerate(children_list):
-            if child.class_name == target_name:
-                target_index = i
-            elif child.class_name == moved_name:
-                moved_index = i
-                
-        # 如果都找到了且moved_index在target_index之前，则调整顺序
-        if target_index != -1 and moved_index != -1 and moved_index < target_index:
-            # 移除moved_item
-            moved_item = children_list.pop(moved_index)
-            # 在target_item之后插入
-            children_list.insert(target_index, moved_item)
+        # 更新模型
+        self.source_model.update_from_categories(self.project_info.categories)
+
             
-            # 同时移动所有子项到moved_item之后
-            inserted_count = 0
-            for child in moved_children:
-                # 查找子项在列表中的位置
-                child_index = -1
-                for i, c in enumerate(children_list):
-                    if c.class_name == child.class_name:
-                        child_index = i
-                        break
-                        
-                if child_index != -1:
-                    # 移除子项
-                    child_item = children_list.pop(child_index)
-                    # 如果子项在moved_item之前被移除，需要调整target_index
-                    if child_index < target_index:
-                        target_index -= 1
-                    # 在moved_item之后插入子项
-                    target_index += 1
-                    children_list.insert(target_index, child_item)
-                    inserted_count += 1
+    def _reorder_with_moved_item_after_target_and_children(self, moved_class_name: str, target_class_name: str, moved_children: list):
+        """重新排序列表，确保移动的项及其子项在目标项之后"""
+        try:
+            # 使用domain方法处理移动操作
+            self.project_info.domain.move_category_with_children_after(moved_class_name, target_class_name)
+            
+            # 更新模型
+            self.source_model.update_from_categories(self.project_info.categories)
+        except ValueError as e:
+            print(f"[Drag] Error moving category with children: {e}")
