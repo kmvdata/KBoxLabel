@@ -443,15 +443,109 @@ class ProjectDomain(AbsSqliteDomain):
         self.load_categories()
 
     def move_category_as_children(self, parent_category_name: str, child_category_name: str, before_category_name: Optional[str] = None):
-        # TODO: 移动类别为子类别
-        # 把列表中的child_category_name设置为parent_category_name的二级item，并放到before_category_name之后。
-        # 如果before_category_name为None，则把child_category_name设置为parent_category_name的二级item，并放在parent_category_name的最后。
-        # 要检查参数合法性，即列表中是否包含这参数指定的类别
-        # 最后调用self.refresh_order_entire_list()
-        pass
+        """
+        将一个类别移动为另一个类别的子类别，并可选择性地调整其在子类别列表中的位置。
+        
+        此方法会将[child_category_name](file:///Users/kermit/Projects/KBoxLabel/src/common/domain/project_domain.py#L445-L445)设置为[parent_category_name](file:///Users/kermit/Projects/KBoxLabel/src/common/domain/project_domain.py#L445-L445)的子类别，
+        并根据[before_category_name](file:///Users/kermit/Projects/KBoxLabel/src/common/domain/project_domain.py#L445-L445)参数决定其在子类别列表中的位置。
+        
+        Args:
+            parent_category_name (str): 父类别的名称，将成为[child_category_name](file:///Users/kermit/Projects/KBoxLabel/src/common/domain/project_domain.py#L445-L445)的父类别
+            child_category_name (str): 要移动的子类别的名称
+            before_category_name (Optional[str]): 可选参数，指定[child_category_name](file:///Users/kermit/Projects/KBoxLabel/src/common/domain/project_domain.py#L445-L445)应该放置在其后的类别名称。
+                                             如果为None，则[child_category_name](file:///Users/kermit/Projects/KBoxLabel/src/common/domain/project_domain.py#L445-L445)会被放置在父类别的最后位置。
+                                             
+        Raises:
+            ValueError: 当任何指定的类别名称在当前类别列表中找不到时抛出此异常
+            
+        Example:
+            # 将"狗"类别设置为"动物"类别的子类别，并放置在"猫"类别之后
+            project_domain.move_category_as_children("动物", "狗", "猫")
+            
+            # 将"鸟"类别设置为"动物"类别的子类别，并放置在最后
+            project_domain.move_category_as_children("动物", "鸟")
+        """
+        # 检查参数合法性，确保所有涉及的类别都存在于当前类别列表中
+        category_names = {cat.class_name for cat in self.categories}
+        if parent_category_name not in category_names:
+            raise ValueError(f"Parent category '{parent_category_name}' not found")
+        if child_category_name not in category_names:
+            raise ValueError(f"Child category '{child_category_name}' not found")
+        if before_category_name is not None and before_category_name not in category_names:
+            raise ValueError(f"Before category '{before_category_name}' not found")
+        
+        # 查找要移动的子类别对象
+        child_category = None
+        for cat in self.categories:
+            if cat.class_name == child_category_name:
+                child_category = cat
+                break
+        
+        # 设置为父类的子项
+        child_category.parent_name = parent_category_name
+        
+        # 如果指定了before_category_name，则调整顺序
+        if before_category_name is not None:
+            # 找到目标位置并重新排列
+            self.refresh_order_entire_list()
+            
+            # 查找before_category和child_category在列表中的位置
+            before_index = None
+            child_index = None
+            for i, cat in enumerate(self.categories):
+                if cat.class_name == before_category_name:
+                    before_index = i
+                elif cat.class_name == child_category_name:
+                    child_index = i
+            
+            # 如果before_category在child_category之前，需要将child_category移到before_category之后
+            if before_index is not None and child_index is not None and before_index < child_index:
+                # 重新排列列表，将子类别移动到指定位置之后
+                self.categories.remove(child_category)
+                self.categories.insert(before_index + 1, child_category)
+        else:
+            # 没有指定before_category_name，只需设置parent_name即可
+            pass
+            
+        # 重新计算并更新所有类别的顺序值
+        self.refresh_order_entire_list()
 
     def move_category(self, category: AnnotationCategoryDTO, target_index: int):
-        # 把self.categories中的category移动到指定位置，首先需要检查target_index是否合法，以及category是否在当前self.categories列表中
-        # 最后调用self.refresh_order_entire_list()
-        pass
+        """
+        将指定的类别对象移动到当前类别列表中的指定索引位置。
+        
+        此方法允许在当前类别列表中重新排列类别顺序，通过指定类别对象和目标索引位置来实现。
+        
+        Args:
+            category (AnnotationCategoryDTO): 要移动的类别对象，必须已经在当前类别列表中
+            target_index (int): 目标索引位置，从0开始计算
+            
+        Raises:
+            IndexError: 当target_index超出有效范围时抛出此异常
+            ValueError: 当指定的category对象不在当前类别列表中时抛出此异常
+            
+        Example:
+            # 将第一个类别移动到列表的末尾
+            first_category = project_domain.categories[0]
+            project_domain.move_category(first_category, len(project_domain.categories) - 1)
+            
+            # 将最后一个类别移动到列表的开头
+            last_category = project_domain.categories[-1]
+            project_domain.move_category(last_category, 0)
+        """
+        # 检查target_index是否合法，必须在列表的有效索引范围内
+        if target_index < 0 or target_index >= len(self.categories):
+            raise IndexError("Target index out of range")
+        
+        # 检查category是否在当前列表中，确保我们只移动已存在的类别
+        if category not in self.categories:
+            raise ValueError("Category not found in categories list")
+        
+        # 移动category到指定位置，先从原位置移除再插入到新位置
+        self.categories.remove(category)
+        self.categories.insert(target_index, category)
+        
+        # 重新计算并更新所有类别的顺序值以保持数据一致性
+        self.refresh_order_entire_list()
+
 
