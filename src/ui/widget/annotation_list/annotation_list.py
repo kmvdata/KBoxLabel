@@ -1017,29 +1017,7 @@ class AnnotationList(QListView):
         self.setCurrentIndex(QModelIndex())
         print("[Drag] Drag leave event handled, state reset")
 
-    def move_item_as_child_after(self, child_name: str, parent_name: str, after_child_name: Optional[str] = None):
-        """
-        将指定的子项移动为某个父项的子项，并可选择放置在特定子项之后
-        
-        Args:
-            child_name: 要移动的子项ID
-            parent_name: 目标父项ID
-            after_child_name: 可选，放置在该子项之后
-        """
-        try:
-            # 使用domain方法处理父子关系
-            self.project_info.domain.move_category_as_children(parent_name, child_name, after_child_name)
-            
-            # 更新模型
-            self.source_model.update_from_categories(self.project_info.categories)
-            
-            # 保存更改
-            self.project_info.domain.save_categories()
-            
-            return True
-        except ValueError:
-            return False
-        
+
     def _move_item_with_same_parent_before(self, moved_class_name: str, target_class_name: str):
         """将拖拽项设置为与目标项相同的父级，并放置在目标项之前"""
         print(f"[Drag] Moving item '{moved_class_name}' to same parent as '{target_class_name}', placing before target")
@@ -1056,25 +1034,7 @@ class AnnotationList(QListView):
         except ValueError as e:
             print(f"[Drag] Error moving category: {e}")
         
-    def _reorder_with_moved_item_before_target_and_children(self, moved_class_name: str, target_class_name: str, moved_children: list):
-        """重新排序列表，确保移动的项及其子项在目标项之前"""
-        try:
-            # 使用domain方法处理移动操作
-            self.project_info.domain.move_category_with_children_before(moved_class_name, target_class_name)
-            
-            # 更新模型
-            self.source_model.update_from_categories(self.project_info.categories)
-        except ValueError as e:
-            print(f"[Drag] Error moving category with children: {e}")
 
-    def _ensure_order_before_with_children(self, children_list, target_name, moved_name, moved_children):
-        """确保在children_list中moved_name及其子项在target_name之前"""
-        # 使用domain方法处理排序操作
-        self.project_info.domain.ensure_order_before_with_children(target_name, moved_name)
-        
-        # 更新模型
-        self.source_model.update_from_categories(self.project_info.categories)
-                
     def _move_item_with_same_parent_after(self, moved_class_name: str, target_class_name: str):
         """将拖拽项设置为与目标项相同的父级，并放置在目标项之后"""
         print(f"[Drag] Moving item '{moved_class_name}' to same parent as '{target_class_name}', placing after target")
@@ -1091,23 +1051,3 @@ class AnnotationList(QListView):
         except ValueError as e:
             print(f"[Drag] Error moving category: {e}")
 
-
-    def _ensure_order_with_children(self, children_list, target_name, moved_name, moved_children):
-        """确保在children_list中moved_name及其子项在target_name之后"""
-        # 使用domain方法处理排序操作
-        self.project_info.domain.ensure_order_with_children(target_name, moved_name)
-        
-        # 更新模型
-        self.source_model.update_from_categories(self.project_info.categories)
-
-            
-    def _reorder_with_moved_item_after_target_and_children(self, moved_class_name: str, target_class_name: str, moved_children: list):
-        """重新排序列表，确保移动的项及其子项在目标项之后"""
-        try:
-            # 使用domain方法处理移动操作
-            self.project_info.domain.move_category_with_children_after(moved_class_name, target_class_name)
-            
-            # 更新模型
-            self.source_model.update_from_categories(self.project_info.categories)
-        except ValueError as e:
-            print(f"[Drag] Error moving category with children: {e}")

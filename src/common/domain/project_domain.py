@@ -510,72 +510,6 @@ class ProjectDomain(AbsSqliteDomain):
         # 重新计算并更新所有类别的顺序值
         self.refresh_order_entire_list()
 
-    def _find_categories_by_name(self, first_category_name: str, second_category_name: str) -> tuple[AnnotationCategoryDTO, AnnotationCategoryDTO]:
-        """
-        根据两个类别名称查找对应的类别对象
-        
-        Args:
-            first_category_name (str): 第一个类别名称
-            second_category_name (str): 第二个类别名称
-            
-        Returns:
-            tuple[AnnotationCategoryDTO, AnnotationCategoryDTO]: 两个类别对象
-            
-        Raises:
-            ValueError: 当任何一个类别名称找不到时抛出此异常
-        """
-        first_category = None
-        second_category = None
-        
-        for cat in self.categories:
-            if cat.class_name == first_category_name:
-                first_category = cat
-            elif cat.class_name == second_category_name:
-                second_category = cat
-                
-        if first_category is None or second_category is None:
-            raise ValueError("Category not found")
-            
-        return first_category, second_category
-
-    def move_category(self, category: AnnotationCategoryDTO, target_index: int):
-        """
-        将指定的类别对象移动到当前类别列表中的指定索引位置。
-        
-        此方法允许在当前类别列表中重新排列类别顺序，通过指定类别对象和目标索引位置来实现。
-        
-        Args:
-            category (AnnotationCategoryDTO): 要移动的类别对象，必须已经在当前类别列表中
-            target_index (int): 目标索引位置，从0开始计算
-            
-        Raises:
-            IndexError: 当target_index超出有效范围时抛出此异常
-            ValueError: 当指定的category对象不在当前类别列表中时抛出此异常
-            
-        Example:
-            # 将第一个类别移动到列表的末尾
-            first_category = project_domain.categories[0]
-            project_domain.move_category(first_category, len(project_domain.categories) - 1)
-            
-            # 将最后一个类别移动到列表的开头
-            last_category = project_domain.categories[-1]
-            project_domain.move_category(last_category, 0)
-        """
-        # 检查target_index是否合法，必须在列表的有效索引范围内
-        if target_index < 0 or target_index >= len(self.categories):
-            raise IndexError("Target index out of range")
-        
-        # 检查category是否在当前类别列表中，确保我们只移动已存在的类别
-        if category not in self.categories:
-            raise ValueError("Category not found in categories list")
-        
-        # 移动category到指定位置，先从原位置移除再插入到新位置
-        self.categories.remove(category)
-        self.categories.insert(target_index, category)
-        
-        # 重新计算并更新所有类别的顺序值以保持数据一致性
-        self.refresh_order_entire_list()
-
     def move_category_by_name_before(self, moved_category_name: str, target_category_name: str):
         """
         将一个类别移动到另一个类别之前，并保持相同的父级关系
@@ -602,52 +536,6 @@ class ProjectDomain(AbsSqliteDomain):
             if cat.parent_name == moved_category_name:
                 cat.parent_name = target_parent_name
                 moved_children.append(cat)
-        
-        # 重新排序整个列表
-        self.refresh_order_entire_list()
-
-    def move_category_with_children_before(self, moved_category_name: str, target_category_name: str):
-        """
-        将一个类别及其所有子项移动到另一个类别之前
-        
-        Args:
-            moved_category_name (str): 要移动的类别名称
-            target_category_name (str): 目标类别名称（将移动到此类别之前）
-        """
-        # 查找要移动的类别和目标类别
-        moved_category, target_category = self._find_categories_by_name(moved_category_name, target_category_name)
-        
-        if moved_category == target_category:
-            return  # 位置相同，无需移动
-        
-        # 查找所有要移动的子项
-        moved_children = []
-        for cat in self.categories:
-            if cat.parent_name == moved_category_name:
-                moved_children.append(cat)
-        
-        # 获取目标的父级
-        target_parent_name = target_category.parent_name
-        
-        # 设置移动项的父级与目标项相同
-        moved_category.parent_name = target_parent_name
-        
-        # 更新所有子项的父级为target_parent_name
-        for child in moved_children:
-            child.parent_name = target_parent_name
-        
-        # 调整位置 - 将移动项放在目标项之前
-        target_index = self.categories.index(target_category)
-        moved_index = self.categories.index(moved_category)
-        
-        # 先移除移动项及其所有子项
-        items_to_move = [moved_category] + moved_children
-        for item in items_to_move:
-            self.categories.remove(item)
-        
-        # 再将它们插入到目标位置
-        for i, item in enumerate(items_to_move):
-            self.categories.insert(target_index + i, item)
         
         # 重新排序整个列表
         self.refresh_order_entire_list()
@@ -702,121 +590,31 @@ class ProjectDomain(AbsSqliteDomain):
         # 重新排序整个列表
         self.refresh_order_entire_list()
 
-    def move_category_with_children_after(self, moved_category_name: str, target_category_name: str):
+    def _find_categories_by_name(self, first_category_name: str, second_category_name: str) -> tuple[AnnotationCategoryDTO, AnnotationCategoryDTO]:
         """
-        将一个类别及其所有子项移动到另一个类别之后
-        
+        根据两个类别名称查找对应的类别对象
+
         Args:
-            moved_category_name (str): 要移动的类别名称
-            target_category_name (str): 目标类别名称（将移动到此类别之后）
+            first_category_name (str): 第一个类别名称
+            second_category_name (str): 第二个类别名称
+
+        Returns:
+            tuple[AnnotationCategoryDTO, AnnotationCategoryDTO]: 两个类别对象
+
+        Raises:
+            ValueError: 当任何一个类别名称找不到时抛出此异常
         """
-        # 查找要移动的类别和目标类别
-        moved_category, target_category = self._find_categories_by_name(moved_category_name, target_category_name)
-        
-        # 查找所有要移动的子项
-        moved_children = []
+        first_category = None
+        second_category = None
+
         for cat in self.categories:
-            if cat.parent_name == moved_category_name:
-                moved_children.append(cat)
-        
-        # 获取目标的父级
-        target_parent_name = target_category.parent_name
-        
-        # 设置移动项的父级与目标项相同
-        moved_category.parent_name = target_parent_name
-        
-        # 更新所有子项的父级为target_parent_name
-        for child in moved_children:
-            child.parent_name = target_parent_name
-        
-        # 调整位置 - 将移动项放在目标项之后
-        target_index = self.categories.index(target_category)
-        moved_index = self.categories.index(moved_category)
-        
-        # 先移除移动项及其所有子项
-        items_to_move = [moved_category] + moved_children
-        for item in items_to_move:
-            self.categories.remove(item)
-        
-        # 再将它们插入到目标位置之后
-        # 如果目标在移动项之前，目标索引不需要调整
-        # 如果目标在移动项之后，由于已经移除了移动项，所以目标索引也不需要调整
-        for i, item in enumerate(items_to_move):
-            self.categories.insert(target_index + 1 + i, item)
-        
-        # 重新排序整个列表
-        self.refresh_order_entire_list()
+            if cat.class_name == first_category_name:
+                first_category = cat
+            elif cat.class_name == second_category_name:
+                second_category = cat
 
-    def ensure_order_before_with_children(self, target_name: str, moved_name: str):
-        """
-        确保在类别列表中moved_name及其子项在target_name之前
-        
-        Args:
-            target_name (str): 目标类别名称
-            moved_name (str): 要移动的类别名称
-        """
-        # 查找要移动的类别和目标类别
-        moved_category, target_category = self._find_categories_by_name(moved_name, target_name)
-        
-        # 查找所有要移动的子项
-        moved_children = []
-        for cat in self.categories:
-            if cat.parent_name == moved_name:
-                moved_children.append(cat)
-        
-        # 调整位置 - 将移动项放在目标项之前
-        target_index = self.categories.index(target_category)
-        moved_index = self.categories.index(moved_category)
-        
-        # 如果都找到了且moved_index在target_index之后，则调整顺序
-        if target_index != -1 and moved_index != -1 and moved_index > target_index:
-            # 先移除移动项及其所有子项
-            items_to_move = [moved_category] + moved_children
-            for item in items_to_move:
-                self.categories.remove(item)
-            
-            # 再将它们插入到目标位置
-            for i, item in enumerate(items_to_move):
-                self.categories.insert(target_index + i, item)
-        
-        # 重新排序整个列表
-        self.refresh_order_entire_list()
+        if first_category is None or second_category is None:
+            raise ValueError("Category not found")
 
-    def ensure_order_with_children(self, target_name: str, moved_name: str):
-        """
-        确保在类别列表中moved_name及其子项在target_name之后
-        
-        Args:
-            target_name (str): 目标类别名称
-            moved_name (str): 要移动的类别名称
-        """
-        # 查找要移动的类别和目标类别
-        moved_category, target_category = self._find_categories_by_name(moved_name, target_name)
-        
-        # 查找所有要移动的子项
-        moved_children = []
-        for cat in self.categories:
-            if cat.parent_name == moved_name:
-                moved_children.append(cat)
-        
-        # 调整位置 - 将移动项放在目标项之后
-        target_index = self.categories.index(target_category)
-        moved_index = self.categories.index(moved_category)
-        
-        # 如果都找到了且moved_index在target_index之前，则调整顺序
-        if target_index != -1 and moved_index != -1 and moved_index < target_index:
-            # 先移除移动项及其所有子项
-            items_to_move = [moved_category] + moved_children
-            for item in items_to_move:
-                self.categories.remove(item)
-            
-            # 再将它们插入到目标位置之后
-            for i, item in enumerate(items_to_move):
-                self.categories.insert(target_index + 1 + i, item)
-        
-        # 重新排序整个列表
-        self.refresh_order_entire_list()
-
-
-
+        return first_category, second_category
 
