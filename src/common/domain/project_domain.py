@@ -510,6 +510,34 @@ class ProjectDomain(AbsSqliteDomain):
         # 重新计算并更新所有类别的顺序值
         self.refresh_order_entire_list()
 
+    def _find_categories_by_name(self, first_category_name: str, second_category_name: str) -> tuple[AnnotationCategoryDTO, AnnotationCategoryDTO]:
+        """
+        根据两个类别名称查找对应的类别对象
+        
+        Args:
+            first_category_name (str): 第一个类别名称
+            second_category_name (str): 第二个类别名称
+            
+        Returns:
+            tuple[AnnotationCategoryDTO, AnnotationCategoryDTO]: 两个类别对象
+            
+        Raises:
+            ValueError: 当任何一个类别名称找不到时抛出此异常
+        """
+        first_category = None
+        second_category = None
+        
+        for cat in self.categories:
+            if cat.class_name == first_category_name:
+                first_category = cat
+            elif cat.class_name == second_category_name:
+                second_category = cat
+                
+        if first_category is None or second_category is None:
+            raise ValueError("Category not found")
+            
+        return first_category, second_category
+
     def move_category(self, category: AnnotationCategoryDTO, target_index: int):
         """
         将指定的类别对象移动到当前类别列表中的指定索引位置。
@@ -557,23 +585,10 @@ class ProjectDomain(AbsSqliteDomain):
             target_category_name (str): 目标类别名称（将移动到此类别之前）
         """
         # 查找要移动的类别和目标类别
-        moved_category = None
-        target_category = None
-        moved_index = -1
-        target_index = -1
+        # 查找要移动的类别和目标类别
+        moved_category, target_category = self._find_categories_by_name(moved_category_name, target_category_name)
         
-        for i, cat in enumerate(self.categories):
-            if cat.class_name == moved_category_name:
-                moved_category = cat
-                moved_index = i
-            elif cat.class_name == target_category_name:
-                target_category = cat
-                target_index = i
-                
-        if moved_category is None or target_category is None:
-            raise ValueError("Category not found")
-            
-        if moved_index == target_index:
+        if moved_category == target_category:
             return  # 位置相同，无需移动
             
         # 获取目标的父级
@@ -601,21 +616,7 @@ class ProjectDomain(AbsSqliteDomain):
             target_category_name (str): 目标类别名称（将移动到此类别之后）
         """
         # 查找要移动的类别和目标类别
-        moved_category = None
-        target_category = None
-        moved_index = -1
-        target_index = -1
-        
-        for i, cat in enumerate(self.categories):
-            if cat.class_name == moved_category_name:
-                moved_category = cat
-                moved_index = i
-            elif cat.class_name == target_category_name:
-                target_category = cat
-                target_index = i
-                
-        if moved_category is None or target_category is None:
-            raise ValueError("Category not found")
+        moved_category, target_category = self._find_categories_by_name(moved_category_name, target_category_name)
             
         # 获取目标的父级
         target_parent_name = target_category.parent_name
@@ -631,6 +632,9 @@ class ProjectDomain(AbsSqliteDomain):
                 moved_children.append(cat)
         
         # 调整位置 - 将移动项放在目标项之后
+        target_index = self.categories.index(target_category)
+        moved_index = self.categories.index(moved_category)
+        
         if target_index < moved_index:
             # 如果目标在移动项之前，移动项的新位置是目标项位置
             self.categories.remove(moved_category)
