@@ -442,3 +442,16 @@ class ProjectDomain(AbsSqliteDomain):
         # 删除完成后重新加载categories
         self.load_categories()
 
+    def move_category_as_children(self, parent_category_name: str, child_category_name: str, before_category_name: Optional[str] = None):
+        # TODO: 移动类别为子类别
+        # 把列表中的child_category_name设置为parent_category_name的二级item，并放到before_category_name之后。
+        # 如果before_category_name为None，则把child_category_name设置为parent_category_name的二级item，并放在parent_category_name的最后。
+        # 要检查参数合法性，即列表中是否包含这参数指定的类别
+        # 最后调用self.refresh_order_entire_list()
+        pass
+
+    def move_category(self, category: AnnotationCategoryDTO, target_index: int):
+        # 把self.categories中的category移动到指定位置，首先需要检查target_index是否合法，以及category是否在当前self.categories列表中
+        # 最后调用self.refresh_order_entire_list()
+        pass
+
