@@ -805,10 +805,10 @@ class AnnotationList(QListView):
 
         # 根据position决定插入位置
         if position is not None and 0 <= position <= len(self.project_info.categories):
-            self.project_info.categories.insert(position, new_category)
+            self.project_info.domain.insert_category(position, new_category)
             self.source_model.insert_annotation(new_category, position)
         else:
-            self.project_info.categories.append(new_category)
+            self.project_info.domain.append(new_category)
             self.source_model.add_annotation(new_category)
 
         # 获取新添加项的索引
@@ -884,9 +884,7 @@ class AnnotationList(QListView):
                 # 删除成功后，立即更新project_info中的categories，防止旧数据被保存
                 self.source_model.removeRow(row)
                 self.source_model.update_from_categories(self.project_info.categories)
-                
-                # 保存更改
-                self.project_info.domain.save_categories()
+
 
     def contextMenuEvent(self, event):
         """重写右键菜单事件"""

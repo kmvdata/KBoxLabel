@@ -341,33 +341,6 @@ class ProjectDomain(AbsSqliteDomain):
             print(f"统计数据库中kolo_item数量时出错: {str(e)}")
             return 0
 
-    def delete_category(self, category_name: str):
-        """
-        删除指定类别的kolo项
-        :param category_name: 类别名称
-        """
-        try:
-            # 创建数据库会话
-            with self.db_session() as session:
-                # 删除kolo_item表中所有class_name等于category_name的数据
-                session.query(KoloItem).filter(KoloItem.class_name == category_name).delete()
-                
-                # 删除annotation_category表中class_name为category_name的数据
-                session.query(AnnotationCategory).filter(AnnotationCategory.class_name == category_name).delete()
-                
-                # 把annotation_category表中parent_name为category_name的数据的parent_name字段都设置成None
-                session.query(AnnotationCategory).filter(AnnotationCategory.parent_name == category_name).update({
-                    AnnotationCategory.parent_name: None
-                })
-                
-                session.commit()  # 确保提交事务
-                print(f"已删除类别 '{category_name}' 相关的所有数据")
-        except Exception as e:
-            print(f"删除类别 '{category_name}' 时出错: {str(e)}")
-            raise
-        # 删除完成后重新加载categories
-        self.load_categories()
-
     def refresh_order_entire_list(self):
         """根据parent_name指向的父子关系以及整个self.categories列表当前顺序，重新设置每个category的order值"""
         # 创建类别名称到类别对象的映射
@@ -434,20 +407,38 @@ class ProjectDomain(AbsSqliteDomain):
 
         self.save_categories()
 
+    def insert_category(self, index: int, category: AnnotationCategoryDTO):
+        self.categories.insert(index, category)
+        self.refresh_order_entire_list()
 
+    def append(self, category: AnnotationCategoryDTO):
+        self.categories.append(category)
+        self.refresh_order_entire_list()
 
+    def delete_category(self, category_name: str):
+        """
+        删除指定类别的kolo项
+        :param category_name: 类别名称
+        """
+        try:
+            # 创建数据库会话
+            with self.db_session() as session:
+                # 删除kolo_item表中所有class_name等于category_name的数据
+                session.query(KoloItem).filter(KoloItem.class_name == category_name).delete()
 
+                # 删除annotation_category表中class_name为category_name的数据
+                session.query(AnnotationCategory).filter(AnnotationCategory.class_name == category_name).delete()
 
+                # 把annotation_category表中parent_name为category_name的数据的parent_name字段都设置成None
+                session.query(AnnotationCategory).filter(AnnotationCategory.parent_name == category_name).update({
+                    AnnotationCategory.parent_name: None
+                })
 
-
-
-
-
-
-
-
-
-
-
-
+                session.commit()  # 确保提交事务
+                print(f"已删除类别 '{category_name}' 相关的所有数据")
+        except Exception as e:
+            print(f"删除类别 '{category_name}' 时出错: {str(e)}")
+            raise
+        # 删除完成后重新加载categories
+        self.load_categories()
 
