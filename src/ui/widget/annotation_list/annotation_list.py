@@ -702,32 +702,6 @@ class AnnotationList(QListView):
         self.proxy_model.setFilterCaseSensitivity(Qt.CaseInsensitive)
         self.proxy_model.setFilterRole(Qt.DisplayRole)
 
-    def handle_add_annotation(self, position: QModelIndex = None, default_name=None):
-        """处理添加新类别，position为源模型中的位置索引，None表示添加到末尾"""
-        # 调用模型的方法创建新类别
-        if position is not None and position.isValid():
-            source_index = self.proxy_model.mapToSource(position)
-            new_category = self.source_model.create_new_category_at_index(source_index, default_name)
-            # 获取新添加项的索引
-            proxy_index = self.proxy_model.mapFromSource(self.source_model.index(source_index.row(), 0))
-        else:
-            # 添加到末尾
-            row_count = self.source_model.rowCount()
-            end_index = self.source_model.index(row_count, 0)
-            new_category = self.source_model.create_new_category_at_index(end_index, default_name)
-            proxy_index = self.proxy_model.mapFromSource(self.source_model.index(row_count, 0))
-
-        # 滚动到新项位置
-        self.scrollTo(proxy_index)
-
-        # 选中新项
-        self.selectionModel().select(
-            proxy_index,
-            QItemSelectionModel.SelectionFlag.ClearAndSelect
-        )
-
-        self.project_info.domain.refresh_order_entire_list()
-
     def append_category(self, category: AnnotationCategoryDTO):
         """添加类别"""
         self.source_model.append_annotation(category)
@@ -801,7 +775,7 @@ class AnnotationList(QListView):
 
         # 添加菜单项
         add_action = QAction("新增", self)
-        add_action.triggered.connect(self._context_add)  # type:ignore
+        add_action.triggered.connect(self._handle_add_annotation)  # type:ignore
 
         rename_action = QAction("重命名", self)
         rename_action.triggered.connect(self._handle_rename) # type: ignore
@@ -825,10 +799,36 @@ class AnnotationList(QListView):
         # 显示菜单
         menu.exec_(event.globalPos())
 
-    def _context_add(self):
-        """处理右键菜单中的新增操作"""
+    def _handle_add_annotation(self):
+        """处理新增标注操作"""
+        position: Optional[QModelIndex] = None
         if self.right_click_index and self.right_click_index.isValid():
-            self.handle_add_annotation(self.right_click_index )
+            # 在右键点击位置添加新类别
+            position = self.right_click_index
+        """处理添加新类别，position为源模型中的位置索引，None表示添加到末尾"""
+        # 调用模型的方法创建新类别
+        if position is not None and position.isValid():
+            source_index = self.proxy_model.mapToSource(position)
+            new_category = self.source_model.create_new_category_at_index(source_index)
+            # 获取新添加项的索引
+            proxy_index = self.proxy_model.mapFromSource(self.source_model.index(source_index.row(), 0))
+        else:
+            # 添加到末尾
+            row_count = self.source_model.rowCount()
+            end_index = self.source_model.index(row_count, 0)
+            new_category = self.source_model.create_new_category_at_index(end_index)
+            proxy_index = self.proxy_model.mapFromSource(self.source_model.index(row_count, 0))
+
+        # 滚动到新项位置
+        self.scrollTo(proxy_index)
+
+        # 选中新项
+        self.selectionModel().select(
+            proxy_index,
+            QItemSelectionModel.SelectionFlag.ClearAndSelect
+        )
+
+        self.project_info.domain.refresh_order_entire_list()
 
 
     def load_categories_from_yolo_model(self, model_path):
