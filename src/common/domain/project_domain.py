@@ -123,8 +123,8 @@ class ProjectDomain(AbsSqliteDomain):
         # 转换为AnnotationCategory对象列表
         categories: list = []
         try:
-            # 查询所有类别
-            sql_categories = session.query(SQLAnnotationCategory).all()
+            # 查询所有类别，按order字段排序
+            sql_categories = session.query(SQLAnnotationCategory).order_by(SQLAnnotationCategory.order).all()
             for sql_cat in sql_categories:
                 category = AnnotationCategoryDTO(
                     class_id=sql_cat.class_id,
@@ -680,6 +680,8 @@ class ProjectDomain(AbsSqliteDomain):
             print(f"Category {second_category_name} not found")
 
         return first_category, second_category
+
+
 
 
 

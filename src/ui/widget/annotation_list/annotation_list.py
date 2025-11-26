@@ -650,12 +650,6 @@ class AnnotationList(QListView):
         except ValueError as e:
             print(f"[Drag] Error establishing parent-child relationship: {e}")
 
-    def _reorder_entire_list(self):
-        """根据parent_name和order属性重新排序整个列表"""
-        self.project_info.domain.refresh_order_entire_list()
-        # 更新模型
-        self.source_model.refresh_model()
-
     def _handle_item_click(self, clicked_index):
         """处理点击事件 - 保持单选状态"""
         if not clicked_index.isValid():

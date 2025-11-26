@@ -23,7 +23,10 @@ class AnnotationListModel(QStandardItemModel):
         # 清空现有模型数据
         self.clear_annotations()
 
-        for category in self.domain.categories:
+        # 先确保domain中的categories已按order排序
+        sorted_categories = sorted(self.domain.categories, key=lambda cat: cat.order)
+        
+        for category in sorted_categories:
             item = AnnotationItem(category)
             self.appendRow(item)
 
@@ -57,3 +60,12 @@ class AnnotationListModel(QStandardItemModel):
 
     def set_color(self, index: QModelIndex, color: QColor):
         self.setData(index, color, Qt.UserRole)
+
+    def delete_category(self, category_name: str):
+        """删除指定名称的类别"""
+        self.domain.delete_category(category_name)
+        self.refresh_model()
+
+
+
+
