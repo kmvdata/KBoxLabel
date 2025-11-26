@@ -131,4 +131,23 @@ class AnnotationListModel(QStandardItemModel):
         return new_category
 
     def move_category(self, dragged_category_name: str, target_category_name: str, drop_area: AnnotationDropArea):
-        pass
+        """
+        移动类别到目标类别
+        
+        Args:
+            dragged_category_name (str): 被拖拽的类别名称
+            target_category_name (str): 目标类别名称
+            drop_area (AnnotationDropArea): 放置区域 (TOP, CENTER, BOTTOM)
+        """
+        if drop_area == AnnotationDropArea.CENTER:
+            # 将dragged_category_name作为target_category_name的子类别
+            self.domain.move_category_as_children(target_category_name, dragged_category_name)
+        elif drop_area == AnnotationDropArea.TOP:
+            # 将dragged_category_name移动到target_category_name之前
+            self.domain.move_category_by_name_before(dragged_category_name, target_category_name)
+        elif drop_area == AnnotationDropArea.BOTTOM:
+            # 将dragged_category_name移动到target_category_name之后
+            self.domain.move_category_by_name_after(dragged_category_name, target_category_name)
+        
+        # 重新刷新模型以反映更改
+        self.refresh_model()

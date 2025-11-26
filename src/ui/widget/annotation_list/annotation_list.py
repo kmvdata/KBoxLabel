@@ -14,7 +14,7 @@ from ultralytics import YOLO
 from src.core.project_info import ProjectInfo
 from src.models.dto.annotation_category_dto import AnnotationCategoryDTO
 from src.ui.widget.annotation_list.annotation_delegate import AnnotationDelegate
-from src.ui.widget.annotation_list.annotation_list_model import AnnotationListModel
+from src.ui.widget.annotation_list.annotation_list_model import AnnotationListModel, AnnotationDropArea
 from src.ui.widget.annotation_list.editable_annotation_delegate import EditableAnnotationDelegate
 
 
@@ -484,16 +484,18 @@ class AnnotationList(QListView):
                         # 上半部分 - 放置在目标项之前
                         print("[Drag] Drop position: upper half, placing before target")
                         # 使用domain方法处理移动操作
-                        self.source_model.domain.move_category_by_name_before(dragged_class_name, target_class_name)
+                        # self.source_model.domain.move_category_by_name_before(dragged_class_name, target_class_name)
                         # 更新模型
-                        self.source_model.refresh_model()
+                        # self.source_model.refresh_model()
+                        self.source_model.move_category(dragged_class_name, target_class_name, AnnotationDropArea.TOP)
                     else:
                         # 下半部分 - 放置在目标项之后
                         print("[Drag] Drop position: lower half, placing after target")
+                        self.source_model.move_category(dragged_class_name, target_class_name, AnnotationDropArea.TOP)
                         # 使用domain方法处理移动操作
-                        self.source_model.domain.move_category_by_name_after(dragged_class_name, target_class_name)
+                        #self.source_model.domain.move_category_by_name_after(dragged_class_name, target_class_name)
                         # 更新模型
-                        self.source_model.refresh_model()
+                        #self.source_model.refresh_model()
                         
                     event.acceptProposedAction()
                     # 重置拖拽状态
