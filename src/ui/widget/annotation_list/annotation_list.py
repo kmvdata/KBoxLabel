@@ -765,42 +765,34 @@ class AnnotationList(QListView):
 
     def _handle_delete(self):
         """处理删除操作"""
-        if self.right_click_index and self.right_click_index.isValid():
-            source_index = self.proxy_model.mapToSource(self.right_click_index)
-            row = source_index.row()
+        if not(self.right_click_index and self.right_click_index.isValid()):
+            return
 
-            if 0 <= row < len(self.project_info.categories):
-                # 获取要删除的类别
-                category_to_delete = self.project_info.categories[row]
-                category_name = category_to_delete.class_name
+        source_index = self.proxy_model.mapToSource(self.right_click_index)
+        category_name = self.source_model.get_category_name_by_index(source_index)
+        # 检查有多少个kilo_item引用了这个类型
+        count = self.source_model.count_kilo_items_for_category(category_name)
+        # 如果有引用，则弹出确认对话框
+        if count > 0:
+            reply = QMessageBox.question(
+                self,
+                "确认删除",
+                f"有{count}个标记数据使用了类别'{category_name}'，是否确认删除？",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No
+            )
+
+            # 如果用户不确认删除，则返回
+            if reply != QMessageBox.Yes:
+                return
+
+            try:
+                self.source_model.delete_category_by_index(source_index)
+            except Exception as e:
+                QMessageBox.critical(self, "删除失败", f"删除类别时出错: {str(e)}")
+                return
                 
-                # 检查有多少个kilo_item引用了这个类型
-                count = self.project_info.domain.count_kilo_items_for_category(category_name)
-                
-                # 如果有引用，则弹出确认对话框
-                if count > 0:
-                    reply = QMessageBox.question(
-                        self, 
-                        "确认删除", 
-                        f"有{count}个标记数据使用了类别'{category_name}'，是否确认删除？",
-                        QMessageBox.Yes | QMessageBox.No, 
-                        QMessageBox.No
-                    )
-                    
-                    # 如果用户不确认删除，则返回
-                    if reply != QMessageBox.Yes:
-                        return
-                
-                # 调用ProjectDomain的delete_category方法进行删除
-                try:
-                    self.project_info.domain.delete_category(category_name)
-                except Exception as e:
-                    QMessageBox.critical(self, "删除失败", f"删除类别时出错: {str(e)}")
-                    return
-                
-                # 删除成功后，立即更新project_info中的categories，防止旧数据被保存
-                self.source_model.removeRow(row)
-                self.source_model.refresh_model()
+
 
 
     def contextMenuEvent(self, event):

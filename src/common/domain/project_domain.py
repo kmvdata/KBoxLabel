@@ -135,6 +135,7 @@ class ProjectDomain(AbsSqliteDomain):
                 categories.append(category)
 
             self.categories = categories
+            self.refresh_order_entire_list()
             return self.categories
         except Exception as e:
             print(f"加载类别列表失败: {str(e)}")

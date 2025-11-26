@@ -58,6 +58,18 @@ class AnnotationListModel(QStandardItemModel):
                     return item
         return None
 
+    def get_category_name_by_index(self, index: QModelIndex) -> Optional[str]:
+        """根据索引获取对应的类别名称"""
+        if not index.isValid():
+            return None
+            
+        # 从模型中获取item
+        item = self.itemFromIndex(index)
+        if item is not None:
+            # 返回类别名称（存储在UserRole+2中）
+            return item.data(Qt.UserRole + 2)
+        return None
+
     def set_color(self, index: QModelIndex, color: QColor):
         self.setData(index, color, Qt.UserRole)
 
@@ -65,6 +77,19 @@ class AnnotationListModel(QStandardItemModel):
         """删除指定名称的类别"""
         self.domain.delete_category(category_name)
         self.refresh_model()
+
+    def delete_category_by_index(self, index: QModelIndex):
+        """删除指定索引的类别"""
+        # 找出index对应的category名称
+        category_name = self.get_category_name_by_index(index)
+        self.domain.delete_category(category_name)
+        self.refresh_model()
+
+
+
+
+    def count_kilo_items_for_category(self, category_name: str):
+        return self.domain.count_kilo_items_for_category(category_name)
 
 
 
