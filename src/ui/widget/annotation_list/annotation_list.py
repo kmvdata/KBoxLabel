@@ -511,8 +511,10 @@ class AnnotationList(QListView):
                     # 建立父子关系
                     # 检查是否需要在特定子项之后插入
                     insert_after_child_name: Optional[str] = None
-                    # 这里可以根据需要添加逻辑来确定在哪个子项之后插入
-                    self._establish_parent_child_relationship(dragged_class_name, target_class_name, insert_after_child_name)
+                    # 使用domain方法处理父子关系
+                    self.project_info.domain.move_category_as_children(target_class_name, dragged_class_name)
+                    # 更新模型
+                    self.source_model.refresh_model()
                     event.acceptProposedAction()
                     # 重置拖拽状态
                     self.drag_target_row = -1
@@ -632,19 +634,6 @@ class AnnotationList(QListView):
                 break
         
         return True
-
-    def _establish_parent_child_relationship(self, child_name: str, parent_name: str, insert_after_child_name: Optional[str] = None):
-        """建立父子关系，可选择在指定子项之后插入"""
-        print(f"[Drag] Establishing parent-child relationship: child={child_name}, parent={parent_name}, insert_after={insert_after_child_name}")
-        
-        try:
-            # 使用domain方法处理父子关系
-            self.project_info.domain.move_category_as_children(parent_name, child_name)
-            
-            # 更新模型
-            self.source_model.refresh_model()
-        except ValueError as e:
-            print(f"[Drag] Error establishing parent-child relationship: {e}")
 
     def _handle_item_click(self, clicked_index):
         """处理点击事件 - 保持单选状态"""
