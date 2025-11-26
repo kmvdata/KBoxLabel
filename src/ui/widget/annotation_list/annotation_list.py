@@ -484,14 +484,14 @@ class AnnotationList(QListView):
                         # 上半部分 - 放置在目标项之前
                         print("[Drag] Drop position: upper half, placing before target")
                         # 使用domain方法处理移动操作
-                        self.project_info.domain.move_category_by_name_before(dragged_class_name, target_class_name)
+                        self.source_model.domain.move_category_by_name_before(dragged_class_name, target_class_name)
                         # 更新模型
                         self.source_model.refresh_model()
                     else:
                         # 下半部分 - 放置在目标项之后
                         print("[Drag] Drop position: lower half, placing after target")
                         # 使用domain方法处理移动操作
-                        self.project_info.domain.move_category_by_name_after(dragged_class_name, target_class_name)
+                        self.source_model.domain.move_category_by_name_after(dragged_class_name, target_class_name)
                         # 更新模型
                         self.source_model.refresh_model()
                         
@@ -512,7 +512,7 @@ class AnnotationList(QListView):
                     # 检查是否需要在特定子项之后插入
                     insert_after_child_name: Optional[str] = None
                     # 使用domain方法处理父子关系
-                    self.project_info.domain.move_category_as_children(target_class_name, dragged_class_name)
+                    self.source_model.domain.move_category_as_children(target_class_name, dragged_class_name)
                     # 更新模型
                     self.source_model.refresh_model()
                     event.acceptProposedAction()
@@ -815,7 +815,7 @@ class AnnotationList(QListView):
             QItemSelectionModel.SelectionFlag.ClearAndSelect
         )
 
-        self.project_info.domain.refresh_order_entire_list()
+        self.source_model.domain.refresh_order_entire_list()
 
 
     def load_categories_from_yolo_model(self, model_path):
@@ -830,7 +830,8 @@ class AnnotationList(QListView):
                 AnnotationCategoryDTO(class_id=i, class_name=name)
                 for i, name in class_dict.items()
             ]
-            self.project_info.domain.add_categories(new_categories)
+            for category in new_categories:
+                self.source_model.append_annotation(category)
             return True
         except Exception as e:
             print(f"加载YOLO模型失败: {str(e)}")
@@ -839,12 +840,8 @@ class AnnotationList(QListView):
 
     def select_category_by_name(self, class_name: str):
         """根据类别名称选中对应的列表项"""
-        return self._select_category_by_attr('class_name', class_name)
-    
-    def _select_category_by_attr(self, attr_name: str, attr_value):
-        """根据指定属性名和值选中对应的列表项"""
-        for i, category in enumerate(self.project_info.categories):
-            if getattr(category, attr_name) == attr_value:
+        for i, category in enumerate(self.source_model.domain.categories):
+            if category.class_name == class_name:
                 proxy_index = self.proxy_model.mapFromSource(self.source_model.index(i, 0))
                 self.selectionModel().select(
                     proxy_index,
