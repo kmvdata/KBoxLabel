@@ -23,15 +23,6 @@ class AnnotationList(QListView):
     TOOLBAR_HEIGHT = 56
     DROP_INDICATOR_HEIGHT = 2  # 拖拽指示器高度
 
-    def load_categories(self):
-        """加载项目中的所有类别到列表中"""
-        # 清空现有模型数据
-        self.source_model.clear_annotations()
-        
-        # 从project_info获取类别并添加到模型
-        for category in self.project_info.categories:
-            self.source_model.add_annotation(category)
-
     def __init__(self, project_info: ProjectInfo, row_height=56):
         super().__init__()
         self.search_edit = None
@@ -54,7 +45,7 @@ class AnnotationList(QListView):
         self.toolbar = self.create_toolbar()
 
         # 创建模型
-        self.source_model = AnnotationListModel(self)
+        self.source_model = AnnotationListModel(project_info=self.project_info, parent=self)
 
         # 创建代理模型用于过滤
         self.proxy_model = QSortFilterProxyModel(self)
@@ -83,7 +74,7 @@ class AnnotationList(QListView):
         self.source_model.dataChanged.connect(self._handle_model_data_changed)
         
         # 加载类别数据
-        self.load_categories()
+        self.source_model.refresh_model()
 
     def calculate_min_width(self):
         """计算最小宽度"""
@@ -495,14 +486,14 @@ class AnnotationList(QListView):
                         # 使用domain方法处理移动操作
                         self.project_info.domain.move_category_by_name_before(dragged_class_name, target_class_name)
                         # 更新模型
-                        self.source_model.update_from_categories(self.project_info.categories)
+                        self.source_model.refresh_model()
                     else:
                         # 下半部分 - 放置在目标项之后
                         print("[Drag] Drop position: lower half, placing after target")
                         # 使用domain方法处理移动操作
                         self.project_info.domain.move_category_by_name_after(dragged_class_name, target_class_name)
                         # 更新模型
-                        self.source_model.update_from_categories(self.project_info.categories)
+                        self.source_model.refresh_model()
                         
                     event.acceptProposedAction()
                     # 重置拖拽状态
@@ -633,7 +624,7 @@ class AnnotationList(QListView):
         self.project_info.domain.refresh_order_entire_list()
         
         # 更新模型
-        self.source_model.update_from_categories(self.project_info.categories)
+        self.source_model.refresh_model()
         
         # 保存更改
         self.project_info.domain.save_categories()
@@ -683,7 +674,7 @@ class AnnotationList(QListView):
             self.project_info.domain.move_category_as_children(parent_name, child_name)
             
             # 更新模型
-            self.source_model.update_from_categories(self.project_info.categories)
+            self.source_model.refresh_model()
             
             # 保存更改
             self.project_info.domain.save_categories()
@@ -695,7 +686,7 @@ class AnnotationList(QListView):
         """根据parent_name和order属性重新排序整个列表"""
         self.project_info.domain.refresh_order_entire_list()
         # 更新模型
-        self.source_model.update_from_categories(self.project_info.categories)
+        self.source_model.refresh_model()
 
     def _handle_item_click(self, clicked_index):
         """处理点击事件 - 保持单选状态"""
@@ -772,10 +763,9 @@ class AnnotationList(QListView):
         # 根据position决定插入位置
         if position is not None and 0 <= position <= len(self.project_info.categories):
             self.project_info.domain.insert_category(position, new_category)
-            self.source_model.insert_annotation(new_category, position)
+            self.source_model.insert_annotation(position, new_category)
         else:
-            self.project_info.domain.append(new_category)
-            self.source_model.add_annotation(new_category)
+            self.source_model.append_annotation(new_category)
 
         # 获取新添加项的索引
         if position is not None:
@@ -849,7 +839,7 @@ class AnnotationList(QListView):
                 
                 # 删除成功后，立即更新project_info中的categories，防止旧数据被保存
                 self.source_model.removeRow(row)
-                self.source_model.update_from_categories(self.project_info.categories)
+                self.source_model.refresh_model()
 
 
     def contextMenuEvent(self, event):

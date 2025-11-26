@@ -5,6 +5,7 @@ from PyQt5.QtGui import QStandardItemModel, QColor
 from ultralytics import YOLO
 from ultralytics import YOLO
 
+from src.core.project_info import ProjectInfo
 from src.models.dto.annotation_category_dto import AnnotationCategoryDTO
 from src.ui.widget.annotation_list.annotation_item import AnnotationItem
 
@@ -12,17 +13,30 @@ from src.ui.widget.annotation_list.annotation_item import AnnotationItem
 class AnnotationListModel(QStandardItemModel):
     """自定义模型，存储带序号的标注类别数据"""
 
-    def __init__(self, parent=None):
+    def __init__(self, project_info: ProjectInfo, parent=None):
         super().__init__(0, 1, parent)
         self._category_items = {}  # class_name -> QStandardItem 映射
+        self.domain = project_info.domain
 
-    def add_annotation(self, category: AnnotationCategoryDTO):
+    def refresh_model(self):
+        """加载项目中的所有类别到列表中"""
+        # 清空现有模型数据
+        self.clear_annotations()
+
+        # 从project_info获取类别并添加到模型
+        for category in self.domain.categories:
+            item = AnnotationItem(category)
+            self.appendRow(item)
+            self._category_items[category.class_name] = item
+
+    def append_annotation(self, category: AnnotationCategoryDTO):
         """添加带序号的标注项"""
+        self.domain.append(category)
         item = AnnotationItem(category)
         self.appendRow(item)
         self._category_items[category.class_name] = item
 
-    def insert_annotation(self, category: AnnotationCategoryDTO, row: int):
+    def insert_annotation(self, row: int, category: AnnotationCategoryDTO):
         """在指定位置插入标注项"""
         item = AnnotationItem(category)
         self.insertRow(row, item)
@@ -33,12 +47,6 @@ class AnnotationListModel(QStandardItemModel):
         self.clear()
         self.setColumnCount(1)
         self._category_items.clear()
-
-    def update_from_categories(self, categories: list[AnnotationCategoryDTO]):
-        """从类别列表更新模型"""
-        self.clear_annotations()
-        for category in categories:
-            self.add_annotation(category)
 
     def get_item_by_class_name(self, class_name: str) -> AnnotationItem:
         """根据class_id获取对应的item"""
