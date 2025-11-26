@@ -841,7 +841,8 @@ class AnnotationList(QListView):
         """处理右键菜单中的新增操作"""
         reference_id = None
         insert_position = None
-
+        a = self.source_model.rowCount()
+        print(a)
         if self.right_click_index and self.right_click_index.isValid():
             # 如果有选中项，获取其ID作为参考
             source_index = self.proxy_model.mapToSource(self.right_click_index)

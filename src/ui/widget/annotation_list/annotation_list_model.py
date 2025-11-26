@@ -85,12 +85,28 @@ class AnnotationListModel(QStandardItemModel):
         self.domain.delete_category(category_name)
         self.refresh_model()
 
-
-
-
     def count_kilo_items_for_category(self, category_name: str):
         return self.domain.count_kilo_items_for_category(category_name)
 
+    def create_new_category_at_index(self, index: QModelIndex, default_name=None):
+        """在指定索引位置创建新的类别"""
+        # 使用domain方法获取最大ID
+        max_id = self.domain.get_max_category_id()
+        new_id = max_id + 1
 
+        if default_name is None:
+            new_name = f"新类别 {new_id}"
+        else:
+            new_name = default_name
 
+        new_category = AnnotationCategoryDTO(
+            class_id=new_id,
+            class_name=new_name
+        )
 
+        # 插入新的类别
+        self.insert_annotation(index.row(), new_category)
+        
+        self.domain.refresh_order_entire_list()
+        
+        return new_category

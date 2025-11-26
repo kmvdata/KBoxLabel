@@ -682,6 +682,21 @@ class ProjectDomain(AbsSqliteDomain):
 
         return first_category, second_category
 
+    def get_max_category_id(self):
+        """
+        获取annotation_category表中最大的class_id值
+        :return: 最大的class_id值，如果没有记录则返回0
+        """
+        session = self.db_session()
+        try:
+            # 查询annotation_category表中最大的class_id值
+            max_id = session.query(SQLAnnotationCategory.class_id).order_by(SQLAnnotationCategory.class_id.desc()).first()
+            return max_id[0] if max_id else 0
+        finally:
+            session.close()
+
+
+
 
 
 
