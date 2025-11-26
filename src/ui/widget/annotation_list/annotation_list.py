@@ -575,59 +575,27 @@ class AnnotationList(QListView):
     def _reorder_items(self, dragged_class_name, dragged_parent_name=None):
         """重新排序项目"""
         print(f"[Drag] Reordering items, dragged class name: {dragged_class_name}, parent name: {dragged_parent_name}")
-            
-        # 找到被拖拽的项目在当前列表中的位置
-        dragged_row = -1
-        for i, cat in enumerate(self.project_info.categories):
-            if cat.class_name == dragged_class_name:
-                dragged_row = i
-                break
-                
-        if dragged_row == -1:
-            print(f"[Drag] Dragged item not found in categories, aborting reorder")
-            return
-            
-        print(f"[Drag] Dragged item found at row: {dragged_row}")
-        # 获取被拖拽的类别
-        dragged_category = self.project_info.categories[dragged_row]
-        print(f"[Drag] Dragged category details: name={dragged_category.class_name}, parent={dragged_category.parent_name}")
         
         # 如果是从子项变为一级项，更新其属性
-        if self.is_dragging_child_to_gap and dragged_category.parent_name is not None:
+        if self.is_dragging_child_to_gap:
             print("[Drag] Converting child item to top-level item")
-            # 设置为一级项
-            dragged_category.parent_name = None
+            # 使用domain方法将子项转换为顶级项
+            self.source_model.domain.convert_child_to_top_level(dragged_class_name)
             print("[Drag] Set item as top-level (parent=None)")
-            
-            # 更新模型中的数据
-            dragged_item = self.source_model.get_item_by_class_name(dragged_class_name)
-            if dragged_item:
-                dragged_item.set_parent_name(None)
         
-        # 从原位置移除
-        removed_category = self.project_info.categories.pop(dragged_row)
-        print(f"[Drag] Removed category from row {dragged_row}")
-        
-        # 计算插入位置（如果原位置在目标位置之前，目标位置需要减1）
+        # 计算插入位置
         # 如果 drag_target_row 为 -1，则插入到末尾
         if self.drag_target_row == -1:
-            insert_row = len(self.project_info.categories)
+            target_position = len(self.project_info.categories)
         else:
-            insert_row = self.drag_target_row
-            if dragged_row < insert_row:
-                insert_row -= 1
+            target_position = self.drag_target_row
             
-        # 插入到新位置
-        self.project_info.categories.insert(insert_row, removed_category)
+        # 使用domain方法移动类别到指定位置
+        self.source_model.domain.move_category_to_position(dragged_class_name, target_position)
 
-        # 重新排序整个列表以确保正确的显示顺序
-        self.project_info.domain.refresh_order_entire_list()
-        
         # 更新模型
         self.source_model.refresh_model()
         
-        # 保存更改
-        self.project_info.domain.save_categories()
         print("[Drag] Categories saved")
 
     def _can_drop_category(self, dragged_class_name: str, target_class_name: str) -> bool:

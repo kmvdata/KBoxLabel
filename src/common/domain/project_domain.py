@@ -590,6 +590,66 @@ class ProjectDomain(AbsSqliteDomain):
         # 重新排序整个列表
         self.refresh_order_entire_list()
 
+    def move_category_to_position(self, moved_category_name: str, target_position: int):
+        """
+        将一个类别移动到指定的位置
+        
+        Args:
+            moved_category_name (str): 要移动的类别名称
+            target_position (int): 目标位置索引
+        """
+        # 查找要移动的类别
+        moved_category = None
+        moved_index = -1
+        for i, cat in enumerate(self.categories):
+            if cat.class_name == moved_category_name:
+                moved_category = cat
+                moved_index = i
+                break
+        
+        if moved_category is None:
+            raise ValueError(f"Category {moved_category_name} not found")
+        
+        # 如果目标位置超出范围，则放在末尾
+        if target_position >= len(self.categories):
+            target_position = len(self.categories) - 1
+        elif target_position < 0:
+            target_position = 0
+            
+        # 如果位置相同，则无需移动
+        if moved_index == target_position:
+            return
+            
+        # 移动类别到新位置
+        self.categories.remove(moved_category)
+        self.categories.insert(target_position, moved_category)
+        
+        # 重新排序整个列表
+        self.refresh_order_entire_list()
+
+    def convert_child_to_top_level(self, category_name: str):
+        """
+        将子类别转换为顶级类别（设置parent_name为None）
+        
+        Args:
+            category_name (str): 要转换的类别名称
+        """
+        # 查找类别
+        category = None
+        for cat in self.categories:
+            if cat.class_name == category_name:
+                category = cat
+                break
+        
+        if category is None:
+            raise ValueError(f"Category {category_name} not found")
+        
+        # 设置为顶级类别
+        category.parent_name = None
+        
+        # 重新排序整个列表
+        self.refresh_order_entire_list()
+
     def _find_categories_by_name(self, first_category_name: str, second_category_name: str) -> tuple[AnnotationCategoryDTO, AnnotationCategoryDTO]:
         """
         根据两个类别名称查找对应的类别对象
@@ -620,4 +680,6 @@ class ProjectDomain(AbsSqliteDomain):
             print(f"Category {second_category_name} not found")
 
         return first_category, second_category
+
+
 
