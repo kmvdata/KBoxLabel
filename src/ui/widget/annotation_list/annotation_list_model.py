@@ -1,4 +1,5 @@
 # annotation_list_model.py
+from enum import Enum
 from typing import Optional
 
 from PyQt5.QtCore import Qt, QModelIndex
@@ -10,6 +11,10 @@ from src.core.project_info import ProjectInfo
 from src.models.dto.annotation_category_dto import AnnotationCategoryDTO
 from src.ui.widget.annotation_list.annotation_item import AnnotationItem
 
+class AnnotationMovingFlag(Enum):
+    BEFORE = "之前"
+    AFTER = "之后"
+    CHILD = "父子"
 
 class AnnotationListModel(QStandardItemModel):
     """自定义模型，存储带序号的标注类别数据"""
@@ -124,3 +129,7 @@ class AnnotationListModel(QStandardItemModel):
         self.domain.refresh_order_entire_list()
         
         return new_category
+
+
+    def move_category(self, source_category_name: str, target_category_name: str, moving_flag: AnnotationMovingFlag):
+        pass
