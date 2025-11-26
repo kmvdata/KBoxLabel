@@ -223,12 +223,34 @@ class ProjectDomain(AbsSqliteDomain):
 
     def change_category_class_id(self, category_name: str, new_class_id: int):
         """
-        在数据库中，把kolo_item表中class_name=category_name的项目，全部改成class_id=new_class_id
+        在数据库中，把annotation_category表中class_name=category_name的项目，全部改成class_id=new_class_id
         :param category_name: 类别名称
         :param new_class_id: 新类别ID
         """
-        pass
+        # 获取数据库会话
+        session = self.db_session()
+        try:
+            # 更新annotation_category表中class_name等于category_name的记录的class_id
+            updated_count = session.query(AnnotationCategory).filter(
+                AnnotationCategory.class_name == category_name
+            ).update({AnnotationCategory.class_id: new_class_id})
             
+            print(f"更新了 {updated_count} 条AnnotationCategory记录的class_id为{new_class_id}")
+            
+            # 同时也要更新kolo_item表中class_name等于category_name的记录的class_id
+            # 但实际上kolo_item表没有class_id字段，只有class_name字段，所以不需要更新kolo_item表
+            
+            session.commit()
+            print('事务执行完成')
+        except Exception as e:
+            # 回滚事务
+            session.rollback()
+            print(f"更新类别class_id失败: {str(e)}")
+            raise e
+        finally:
+            # 关闭会话
+            session.close()
+
     def load_kolo_items_for_image(self, img_name: str) -> list[KoloItem]:
         """
         从数据库加载指定图片的kolo项
@@ -702,6 +724,8 @@ class ProjectDomain(AbsSqliteDomain):
             return max_id[0] if max_id else 0
         finally:
             session.close()
+
+
 
 
 
