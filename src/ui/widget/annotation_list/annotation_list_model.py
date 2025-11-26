@@ -11,10 +11,10 @@ from src.core.project_info import ProjectInfo
 from src.models.dto.annotation_category_dto import AnnotationCategoryDTO
 from src.ui.widget.annotation_list.annotation_item import AnnotationItem
 
-class AnnotationMovingFlag(Enum):
-    BEFORE = "之前"
-    AFTER = "之后"
-    CHILD = "父子"
+class AnnotationDropArea(Enum):
+    TOP = "top"
+    CENTER = "center"
+    BOTTOM = "bottom"
 
 class AnnotationListModel(QStandardItemModel):
     """自定义模型，存储带序号的标注类别数据"""
@@ -130,6 +130,5 @@ class AnnotationListModel(QStandardItemModel):
         
         return new_category
 
-
-    def move_category(self, source_category_name: str, target_category_name: str, moving_flag: AnnotationMovingFlag):
+    def move_category(self, dragged_category_name: str, target_category_name: str, drop_area: AnnotationDropArea):
         pass
