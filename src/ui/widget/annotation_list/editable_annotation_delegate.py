@@ -4,6 +4,7 @@ from PyQt5.QtCore import Qt, QRect
 from PyQt5.QtWidgets import QLineEdit, QSpinBox, QWidget, QMessageBox, QProgressDialog
 from ultralytics import YOLO
 
+from src.core.project_info import ProjectInfo
 from src.ui.widget.annotation_list.annotation_delegate import AnnotationDelegate
 
 
@@ -15,10 +16,11 @@ class EditableAnnotationDelegate(AnnotationDelegate):
     EDIT_TYPE_TEXT = "text"
     EDIT_TYPE_ID = "id"
 
-    def __init__(self, row_height=56, parent=None):
+    def __init__(self, project_info: ProjectInfo, row_height=56, parent=None):
         super().__init__(row_height, parent)
         self.current_edit_type = None
         self.original_name = None
+        self.domain = project_info.domain
 
     def createEditor(self, parent, option, index):
         """创建编辑器"""
@@ -107,7 +109,7 @@ class EditableAnnotationDelegate(AnnotationDelegate):
                     success = model.setData(index, category_name, Qt.DisplayRole)
                     
                     # 如果更新成功，继续更新数据库
-                    if success and view is not None and hasattr(view, 'project_info'):
+                    if success:
                         try:
                             # 显示进度对话框
                             progress = QProgressDialog("正在更新类别名称...", "取消", 0, 2, view)
@@ -116,17 +118,10 @@ class EditableAnnotationDelegate(AnnotationDelegate):
                             progress.show()
                             progress.setValue(0)
                             
-                            # 更新project_info.categories中的对应项
-                            for category in view.project_info.categories:
-                                if category.class_name == old_class_name:
-                                    category.class_name = category_name
-                                    break
+                            # 更新数据库中annotation_category表和kolo_item表
+                            self.domain.rename_category(old_class_name, category_name)
                             
                             progress.setValue(1)
-                            
-                            # 更新数据库中annotation_category表和kolo_item表
-                            view.project_info.domain.rename_category(old_class_name, category_name)
-
                             progress.setValue(2)
                             
                             # 显示成功消息
@@ -154,21 +149,9 @@ class EditableAnnotationDelegate(AnnotationDelegate):
                 
                 # 如果是修改ID，同时更新project_info.categories中的对应项
                 if success:
-                    view = self.parent()
-                    if view is not None and hasattr(view, 'project_info'):
-                        # 获取修改项的class_name
-                        class_name = model.data(index, Qt.UserRole + 2)
-                        # 在project_info.categories中找到对应的类别并更新class_id
-                        for category in view.project_info.categories:
-                            if category.class_name == class_name:
-                                category.class_id = class_id
-                                break
-
-        # 只有在设置数据成功时才保存
-        if success:
-            view = self.parent()
-            if view is not None and hasattr(view, 'save_categories'):
-                view.save_categories()  # 调用AnnotationList的save_categories方法
+                    # 获取修改项的class_name
+                    class_name = model.data(index, Qt.UserRole + 2)
+                    self.domain.change_category_class_id(class_name, class_id)
 
     def updateEditorGeometry(self, editor, option, index):
         """更新编辑器几何形状"""

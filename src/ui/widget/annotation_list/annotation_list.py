@@ -65,7 +65,7 @@ class AnnotationList(QListView):
         self.setAttribute(Qt.WidgetAttribute.WA_AlwaysShowToolTips)
 
         # 设置委托
-        self.delegate = EditableAnnotationDelegate(row_height, self)
+        self.delegate = EditableAnnotationDelegate(self.project_info, row_height, self)
         self.setItemDelegate(self.delegate)
 
         # 连接信号
@@ -643,10 +643,6 @@ class AnnotationList(QListView):
             
             # 更新模型
             self.source_model.refresh_model()
-            
-            # 保存更改
-            self.project_info.domain.save_categories()
-            print("[Drag] Categories saved")
         except ValueError as e:
             print(f"[Drag] Error establishing parent-child relationship: {e}")
 
@@ -818,6 +814,8 @@ class AnnotationList(QListView):
             end_index = self.source_model.index(row_count, 0)
             new_category = self.source_model.create_new_category_at_index(end_index)
             proxy_index = self.proxy_model.mapFromSource(self.source_model.index(row_count, 0))
+
+        print(f"新类别添加成功: {new_category.class_name}")
 
         # 滚动到新项位置
         self.scrollTo(proxy_index)

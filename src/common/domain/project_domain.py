@@ -220,6 +220,14 @@ class ProjectDomain(AbsSqliteDomain):
 
         # rename执行完成后重新加载categories
         self.load_categories()
+
+    def change_category_class_id(self, category_name: str, new_class_id: int):
+        """
+        在数据库中，把kolo_item表中class_name=category_name的项目，全部改成class_id=new_class_id
+        :param category_name: 类别名称
+        :param new_class_id: 新类别ID
+        """
+        pass
             
     def load_kolo_items_for_image(self, img_name: str) -> list[KoloItem]:
         """
