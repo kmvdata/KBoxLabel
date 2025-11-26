@@ -461,107 +461,55 @@ class AnnotationList(QListView):
             index = self.indexAt(pos)
             print(f"[Drag] Drop index: valid={index.isValid()}")
             
-            # 如果放置在项目上，建立父子关系
-            if index.isValid() and self.drag_target_row == -1:
-                print("[Drag] Drop on item, attempting to establish parent-child relationship")
+            # 分析拖拽情况并确定drop区域
+            drop_area = None
+            target_class_name = None
+            
+            if index.isValid():
                 # 获取目标类别
                 source_index = self.proxy_model.mapToSource(index)
                 target_class_name = self.source_model.data(source_index, Qt.UserRole + 2)
                 target_parent_name = self.source_model.data(source_index, Qt.UserRole + 3)  # 获取目标的父级
                 print(f"[Drag] Target item name: {target_class_name}, parent: {target_parent_name}")
                 
-                # 如果目标已经是子项，则将拖拽项设置为与目标相同的父级
-                if target_parent_name is not None:
-                    print(f"[Drag] Target is already a child, setting dragged item to same parent: {target_parent_name}")
-                    # 计算放置位置（上方1/4、中间2/4、下方1/4）
-                    rect = self.visualRect(index)
-                    y_pos_in_item = pos.y() - rect.top()
-                    item_height = rect.height()
-                    print(f"[Drag] Position in item: y={y_pos_in_item}, item height: {item_height}")
-                    
-                    # 根据释放位置决定放置在目标项的上方还是下方
-                    if y_pos_in_item < item_height / 2:
-                        # 上半部分 - 放置在目标项之前
-                        print("[Drag] Drop position: upper half, placing before target")
-                        # 使用domain方法处理移动操作
-                        # self.source_model.domain.move_category_by_name_before(dragged_class_name, target_class_name)
-                        # 更新模型
-                        # self.source_model.refresh_model()
-                        self.source_model.move_category(dragged_class_name, target_class_name, AnnotationDropArea.TOP)
-                    else:
-                        # 下半部分 - 放置在目标项之后
-                        print("[Drag] Drop position: lower half, placing after target")
-                        self.source_model.move_category(dragged_class_name, target_class_name, AnnotationDropArea.TOP)
-                        # 使用domain方法处理移动操作
-                        #self.source_model.domain.move_category_by_name_after(dragged_class_name, target_class_name)
-                        # 更新模型
-                        #self.source_model.refresh_model()
-                        
-                    event.acceptProposedAction()
-                    # 重置拖拽状态
-                    self.drag_target_row = -1
-                    self.is_dragging_child_to_gap = False
-                    self.drag_hover_index = None
-                    self.delegate.set_hovered_index(None)
-                    self.delegate.set_hovered_index(None)
-                    self.viewport().update()
-                    print("[Drag] Item moved with same parent")
-                    return
-                # 检查是否可以建立父子关系
-                elif self._can_drop_category(dragged_class_name, target_class_name):
-                    print(f"[Drag] Parent-child relationship allowed, establishing relationship: {dragged_class_name} - {target_class_name}")
-                    # 建立父子关系
-                    # 检查是否需要在特定子项之后插入
-                    insert_after_child_name: Optional[str] = None
-                    # 使用domain方法处理父子关系
-                    self.source_model.domain.move_category_as_children(target_class_name, dragged_class_name)
-                    # 更新模型
-                    self.source_model.refresh_model()
-                    event.acceptProposedAction()
-                    # 重置拖拽状态
-                    self.drag_target_row = -1
-                    self.is_dragging_child_to_gap = False
-                    self.drag_hover_index = None
-                    self.delegate.set_hovered_index(None)
-                    self.delegate.set_hovered_index(None)
-                    self.viewport().update()
-                    print("[Drag] Parent-child relationship established")
-                    # 不再重新加载数据，避免覆盖内存中的更改
-                    # self.load_categories()
-                    return
+                # 计算放置位置（上方1/4、中间2/4、下方1/4）
+                rect = self.visualRect(index)
+                y_pos_in_item = pos.y() - rect.top()
+                item_height = rect.height()
+                print(f"[Drag] Position in item: y={y_pos_in_item}, item height: {item_height}")
+                
+                # 根据释放位置决定放置在目标项的上方、中间还是下方
+                if y_pos_in_item < item_height / 4:
+                    # 上方1/4区域 - 放置在目标项之前
+                    drop_area = AnnotationDropArea.TOP
+                    print("[Drag] Drop position: top quarter, placing before target")
+                elif y_pos_in_item > 3 * item_height / 4:
+                    # 下方1/4区域 - 放置在目标项之后
+                    drop_area = AnnotationDropArea.BOTTOM
+                    print("[Drag] Drop position: bottom quarter, placing after target")
                 else:
-                    print("[Drag] Parent-child relationship not allowed")
-            elif self.drag_target_row != -1:
+                    # 中间2/4区域 - 检查是否可以建立父子关系
+                    print("[Drag] Drop position: middle half")
+                    # 如果目标已经是子项，则将拖拽项设置为与目标相同的父级
+                    if target_parent_name is not None:
+                        print(f"[Drag] Target is already a child, setting dragged item to same parent: {target_parent_name}")
+                        drop_area = AnnotationDropArea.TOP  # 作为同级项处理
+                    elif self._can_drop_category(dragged_class_name, target_class_name):
+                        print("[Drag] Parent-child relationship allowed")
+                        drop_area = AnnotationDropArea.CENTER
+                    else:
+                        print("[Drag] Parent-child relationship not allowed, placing after target")
+                        drop_area = AnnotationDropArea.BOTTOM
+                        
+                # 调用模型的移动方法
+                if drop_area and target_class_name:
+                    self.source_model.move_category(dragged_class_name, target_class_name, drop_area)
+                    event.acceptProposedAction()
+            elif self.drag_target_row != -1 or True:  # 总是处理这种情况
                 print(f"[Drag] Drop on gap, reordering items. Target row: {self.drag_target_row}")
                 # 放置在间隙，重新排序
                 self._reorder_items(dragged_class_name, dragged_parent_name)
                 event.acceptProposedAction()
-                # 重置拖拽状态
-                self.drag_target_row = -1
-                self.is_dragging_child_to_gap = False
-                self.drag_hover_index = None
-                self.delegate.set_hovered_index(None)
-                self.viewport().update()
-                print("[Drag] Items reordered")
-                # 不再重新加载数据，避免覆盖内存中的更改
-                # self.load_categories()
-                return
-            else:
-                # 特殊情况处理：即使drag_target_row为-1，也要处理重新排序
-                # 这种情况可能发生在直接拖拽到列表末尾等场景
-                print("[Drag] Special case: reordering items with target row -1")
-                self._reorder_items(dragged_class_name, dragged_parent_name)
-                event.acceptProposedAction()
-                # 重置拖拽状态
-                self.drag_target_row = -1
-                self.is_dragging_child_to_gap = False
-                self.drag_hover_index = None
-                self.delegate.set_hovered_index(None)
-                self.viewport().update()
-                print("[Drag] Items reordered (special case)")
-                # 不再重新加载数据，避免覆盖内存中的更改
-                # self.load_categories()
-                return
                     
         print("[Drag] Calling super().dropEvent()")
         super().dropEvent(event)
@@ -573,8 +521,6 @@ class AnnotationList(QListView):
         self.delegate.set_drag_target_index(None)
         self.viewport().update()
         print("[Drag] Drop event finished, state reset")
-        # 不再重新加载数据，避免覆盖内存中的更改
-        # self.load_categories()
 
     def _reorder_items(self, dragged_class_name, dragged_parent_name=None):
         """重新排序项目"""
