@@ -297,14 +297,7 @@ class ImageCanvas(QGraphicsView):
                 self.category_map[new_category.class_name] = new_category
                 category = new_category
                 # 添加到annotation_list
-                self.annotation_list.handle_add_annotation(
-                    position=len(self.project_info.categories),
-                    reference_id=max((cat.class_id for cat in self.project_info.categories), default=0),
-                    default_name=category.class_name
-                )
-
-                # 将新创建的类别保存到数据库
-                self.project_info.domain.add_categories([new_category])
+                self.annotation_list.append_category(category)
 
 
             # 创建并添加AnnotationView
@@ -1077,11 +1070,7 @@ class ImageCanvas(QGraphicsView):
 
         if not exists:
             # 如果不存在，添加到列表末尾
-            self.annotation_list.handle_add_annotation(
-                position=len(self.project_info.categories),
-                reference_id=max((cat.class_id for cat in self.project_info.categories), default=0),
-                default_name=category.class_name
-            )
+            self.annotation_list.add_category(category)
 
         # 发射信号通知选中的标注类别
         # self.annotation_selected.emit(category)

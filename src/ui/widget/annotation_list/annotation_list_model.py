@@ -32,15 +32,29 @@ class AnnotationListModel(QStandardItemModel):
 
     def append_annotation(self, category: AnnotationCategoryDTO):
         """添加带序号的标注项"""
-        self.domain.append(category)
-        item = AnnotationItem(category)
-        self.appendRow(item)
+        # 检查是否已存在相同class_name的项
+        existing_item = self.get_item_by_class_name(category.class_name)
+        if existing_item is None:
+            # 不存在则添加
+            self.domain.append(category)
+            item = AnnotationItem(category)
+            self.appendRow(item)
+        else:
+            # 已存在则更新
+            existing_item.set_category(category)
 
     def insert_annotation(self, row: int, category: AnnotationCategoryDTO):
         """在指定位置插入标注项"""
-        self.domain.insert_category(row, category)
-        item = AnnotationItem(category)
-        self.insertRow(row, item)
+        # 检查是否已存在相同class_name的项
+        existing_item = self.get_item_by_class_name(category.class_name)
+        if existing_item is None:
+            # 不存在则插入
+            self.domain.insert_category(row, category)
+            item = AnnotationItem(category)
+            self.insertRow(row, item)
+        else:
+            # 已存在则更新
+            existing_item.set_category(category)
 
     def clear_annotations(self):
         """清除所有标注"""

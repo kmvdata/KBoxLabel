@@ -702,37 +702,20 @@ class AnnotationList(QListView):
         self.proxy_model.setFilterCaseSensitivity(Qt.CaseInsensitive)
         self.proxy_model.setFilterRole(Qt.DisplayRole)
 
-    def handle_add_annotation(self, position=None, reference_id=None, default_name=None):
+    def handle_add_annotation(self, position: QModelIndex = None, default_name=None):
         """处理添加新类别，position为源模型中的位置索引，None表示添加到末尾"""
-        # 根据参考ID生成新ID
-        if reference_id is not None:
-            new_id = reference_id + 1
+        # 调用模型的方法创建新类别
+        if position is not None and position.isValid():
+            source_index = self.proxy_model.mapToSource(position)
+            new_category = self.source_model.create_new_category_at_index(source_index, default_name)
+            # 获取新添加项的索引
+            proxy_index = self.proxy_model.mapFromSource(self.source_model.index(source_index.row(), 0))
         else:
-            # 如果没有参考ID，使用原逻辑（最大值+1）
-            max_id = max((cat.class_id for cat in self.project_info.categories), default=0)
-            new_id = max_id + 1
-
-        if default_name is None:
-            new_name = f"新类别 {new_id}"
-        else:
-            new_name = default_name
-
-        new_category = AnnotationCategoryDTO(
-            class_id=new_id,
-            class_name=new_name
-        )
-
-        # 根据position决定插入位置
-        if position is not None and 0 <= position <= len(self.project_info.categories):
-            self.source_model.insert_annotation(position, new_category)
-        else:
-            self.source_model.append_annotation(new_category)
-
-        # 获取新添加项的索引
-        if position is not None:
-            proxy_index = self.proxy_model.mapFromSource(self.source_model.index(position, 0))
-        else:
-            proxy_index = self.proxy_model.index(self.proxy_model.rowCount() - 1, 0)
+            # 添加到末尾
+            row_count = self.source_model.rowCount()
+            end_index = self.source_model.index(row_count, 0)
+            new_category = self.source_model.create_new_category_at_index(end_index, default_name)
+            proxy_index = self.proxy_model.mapFromSource(self.source_model.index(row_count, 0))
 
         # 滚动到新项位置
         self.scrollTo(proxy_index)
@@ -744,6 +727,11 @@ class AnnotationList(QListView):
         )
 
         self.project_info.domain.refresh_order_entire_list()
+
+    def append_category(self, category: AnnotationCategoryDTO):
+        """添加类别"""
+        self.source_model.append_annotation(category)
+        pass
 
     def _handle_rename(self):
         """处理重命名操作"""
@@ -839,20 +827,8 @@ class AnnotationList(QListView):
 
     def _context_add(self):
         """处理右键菜单中的新增操作"""
-        reference_id = None
-        insert_position = None
-        a = self.source_model.rowCount()
-        print(a)
         if self.right_click_index and self.right_click_index.isValid():
-            # 如果有选中项，获取其ID作为参考
-            source_index = self.proxy_model.mapToSource(self.right_click_index)
-            row = source_index.row()
-            if 0 <= row < len(self.project_info.categories):
-                reference_id = self.project_info.categories[row].class_id
-                insert_position = row + 1  # 在选中项后插入
-
-        # 调用添加方法，传递参考ID和位置
-        self.handle_add_annotation(insert_position, reference_id)
+            self.handle_add_annotation(self.right_click_index )
 
 
     def load_categories_from_yolo_model(self, model_path):
