@@ -613,8 +613,11 @@ class ProjectDomain(AbsSqliteDomain):
             elif cat.class_name == second_category_name:
                 second_category = cat
 
-        if first_category is None or second_category is None:
-            raise ValueError("Category not found")
+        if first_category is None:
+            raise ValueError(f"Category {first_category_name} not found")
+
+        if second_category is None:
+            print(f"Category {second_category_name} not found")
 
         return first_category, second_category
 

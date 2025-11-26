@@ -762,7 +762,6 @@ class AnnotationList(QListView):
 
         # 根据position决定插入位置
         if position is not None and 0 <= position <= len(self.project_info.categories):
-            self.project_info.domain.insert_category(position, new_category)
             self.source_model.insert_annotation(position, new_category)
         else:
             self.source_model.append_annotation(new_category)
