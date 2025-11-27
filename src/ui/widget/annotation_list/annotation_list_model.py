@@ -3,7 +3,8 @@ from enum import Enum
 from typing import Optional
 
 from PyQt5.QtCore import Qt, QModelIndex
-from PyQt5.QtGui import QStandardItemModel, QColor
+from PyQt5.QtGui import QColor
+from PyQt5.QtGui import QStandardItemModel
 from ultralytics import YOLO
 from ultralytics import YOLO
 
@@ -11,6 +12,7 @@ from src.common.domain import AnnotationCategory
 from src.core.project_info import ProjectInfo
 from src.models.dto.annotation_category_dto import AnnotationCategoryDTO
 from src.ui.widget.annotation_list.annotation_item import AnnotationItem
+
 
 class AnnotationDropArea(Enum):
     TOP = "top"
@@ -186,5 +188,7 @@ class AnnotationListModel(QStandardItemModel):
 
     def load_categories(self):
         categories = self.domain.query_all_categories()
-        # 根据categories内容更创建AnnotationItem
-
+        # 根据categories内容创建AnnotationItem
+        for category in categories:
+            item = AnnotationItem(category)
+            self.appendRow(item)

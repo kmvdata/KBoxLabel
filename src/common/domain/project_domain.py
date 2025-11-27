@@ -731,7 +731,7 @@ class ProjectDomain(AbsSqliteDomain):
         :return: 所有数据列表
         """
         with self.db_session() as session:
-            return session.query(SQLAnnotationCategory).all()
+            return session.query(SQLAnnotationCategory).order_by(SQLAnnotationCategory.order).all()
 
     def resave_all_categories(self, sql_annotation_category_list: list[SQLAnnotationCategory]):
         """
