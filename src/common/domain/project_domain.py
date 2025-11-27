@@ -15,20 +15,8 @@ class ProjectDomain(AbsSqliteDomain):
     """数据库领域类"""
     def __init__(self, db_path: Path):
         super().__init__(db_path)
-        self._categories: list[AnnotationCategoryDTO] = []
         self.load_categories()
     
-    @property
-    def categories(self) -> list[AnnotationCategoryDTO]:
-        """获取类别列表"""
-        return self._categories
-    
-    @categories.setter
-    def categories(self, value: list[AnnotationCategoryDTO]):
-        """设置类别列表"""
-        self._categories = value
-        self.refresh_order_entire_list()
-
     def model_path_in_db(self) -> Optional[Path]:
         """从数据库查询模型路径"""
         # 创建数据库会话

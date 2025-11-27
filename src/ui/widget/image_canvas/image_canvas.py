@@ -1047,7 +1047,7 @@ class ImageCanvas(QGraphicsView):
         first_item = selected_items[0]
 
         # 检查该类别是否已存在于annotation_list中
-        exists = any(c.class_name == first_item.class_name for c in self.project_info.categories)
+        exists = self.annotation_list.source_model.get_item_by_class_name(first_item.class_name)
 
         if not exists:
             # 如果不存在，添加到列表末尾

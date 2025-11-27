@@ -17,16 +17,6 @@ class ProjectInfo:
         # 初始化数据库
         self.domain: ProjectDomain = ProjectDomain(self._db_path)
 
-    @property
-    def categories(self) -> list[AnnotationCategoryDTO]:
-        """获取类别列表"""
-        return self.domain.categories
-
-    @categories.setter
-    def categories(self, value: list[AnnotationCategoryDTO]):
-        """设置类别列表"""
-        self.domain.categories = value
-
     def exists(self) -> bool:
         if self.path is None:
             return False

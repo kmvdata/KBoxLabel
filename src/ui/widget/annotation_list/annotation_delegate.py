@@ -7,6 +7,7 @@ from ultralytics import YOLO
 from ultralytics import YOLO
 
 from src.models.dto.annotation_category_dto import AnnotationCategoryDTO
+from src.ui.widget.annotation_list.annotation_item import AnnotationItem
 
 
 class AnnotationDelegate(QStyledItemDelegate):
@@ -129,7 +130,7 @@ class AnnotationDelegate(QStyledItemDelegate):
             painter.restore()
 
     @staticmethod
-    def create_drag_pixmap(category: AnnotationCategoryDTO) -> QPixmap:
+    def create_drag_pixmap(annotation_item: AnnotationItem) -> QPixmap:
         """创建用于拖拽的 pixmap"""
         # 创建一个适当大小的 pixmap
         width = 200
@@ -146,7 +147,7 @@ class AnnotationDelegate(QStyledItemDelegate):
         color_rect = QRect(4, 4, color_size, color_size)
 
         # 使用带透明度的颜色
-        transparent_color = QColor(category.color)
+        transparent_color = QColor(annotation_item.class_color)
         transparent_color.setAlphaF(0.65)
         painter.fillRect(color_rect, transparent_color)
 
@@ -158,7 +159,7 @@ class AnnotationDelegate(QStyledItemDelegate):
         # 绘制类别名称
         text_rect = QRect(color_size + 12, 0, width - color_size - 16, height)
         painter.setPen(Qt.black)
-        painter.drawText(text_rect, Qt.AlignLeft | Qt.AlignVCenter, category.class_name)
+        painter.drawText(text_rect, Qt.AlignLeft | Qt.AlignVCenter, annotation_item.class_name)
 
         painter.end()
         return pixmap

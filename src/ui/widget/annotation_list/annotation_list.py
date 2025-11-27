@@ -1,6 +1,7 @@
 # annotation_list.py
 
 import json
+import typing
 from typing import Optional, Union
 
 from PyQt5 import QtCore
@@ -183,26 +184,14 @@ class AnnotationList(QListView):
 
     def startDrag(self, supported_actions: Union[QtCore.Qt.DropActions, QtCore.Qt.DropAction]):
         """重写拖拽开始事件"""
-        current_index = self.currentIndex()
-        print(f"[Drag] Start dragging, current index: {current_index}")
-        if not current_index.isValid():
-            print("[Drag] Current index is invalid, aborting drag")
-            return
-
-        source_index = self.proxy_model.mapToSource(current_index)
-        print(f"[Drag] Source index row: {source_index.row()}, categories count: {len(self.project_info.categories)}")
-        if not (0 <= source_index.row() < len(self.project_info.categories)):
-            print("[Drag] Source index out of range, aborting drag")
-            return
-
-        category = self.project_info.categories[source_index.row()]
-        print(f"[Drag] Dragging category: id={category.class_id}, name={category.class_name}, parent={category.parent_name}")
+        annotation_item = self.get_annotation_item_by_index(self.currentIndex())
+        print(f"[Drag] Dragging category: id={annotation_item.class_id}, name={annotation_item.class_name}, parent={annotation_item.parent_name}")
 
         drag_data = {
-            'class_id': category.class_id,
-            'class_name': category.class_name,
-            'color': category.color.name(),
-            'parent_name': category.parent_name  # 添加父ID信息
+            'class_id': annotation_item.class_id,
+            'class_name': annotation_item.class_name,
+            'color': annotation_item.class_color.name(),
+            'parent_name': annotation_item.parent_name  # 添加父ID信息
         }
 
         mime_data = QMimeData()
@@ -212,7 +201,7 @@ class AnnotationList(QListView):
         drag.setMimeData(mime_data)
         
         # 使用自定义的 pixmap 作为拖拽图像
-        pixmap = self.delegate.create_drag_pixmap(category)
+        pixmap = self.delegate.create_drag_pixmap(annotation_item)
         drag.setPixmap(pixmap)
         drag.setHotSpot(pixmap.rect().center())  # 设置热点为中心点
         
@@ -321,6 +310,16 @@ class AnnotationList(QListView):
         else:
             print("[Drag] Event ignored, wrong mime type")
             event.ignore()
+
+    def get_annotation_item_by_index(self, index: QModelIndex) -> Optional[AnnotationItem]:
+        """根据索引获取对应的item"""
+        if not index.isValid():
+            return None
+        source_index = self.proxy_model.mapToSource(index)
+        if not (0 <= source_index.row() < self.source_model.rowCount()):
+            print("[Drag] Source index out of range, aborting drag")
+            return None
+        return typing.cast(AnnotationItem, self.source_model.itemFromIndex(source_index))
 
     def _handle_drop_on_gap(self, event, pos, dragged_class_name: str, dragged_parent_name: Optional[str], before_row=None):
         """处理拖拽到间隙的情况"""

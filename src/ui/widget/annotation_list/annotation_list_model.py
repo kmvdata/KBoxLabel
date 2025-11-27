@@ -1,4 +1,5 @@
 # annotation_list_model.py
+import typing
 from enum import Enum
 from typing import Optional
 
