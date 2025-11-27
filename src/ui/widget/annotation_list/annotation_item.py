@@ -9,33 +9,58 @@ from ultralytics import YOLO
 from src.common.domain import AnnotationCategory
 
 
+def _gen_sql_annotation_category(class_name: str, class_id: int, parent_name: str = None) -> AnnotationCategory:
+    category = AnnotationCategory()
+    category.class_id = class_id
+    category.class_name = class_name
+    category.parent_name = parent_name
+    return category
+
 class AnnotationItem(QStandardItem):
     """自定义项，存储带序号的标注类别数据"""
-    def __init__(self, category: AnnotationCategory):
-        super().__init__(category.class_name)
-        self.set_category(category)
+    def __init__(self, class_name: str, class_id: int, parent_name: str = None):
+        super().__init__(class_name)
+        self.set_category(class_name, class_id, parent_name)
 
-    def set_category(self, category: AnnotationCategory):
-        self.setData(self._generate_color_from_class_name(category.class_name), Qt.UserRole)
-        self.setData(category.class_id, Qt.UserRole + 1)
-        self.setData(category.class_name, Qt.UserRole + 2)  # 存储class_name
-        self.setData(category.parent_name, Qt.UserRole + 3)  # 存储父class_name
+    def set_category(self, class_name: str, class_id: int, parent_name: str = None):
+        self.setData(self._generate_color_from_class_name(class_name), Qt.UserRole)
+        self.setData(class_id, Qt.UserRole + 1)
+        self.setData(class_name, Qt.UserRole + 2)  # 存储class_name
+        self.setData(parent_name, Qt.UserRole + 3)  # 存储父class_name
         self.setEditable(True)
 
-    def set_parent_name(self, parent_name):
-        self.setData(parent_name, Qt.UserRole + 3)
 
-    def get_class_id(self) -> int:
+    @property
+    def class_id(self) -> int:
         return self.data(Qt.UserRole + 1)
 
-    def get_class_name(self) -> str:
+    @class_id.setter
+    def class_id(self, class_id: int):
+        self.setData(class_id, Qt.UserRole + 1)
+
+    @property
+    def class_name(self) -> str:
         return self.data(Qt.UserRole + 2)
 
-    def get_parent_name(self) -> str:
+    @class_name.setter
+    def class_name(self, class_name: str):
+        self.setData(class_name, Qt.UserRole + 2)
+
+    @property
+    def parent_name(self) -> str:
         return self.data(Qt.UserRole + 3)
 
-    def get_color(self) -> QColor:
+    @parent_name.setter  # 这里要使用@property装饰的属性名来关联setter
+    def parent_name(self, parent_name: str):  # 补充参数类型注解
+        self.setData(parent_name, Qt.UserRole + 3)
+
+    @property
+    def color(self) -> QColor:
         return self.data(Qt.UserRole)
+
+    @property
+    def annotation_category(self) -> AnnotationCategory:
+        return _gen_sql_annotation_category(self.class_name, self.class_id, self.parent_name)
 
     @staticmethod
     def _generate_color_from_class_id(class_id: int):
