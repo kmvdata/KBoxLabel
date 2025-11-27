@@ -732,16 +732,21 @@ class ProjectDomain(AbsSqliteDomain):
         """
         session = self.db_session()
         try:
-            # 获取所有类别
-            categories = session.query(SQLAnnotationCategory).all()
-
-            # 遍历所有类别并更新数据库
-            for category in categories:
-                session.merge(category)
+            # 删除所有现有的类别
+            session.query(SQLAnnotationCategory).delete()
+            
+            # 添加所有传入的类别对象
+            for category in sql_annotation_category_list:
+                session.add(category)
 
             session.commit()
+        except Exception as e:
+            session.rollback()
+            raise e
         finally:
             session.close()
+
+
 
 
 

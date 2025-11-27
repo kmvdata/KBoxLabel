@@ -7,6 +7,7 @@ from PyQt5.QtGui import QStandardItemModel, QColor
 from ultralytics import YOLO
 from ultralytics import YOLO
 
+from src.common.domain import AnnotationCategory
 from src.core.project_info import ProjectInfo
 from src.models.dto.annotation_category_dto import AnnotationCategoryDTO
 from src.ui.widget.annotation_list.annotation_item import AnnotationItem
@@ -154,6 +155,31 @@ class AnnotationListModel(QStandardItemModel):
 
     def save_categories(self):
         """保存类别列表到数据库"""
-        # 按顺序便利所有的annotation_item，由items生成对应的annotation_category orm对象（class AnnotationCategory(KOrmBase)），
+        # 按顺序遍历所有的annotation_item，由items生成对应的annotation_category orm对象（class AnnotationCategory(KOrmBase)），
         # 然后按照当前顺序，给这些对象的order赋值，从1000开始，每个平级的item的order间隔为1000，如果是二级item，则间隔为1，同一个父item下的二级item，第一个二级item以其父item.order+1起始，依次类推。
         # 最后，调用数据库方法resave_all_categories，保存生成的annotation_category。
+
+        # 收集所有item并构建类别列表
+        categories: list[AnnotationCategory] = []
+        last_order = 1000
+        for row in range(self.rowCount()):
+            item = self.item(row)
+            if isinstance(item, AnnotationItem):
+                sql_category = AnnotationCategory()
+                sql_category.class_id = item.get_class_id()
+                sql_category.class_name = item.get_class_name()
+                color = item.get_color()
+                sql_category.color_r = color.red()
+                sql_category.color_g = color.green()
+                sql_category.color_b = color.blue()
+                sql_category.parent_name = item.get_parent_name()
+                if item.get_parent_name() is None:
+                    sql_category.order = (row+1) * 1000
+                else:
+                    sql_category.order = last_order + 1
+
+                last_order = sql_category.order
+                categories.append(sql_category)
+        
+        # 保存到数据库
+        self.domain.resave_all_categories(categories)
