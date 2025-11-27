@@ -9,13 +9,6 @@ from ultralytics import YOLO
 from src.common.domain import AnnotationCategory
 
 
-def _gen_sql_annotation_category(class_name: str, class_id: int, parent_name: str = None) -> AnnotationCategory:
-    category = AnnotationCategory()
-    category.class_id = class_id
-    category.class_name = class_name
-    category.parent_name = parent_name
-    return category
-
 class AnnotationItem(QStandardItem):
     """自定义项，存储带序号的标注类别数据"""
     def __init__(self, class_name: str, class_id: int, parent_name: str = None):
@@ -58,9 +51,17 @@ class AnnotationItem(QStandardItem):
     def color(self) -> QColor:
         return self.data(Qt.UserRole)
 
+    @staticmethod
+    def gen_sql_annotation_category(class_name: str, class_id: int, parent_name: str = None) -> AnnotationCategory:
+        category = AnnotationCategory()
+        category.class_id = class_id
+        category.class_name = class_name
+        category.parent_name = parent_name
+        return category
+
     @property
     def annotation_category(self) -> AnnotationCategory:
-        return _gen_sql_annotation_category(self.class_name, self.class_id, self.parent_name)
+        return self.gen_sql_annotation_category(self.class_name, self.class_id, self.parent_name)
 
     @staticmethod
     def _generate_color_from_class_id(class_id: int):

@@ -31,12 +31,7 @@ class AnnotationListModel(QStandardItemModel):
         # 清空现有模型数据
         self.clear_annotations()
 
-        # 先确保domain中的categories已按order排序
-        sorted_categories = sorted(self.domain.categories, key=lambda cat: cat.order)
-        
-        for category in sorted_categories:
-            item = AnnotationItem(category)
-            self.appendRow(item)
+        self.load_categories()
 
     def append_annotation(self, category: AnnotationCategoryDTO):
         """添加带序号的标注项"""
@@ -110,26 +105,29 @@ class AnnotationListModel(QStandardItemModel):
     def count_kilo_items_for_category(self, category_name: str):
         return self.domain.count_kilo_items_for_category(category_name)
 
-    def create_new_category_at_index(self, index: QModelIndex, default_name=None):
+    def append_new_category(self, class_name=None):
+        """创建新的类别"""
+        # 调用create_new_category_at_index实现，需要获取列表最后的index作为参数传入
+        self.create_new_category_at_index(self.index(self.rowCount() - 1, 0), class_name)
+
+    def create_new_category_at_index(self, index: QModelIndex, class_name:Optional[str]=None):
         """在指定索引位置创建新的类别"""
         # 使用domain方法获取最大ID
         max_id = self.domain.get_max_category_id()
         new_id = max_id + 1
 
-        if default_name is None:
-            new_name = f"新类别 {new_id}"
-        else:
-            new_name = default_name
+        if class_name is None:
+            class_name = f"新类别 {new_id}"
 
         new_category = AnnotationCategoryDTO(
             class_id=new_id,
-            class_name=new_name
+            class_name=class_name
         )
 
         # 插入新的类别
         self.insert_annotation(index.row(), new_category)
         
-        self.domain.refresh_order_entire_list()
+        self.save_categories()
         
         return new_category
 
@@ -168,14 +166,14 @@ class AnnotationListModel(QStandardItemModel):
             item = self.item(row)
             if isinstance(item, AnnotationItem):
                 sql_category = AnnotationCategory()
-                sql_category.class_id = item.get_class_id()
-                sql_category.class_name = item.get_class_name()
-                color = item.get_color()
+                sql_category.class_id = item.class_id
+                sql_category.class_name = item.class_name
+                color = item.color
                 sql_category.color_r = color.red()
                 sql_category.color_g = color.green()
                 sql_category.color_b = color.blue()
-                sql_category.parent_name = item.get_parent_name()
-                if item.get_parent_name() is None:
+                sql_category.parent_name = item.parent_name
+                if item.parent_name is None:
                     sql_category.order = (row+1) * 1000
                 else:
                     sql_category.order = last_order + 1
@@ -190,5 +188,5 @@ class AnnotationListModel(QStandardItemModel):
         categories = self.domain.query_all_categories()
         # 根据categories内容创建AnnotationItem
         for category in categories:
-            item = AnnotationItem(category)
+            item = AnnotationItem(category.class_name, category.class_id, category.parent_name)
             self.appendRow(item)
