@@ -183,3 +183,8 @@ class AnnotationListModel(QStandardItemModel):
         
         # 保存到数据库
         self.domain.resave_all_categories(categories)
+
+    def load_categories(self):
+        categories = self.domain.query_all_categories()
+        # 根据categories内容更创建AnnotationItem
+

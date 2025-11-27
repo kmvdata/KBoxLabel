@@ -725,26 +725,35 @@ class ProjectDomain(AbsSqliteDomain):
         finally:
             session.close()
 
+    def query_all_categories(self) -> list[SQLAnnotationCategory]:
+        """
+        查询annotation_category表中的所有数据
+        :return: 所有数据列表
+        """
+        with self.db_session() as session:
+            return session.query(SQLAnnotationCategory).all()
+
     def resave_all_categories(self, sql_annotation_category_list: list[SQLAnnotationCategory]):
         """
         重新保存所有类别
-        首先删除SQLAnnotationCategory表中全部的数据，然后保存sql_annotation_category_list传入的所有对象。
+        首先删除SQLAnnotationCategory表中全部的数据，然后保存传入的所有对象。
         """
-        session = self.db_session()
         try:
-            # 删除所有现有的类别
-            session.query(SQLAnnotationCategory).delete()
-            
-            # 添加所有传入的类别对象
-            for category in sql_annotation_category_list:
-                session.add(category)
+            with self.db_session() as session:
+                # 删除所有现有类别
+                session.query(SQLAnnotationCategory).delete()
 
-            session.commit()
+                # 批量添加（高效）
+                if sql_annotation_category_list:
+                    session.add_all(sql_annotation_category_list)
+
+                # 提交事务（上下文块内完成）
+                session.commit()
         except Exception as e:
-            session.rollback()
+            # 上下文管理器的__exit__会自动处理rollback（取决于db_session的实现）
+            # 若自定义上下文管理器未处理，可手动捕获并抛出
             raise e
-        finally:
-            session.close()
+
 
 
 
