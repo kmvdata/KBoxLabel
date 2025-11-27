@@ -1,7 +1,7 @@
 # annotation_item.py
 
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QStandardItem
+from PyQt5.QtGui import QStandardItem, QColor
 from ultralytics import YOLO
 from ultralytics import YOLO
 
@@ -23,4 +23,17 @@ class AnnotationItem(QStandardItem):
 
     def set_parent_name(self, parent_name):
         self.setData(parent_name, Qt.UserRole + 3)
+
+    def get_class_id(self) -> int:
+        return self.data(Qt.UserRole + 1)
+
+    def get_class_name(self) -> str:
+        return self.data(Qt.UserRole + 2)
+
+    def get_parent_name(self) -> str:
+        return self.data(Qt.UserRole + 3)
+
+    def get_color(self) -> QColor:
+        return self.data(Qt.UserRole)
+
 
