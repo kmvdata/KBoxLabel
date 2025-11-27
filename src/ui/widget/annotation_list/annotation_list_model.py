@@ -151,3 +151,9 @@ class AnnotationListModel(QStandardItemModel):
         
         # 重新刷新模型以反映更改
         self.refresh_model()
+
+    def save_categories(self):
+        """保存类别列表到数据库"""
+        # 按顺序便利所有的annotation_item，由items生成对应的annotation_category orm对象（class AnnotationCategory(KOrmBase)），
+        # 然后按照当前顺序，给这些对象的order赋值，从1000开始，每个平级的item的order间隔为1000，如果是二级item，则间隔为1，同一个父item下的二级item，第一个二级item以其父item.order+1起始，依次类推。
+        # 最后，调用数据库方法resave_all_categories，保存生成的annotation_category。

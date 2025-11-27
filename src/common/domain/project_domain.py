@@ -725,6 +725,24 @@ class ProjectDomain(AbsSqliteDomain):
         finally:
             session.close()
 
+    def resave_all_categories(self, sql_annotation_category_list: list[SQLAnnotationCategory]):
+        """
+        重新保存所有类别
+        首先删除SQLAnnotationCategory表中全部的数据，然后保存sql_annotation_category_list传入的所有对象。
+        """
+        session = self.db_session()
+        try:
+            # 获取所有类别
+            categories = session.query(SQLAnnotationCategory).all()
+
+            # 遍历所有类别并更新数据库
+            for category in categories:
+                session.merge(category)
+
+            session.commit()
+        finally:
+            session.close()
+
 
 
 
