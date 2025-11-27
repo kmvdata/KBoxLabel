@@ -13,6 +13,7 @@ from src.common.god.korm_base import KOrmBase
 from src.models.dto.annotation_category_dto import AnnotationCategoryDTO
 from src.core.project_info import ProjectInfo
 from src.common.domain.models.kolo_item import KoloItem
+from src.ui.widget.annotation_list.annotation_item import AnnotationItem
 from src.ui.widget.annotation_list.annotation_list import AnnotationList
 from src.ui.widget.image_canvas.annotation_view import AnnotationView
 
@@ -88,9 +89,6 @@ class ImageCanvas(QGraphicsView):
         self.setScene(self.scene)
         self.image_item: Optional[QGraphicsPixmapItem] = None
         self.current_image_path: Optional[Path] = None
-
-        # 存储标注类别
-        self.category_map = {}  # 用于快速查找class_name对应的类别
 
         # 绘图状态
         self.drawing = False
@@ -189,9 +187,6 @@ class ImageCanvas(QGraphicsView):
         self.resetTransform()
         self.current_scale = 1.0
 
-        # 保存标注类别信息
-        self.category_map = {category.class_name: category for category in self.project_info.categories}
-
         # 添加图片到场景
         self.image_item = self.scene.addPixmap(pixmap)
         self.scene.setSceneRect(self.image_item.boundingRect())
@@ -211,9 +206,6 @@ class ImageCanvas(QGraphicsView):
 
     def load_annotations_on_image(self, image_path: Path, img_width: int, img_height: int):
         """从SQLite数据库加载与图片同名的kolo_item记录"""
-        # 创建类名到类别的映射字典
-        class_name_map = {category.class_name: category for category in self.category_map.values()}
-
         # 从数据库中查询所有匹配image_name的KoloItem对象
         try:
             # 执行查询
@@ -224,19 +216,9 @@ class ImageCanvas(QGraphicsView):
                 class_name = kolo_item.class_name
 
                 # 获取类别对象（如果不存在则创建并添加到映射中）
-                category = class_name_map.get(class_name)
-                if not category:
-                    # 动态创建新类别
-                    new_category = AnnotationCategoryDTO(
-                        class_id=len(self.category_map) + 1,
-                        class_name=class_name,
-                    )
-                    # 添加到类别映射
-                    self.category_map[new_category.class_name] = new_category
-                    class_name_map[class_name] = new_category
-                    category = new_category
-                    print(f"信息: 数据库中类别 '{class_name}' 未定义，已创建新类别（ID={new_category.class_id}）")
-
+                annotation_item = self.annotation_list.source_model.get_item_by_class_name(class_name)
+                if not annotation_item:
+                    annotation_item = self.annotation_list.source_model.append_new_category(class_name)
 
                 # 从KoloItem获取归一化坐标
                 x_center = Decimal(kolo_item.x_center)
@@ -313,10 +295,10 @@ class ImageCanvas(QGraphicsView):
             return False
 
     @property
-    def current_category(self) -> Optional[AnnotationCategoryDTO]:
+    def current_annotation_item(self) -> Optional[AnnotationItem]:
         """获取当前要绘制的标注类别，从annotation list中获取当前选中item对应的category，如果没有选中任何item，则返回none"""
         if self.annotation_list:
-            return self.annotation_list.get_selected_category()
+            return self.annotation_list.get_selected_annotation_item()
         return None
 
     def wheelEvent(self, event):
@@ -396,7 +378,7 @@ class ImageCanvas(QGraphicsView):
                 self.unselect_all_annotations()
 
             # 当设置了当前类别时开始绘制新标注，但按住Shift键时不创建新标注
-            if not is_annotation and self.current_category is not None and not shift_pressed:
+            if not is_annotation and self.current_annotation_item is not None and not shift_pressed:
                 self.start_point = self.mapToScene(event.pos())
                 self.drawing = True
 
@@ -448,7 +430,7 @@ class ImageCanvas(QGraphicsView):
                 # 创建新AnnotationView并设置当前类别
                 item = AnnotationView(
                     Decimal(rect.x()), Decimal(rect.y()), Decimal(rect.width()), Decimal(rect.height()),
-                    self.current_category,
+                    self.current_annotation_item,
                     self
                 )
                 self.scene.addItem(item)
@@ -1063,21 +1045,20 @@ class ImageCanvas(QGraphicsView):
 
         # 获取第一个选中的标注的类别
         first_item = selected_items[0]
-        category = first_item.category
 
         # 检查该类别是否已存在于annotation_list中
-        exists = any(c.class_name == category.class_name for c in self.project_info.categories)
+        exists = any(c.class_name == first_item.class_name for c in self.project_info.categories)
 
         if not exists:
             # 如果不存在，添加到列表末尾
-            self.annotation_list.add_category(category)
+            self.annotation_list.source_model.append_new_category(first_item.class_name)
 
         # 发射信号通知选中的标注类别
         # self.annotation_selected.emit(category)
 
         # 选中列表中对应的项
         if self.annotation_list:
-            self.annotation_list.select_category_by_name(category.class_name)
+            self.annotation_list.select_category_by_name(first_item.class_name)
 
     def show_context_menu(self, position):
         """显示上下文菜单"""
@@ -1210,7 +1191,7 @@ class ImageCanvas(QGraphicsView):
         else:
             # 如果只选中一个项，更新annotation_list中的选中状态
             selected_item = selected_items[0]
-            self.annotation_list.select_category_by_name(selected_item.category.class_name)
+            self.annotation_list.select_category_by_name(selected_item.class_name)
 
     def select_single_annotation(self, annotation_view):
         """选中单个标注视图，取消其他所有标注视图的选中状态，并同步更新annotation_list"""
@@ -1224,7 +1205,7 @@ class ImageCanvas(QGraphicsView):
         
         # 同步更新annotation_list
         if self.annotation_list:
-            self.annotation_list.select_category_by_name(annotation_view.category.class_name)
+            self.annotation_list.select_category_by_name(annotation_view.class_name)
 
         # 刷新画布
         self.viewport().update()

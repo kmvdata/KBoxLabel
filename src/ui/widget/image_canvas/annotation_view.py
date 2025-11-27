@@ -9,7 +9,7 @@ from PyQt5.QtGui import QPen, QPainter, QBrush, QColor
 from PyQt5.QtWidgets import QGraphicsRectItem, QGraphicsItem, QStyle
 
 from src.core.utils.string_util import StringUtil
-from src.models.dto.annotation_category_dto import AnnotationCategoryDTO
+from src.ui.widget.annotation_list.annotation_item import AnnotationItem
 
 
 class AnnotationView(QGraphicsRectItem):
@@ -34,12 +34,12 @@ class AnnotationView(QGraphicsRectItem):
     BOTTOM_LEFT = 7
     LEFT_MIDDLE = 8
 
-    def __init__(self, x: Decimal, y: Decimal, width: Decimal, height: Decimal, category: AnnotationCategoryDTO, parent: any):
+    def __init__(self, x: Decimal, y: Decimal, width: Decimal, height: Decimal, annotation_item: AnnotationItem, parent: any):
         super().__init__(float(x), float(y), float(width), float(height))
-        self.opposite_color = None
-        self.current_color = None
-        self.category = None
-        self.set_category(category)
+        self.opposite_color: Optional[QColor] = None
+        self.current_color: Optional[QColor] = None
+        self.class_name: Optional[str] = None
+        self.set_annotation_item(annotation_item)
         self.setAcceptDrops(True)  # 启用拖放接受
 
         # 初始状态下不设置ItemIsMovable标志，只在选中时设置
@@ -83,10 +83,10 @@ class AnnotationView(QGraphicsRectItem):
             color.alpha()  # 保持透明度不变
         )
 
-    def set_category(self, category: AnnotationCategoryDTO):
-        self.category = category
+    def set_annotation_item(self, annotation_item: AnnotationItem):
+        self.class_name = annotation_item.class_name
         # 保存当前颜色和相反颜色供绘制使用
-        self.current_color = self.category.color
+        self.current_color = annotation_item.class_color
         self.opposite_color = self.get_opposite_color(self.current_color)
         self.update()  # 颜色变化时强制重绘
 
@@ -576,15 +576,15 @@ class AnnotationView(QGraphicsRectItem):
             )
 
             # 调用处理方法
-            self.handle_dropped_annotation(dropped_category)
+            self.handle_dropped_annotation(AnnotationItem(dropped_category.class_name, dropped_category.class_id))
             event.acceptProposedAction()
         else:
             event.ignore()
 
-    def handle_dropped_annotation(self, category):
+    def handle_dropped_annotation(self, annotation_item: AnnotationItem):
         """处理拖拽的标注类别"""
-        self.set_category(category)
-        print(f"拖拽成功! 接收到标注: ID={category.class_id}, 名称='{category.class_name}'")
+        self.set_annotation_item(annotation_item)
+        print(f"拖拽成功! 接收到标注: ID={annotation_item.class_id}, 名称='{annotation_item.class_name}'")
         self.set_needs_save_annotation()
         if self.image_canvas is not None:
             self.image_canvas.save_annotations()

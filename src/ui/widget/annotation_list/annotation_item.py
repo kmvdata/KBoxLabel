@@ -48,7 +48,7 @@ class AnnotationItem(QStandardItem):
         self.setData(parent_name, Qt.UserRole + 3)
 
     @property
-    def color(self) -> QColor:
+    def class_color(self) -> QColor:
         return self.data(Qt.UserRole)
 
     @staticmethod

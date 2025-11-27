@@ -14,6 +14,7 @@ from ultralytics import YOLO
 from src.core.project_info import ProjectInfo
 from src.models.dto.annotation_category_dto import AnnotationCategoryDTO
 from src.ui.widget.annotation_list.annotation_delegate import AnnotationDelegate
+from src.ui.widget.annotation_list.annotation_item import AnnotationItem
 from src.ui.widget.annotation_list.annotation_list_model import AnnotationListModel, AnnotationDropArea
 from src.ui.widget.annotation_list.editable_annotation_delegate import EditableAnnotationDelegate
 
@@ -618,14 +619,16 @@ class AnnotationList(QListView):
                     # 更新模型中的颜色数据
                     self.source_model.set_color(source_index, self.project_info.categories[row].color)
 
-    def get_selected_category(self):
+    def get_selected_annotation_item(self) -> Optional[AnnotationItem]:
         """获取当前选中的完整类别对象"""
         selected = self.selectionModel().selectedIndexes()
         if selected:
             source_index = self.proxy_model.mapToSource(selected[0])
-            class_id = self.source_model.data(source_index, Qt.UserRole + 1)
-            class_name = self.source_model.data(source_index, Qt.DisplayRole)
-            return AnnotationCategoryDTO(class_id, class_name)
+            # 从source_model中获取对应的AnnotationItem实例（关键修复）
+            selected_item = self.source_model.itemFromIndex(source_index)
+            # 确保获取的是AnnotationItem类型（可选类型校验）
+            if isinstance(selected_item, AnnotationItem):
+                return selected_item
         return None
 
     def _handle_search_text_changed(self, search_text):

@@ -46,18 +46,17 @@ class AnnotationListModel(QStandardItemModel):
             # 已存在则更新
             existing_item.set_category(category)
 
-    def insert_annotation(self, row: int, category: AnnotationCategoryDTO):
+    def insert_annotation_item(self, row: int, class_name: str, class_id: int, parent_name: str = None):
         """在指定位置插入标注项"""
         # 检查是否已存在相同class_name的项
-        existing_item = self.get_item_by_class_name(category.class_name)
-        if existing_item is None:
-            # 不存在则插入
-            self.domain.insert_category(row, category)
-            item = AnnotationItem(category)
-            self.insertRow(row, item)
-        else:
-            # 已存在则更新
-            existing_item.set_category(category)
+        existing_item = self.get_item_by_class_name(class_name)
+        # 已存在就直接返回
+        if existing_item:
+            return existing_item
+        # 不存在就执行插入
+        item = AnnotationItem(class_name, class_id, parent_name)
+        self.insertRow(row, item)
+        return item
 
     def clear_annotations(self):
         """清除所有标注"""
@@ -105,31 +104,39 @@ class AnnotationListModel(QStandardItemModel):
     def count_kilo_items_for_category(self, category_name: str):
         return self.domain.count_kilo_items_for_category(category_name)
 
-    def append_new_category(self, class_name=None):
+    def append_new_category(self, class_name=None) -> AnnotationItem:
         """创建新的类别"""
         # 调用create_new_category_at_index实现，需要获取列表最后的index作为参数传入
-        self.create_new_category_at_index(self.index(self.rowCount() - 1, 0), class_name)
+        return self.create_new_category_at_index(self.index(self.rowCount() - 1, 0), class_name)
 
-    def create_new_category_at_index(self, index: QModelIndex, class_name:Optional[str]=None):
+    def create_new_category_at_index(self, index: QModelIndex, class_name:Optional[str]=None) -> AnnotationItem:
         """在指定索引位置创建新的类别"""
         # 使用domain方法获取最大ID
-        max_id = self.domain.get_max_category_id()
-        new_id = max_id + 1
+        new_id = self.domain.get_max_category_id() + 1
 
         if class_name is None:
             class_name = f"新类别 {new_id}"
 
-        new_category = AnnotationCategoryDTO(
-            class_id=new_id,
-            class_name=class_name
+        # 如果class_name已存在，则生成新的class_name
+        while self.get_item_by_class_name(class_name):
+            new_id += 1
+            class_name = f"新类别 {new_id}"
+
+        # 1. 创建AnnotationItem实例（根据AnnotationItem的构造参数调整）
+        # 若AnnotationItem需要parent_name，可从index关联的父项获取，示例中默认None
+        new_item = AnnotationItem(
+            class_name=class_name,
+            class_id=new_id
         )
 
-        # 插入新的类别
-        self.insert_annotation(index.row(), new_category)
-        
+        # 2. 插入AnnotationItem到模型指定位置（处理父索引，适配树形/列表结构）
+        # parent_index = index.parent()  # 获取父节点索引（树形结构）
+        insert_row = index.row()  # 插入位置的行号
+
+        # 模型插入行并设置Item（QStandardItemModel的标准操作）
+        self.insertRow(insert_row, new_item)
         self.save_categories()
-        
-        return new_category
+        return new_item
 
     def move_category(self, dragged_category_name: str, target_category_name: str, drop_area: AnnotationDropArea):
         """
@@ -168,7 +175,7 @@ class AnnotationListModel(QStandardItemModel):
                 sql_category = AnnotationCategory()
                 sql_category.class_id = item.class_id
                 sql_category.class_name = item.class_name
-                color = item.color
+                color = item.class_color
                 sql_category.color_r = color.red()
                 sql_category.color_g = color.green()
                 sql_category.color_b = color.blue()
