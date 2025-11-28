@@ -28,26 +28,45 @@ class AnnotationListModel(QStandardItemModel):
     def refresh_model(self):
         """加载项目中的所有类别到列表中"""
         # 清空现有模型数据
-        self.clear_annotations()
-
-        self.load_categories()
-
-    def insert_annotation_item(self, row: int, class_name: str, class_id: int, parent_name: str = None):
-        """在指定位置插入标注项"""
-        # 检查是否已存在相同class_name的项
-        existing_item = self.get_item_by_class_name(class_name)
-        # 已存在就直接返回
-        if existing_item:
-            return existing_item
-        # 不存在就执行插入
-        item = AnnotationItem(class_name, class_id, parent_name)
-        self.insertRow(row, item)
-        return item
-
-    def clear_annotations(self):
-        """清除所有标注"""
         self.clear()
         self.setColumnCount(1)
+        #重新从数据库中加载AnnotationItem
+        categories = self.domain.query_all_categories()
+        # 根据categories内容创建AnnotationItem
+        for category in categories:
+            item = AnnotationItem(category.class_name, category.class_id, category.parent_name)
+            self.appendRow(item)
+
+    def save_categories(self):
+        """保存类别列表到数据库"""
+        # 按顺序遍历所有的annotation_item，由items生成对应的annotation_category orm对象（class AnnotationCategory(KOrmBase)），
+        # 然后按照当前顺序，给这些对象的order赋值，从1000开始，每个平级的item的order间隔为1000，如果是二级item，则间隔为1，同一个父item下的二级item，第一个二级item以其父item.order+1起始，依次类推。
+        # 最后，调用数据库方法resave_all_categories，保存生成的annotation_category。
+
+        # 收集所有item并构建类别列表
+        categories: list[AnnotationCategory] = []
+        last_order = 1000
+        for row in range(self.rowCount()):
+            item = self.item(row)
+            if isinstance(item, AnnotationItem):
+                sql_category = AnnotationCategory()
+                sql_category.class_id = item.class_id
+                sql_category.class_name = item.class_name
+                color = item.class_color
+                sql_category.color_r = color.red()
+                sql_category.color_g = color.green()
+                sql_category.color_b = color.blue()
+                sql_category.parent_name = item.parent_name
+                if item.parent_name is None:
+                    sql_category.order = (row + 1) * 1000
+                else:
+                    sql_category.order = last_order + 1
+
+                last_order = sql_category.order
+                categories.append(sql_category)
+
+        # 保存到数据库
+        self.domain.resave_all_categories(categories)
 
     def get_item_by_class_name(self, class_name: str) -> Optional[AnnotationItem]:
         """根据class_name获取对应的item"""
@@ -71,14 +90,6 @@ class AnnotationListModel(QStandardItemModel):
             # 返回类别名称（存储在UserRole+2中）
             return item.data(Qt.UserRole + 2)
         return None
-
-    def set_color(self, index: QModelIndex, color: QColor):
-        self.setData(index, color, Qt.UserRole)
-
-    def delete_category(self, category_name: str):
-        """删除指定名称的类别"""
-        self.domain.delete_category(category_name)
-        self.refresh_model()
 
     def delete_category_by_index(self, index: QModelIndex):
         """删除指定索引的类别"""
@@ -144,51 +155,59 @@ class AnnotationListModel(QStandardItemModel):
         """
         if drop_area == AnnotationDropArea.CENTER:
             # 将dragged_category_name作为target_category_name的子类别
-            self.domain.move_category_as_children(target_category_name, dragged_category_name)
+            self.move_category_as_children(target_category_name, dragged_category_name)
         elif drop_area == AnnotationDropArea.TOP:
             # 将dragged_category_name移动到target_category_name之前
-            self.domain.move_category_by_name_before(dragged_category_name, target_category_name)
+            self.move_category_by_name_before(dragged_category_name, target_category_name)
         elif drop_area == AnnotationDropArea.BOTTOM:
             # 将dragged_category_name移动到target_category_name之后
-            self.domain.move_category_by_name_after(dragged_category_name, target_category_name)
+            self.move_category_by_name_after(dragged_category_name, target_category_name)
         
         # 重新刷新模型以反映更改
         self.refresh_model()
 
-    def save_categories(self):
-        """保存类别列表到数据库"""
-        # 按顺序遍历所有的annotation_item，由items生成对应的annotation_category orm对象（class AnnotationCategory(KOrmBase)），
-        # 然后按照当前顺序，给这些对象的order赋值，从1000开始，每个平级的item的order间隔为1000，如果是二级item，则间隔为1，同一个父item下的二级item，第一个二级item以其父item.order+1起始，依次类推。
-        # 最后，调用数据库方法resave_all_categories，保存生成的annotation_category。
+    def move_category_as_children(self, parent_category_name: str, child_category_name: str,
+                                  before_category_name: Optional[str] = None):
+        """
+        将一个类别移动为另一个类别的子类别，并可选择性地调整其在子类别列表中的位置。
 
-        # 收集所有item并构建类别列表
-        categories: list[AnnotationCategory] = []
-        last_order = 1000
-        for row in range(self.rowCount()):
-            item = self.item(row)
-            if isinstance(item, AnnotationItem):
-                sql_category = AnnotationCategory()
-                sql_category.class_id = item.class_id
-                sql_category.class_name = item.class_name
-                color = item.class_color
-                sql_category.color_r = color.red()
-                sql_category.color_g = color.green()
-                sql_category.color_b = color.blue()
-                sql_category.parent_name = item.parent_name
-                if item.parent_name is None:
-                    sql_category.order = (row+1) * 1000
-                else:
-                    sql_category.order = last_order + 1
+        此方法会将[child_category_name](file:///Users/kermit/Projects/KBoxLabel/src/common/domain/project_domain.py#L445-L445)设置为[parent_category_name](file:///Users/kermit/Projects/KBoxLabel/src/common/domain/project_domain.py#L445-L445)的子类别，
+        并根据[before_category_name](file:///Users/kermit/Projects/KBoxLabel/src/common/domain/project_domain.py#L445-L445)参数决定其在子类别列表中的位置。
 
-                last_order = sql_category.order
-                categories.append(sql_category)
-        
-        # 保存到数据库
-        self.domain.resave_all_categories(categories)
+        Args:
+            parent_category_name (str): 父类别的名称，将成为[child_category_name](file:///Users/kermit/Projects/KBoxLabel/src/common/domain/project_domain.py#L445-L445)的父类别
+            child_category_name (str): 要移动的子类别的名称
+            before_category_name (Optional[str]): 可选参数，指定[child_category_name](file:///Users/kermit/Projects/KBoxLabel/src/common/domain/project_domain.py#L445-L445)应该放置在其后的类别名称。
+                                             如果为None，则[child_category_name](file:///Users/kermit/Projects/KBoxLabel/src/common/domain/project_domain.py#L445-L445)会被放置在父类别的最后位置。
 
-    def load_categories(self):
-        categories = self.domain.query_all_categories()
-        # 根据categories内容创建AnnotationItem
-        for category in categories:
-            item = AnnotationItem(category.class_name, category.class_id, category.parent_name)
-            self.appendRow(item)
+        Raises:
+            ValueError: 当任何指定的类别名称在当前类别列表中找不到时抛出此异常
+
+        Example:
+            # 将"狗"类别设置为"动物"类别的子类别，并放置在"猫"类别之后
+            project_domain.move_category_as_children("动物", "狗", "猫")
+
+            # 将"鸟"类别设置为"动物"类别的子类别，并放置在最后
+            project_domain.move_category_as_children("动物", "鸟")
+        """
+        pass
+
+    def move_category_by_name_before(self, moved_category_name: str, target_category_name: str):
+        """
+        将一个类别移动到另一个类别之前，并保持相同的父级关系
+
+        Args:
+            moved_category_name (str): 要移动的类别名称
+            target_category_name (str): 目标类别名称（将移动到此类别之前）
+        """
+        pass
+
+    def move_category_by_name_after(self, moved_category_name: str, target_category_name: str):
+        """
+        将一个类别移动到另一个类别之后，并保持相同的父级关系
+
+        Args:
+            moved_category_name (str): 要移动的类别名称
+            target_category_name (str): 目标类别名称（将移动到此类别之后）
+        """
+        pass
