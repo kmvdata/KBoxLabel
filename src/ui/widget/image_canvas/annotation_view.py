@@ -568,14 +568,11 @@ class AnnotationView(QGraphicsRectItem):
             category_data = json.loads(json_data)
 
             # 创建AnnotationCategory对象
-            from src.models.dto.annotation_category_dto import AnnotationCategoryDTO
-            dropped_category = AnnotationCategoryDTO(
-                class_id=category_data['class_id'],
-                class_name=category_data['class_name']
-            )
+            class_id :int = int(category_data['class_id']),
+            class_name :str = category_data['class_name']
 
             # 调用处理方法
-            self.handle_dropped_annotation(AnnotationItem(dropped_category.class_name, dropped_category.class_id))
+            self.handle_dropped_annotation(AnnotationItem(class_name, class_id))
             event.acceptProposedAction()
         else:
             event.ignore()
