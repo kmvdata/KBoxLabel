@@ -15,8 +15,7 @@ class ProjectDomain(AbsSqliteDomain):
     """数据库领域类"""
     def __init__(self, db_path: Path):
         super().__init__(db_path)
-        self.load_categories()
-    
+
     def model_path_in_db(self) -> Optional[Path]:
         """从数据库查询模型路径"""
         # 创建数据库会话
@@ -101,48 +100,6 @@ class ProjectDomain(AbsSqliteDomain):
             raise e
         finally:
             session.close()
-            
-    def load_categories(self):
-        """
-        从数据库加载类别列表
-        """
-        # 开始会话
-        session = self.db_session()
-        # 转换为AnnotationCategory对象列表
-        categories: list = []
-        try:
-            # 查询所有类别，按order字段排序
-            sql_categories = session.query(SQLAnnotationCategory).order_by(SQLAnnotationCategory.order).all()
-            for sql_cat in sql_categories:
-                category = AnnotationCategoryDTO(
-                    class_id=sql_cat.class_id,
-                    class_name=sql_cat.class_name
-                )
-                category.color = QColor(sql_cat.color_r, sql_cat.color_g, sql_cat.color_b)
-                category.parent_name = sql_cat.parent_name  # 添加加载parent_name字段
-                categories.append(category)
-
-            self.categories = categories
-            self.refresh_order_entire_list()
-            return self.categories
-        except Exception as e:
-            print(f"加载类别列表失败: {str(e)}")
-        finally:
-            session.close()
-
-    def add_categories(self, new_categories: list[AnnotationCategoryDTO]):
-        # 把new_categories添加到self.categories中
-        # 获取当前已存在的类别名称集合
-        existing_names = {category.class_name for category in self.categories}
-        
-        # 添加不重复的新类别
-        for category in new_categories:
-            if category.class_name not in existing_names:
-                self.categories.append(category)
-                existing_names.add(category.class_name)
-        
-        # 重新排序
-        self.refresh_order_entire_list()
 
     def rename_image_for_kolo_item(self, old_img_name: str, new_img_name: str):
         """
@@ -205,9 +162,6 @@ class ProjectDomain(AbsSqliteDomain):
         finally:
             # 关闭会话
             session.close()
-
-        # rename执行完成后重新加载categories
-        self.load_categories()
 
     def change_category_class_id(self, category_name: str, new_class_id: int):
         """
@@ -458,8 +412,7 @@ class ProjectDomain(AbsSqliteDomain):
         except Exception as e:
             print(f"删除类别 '{category_name}' 时出错: {str(e)}")
             raise
-        # 删除完成后重新加载categories
-        self.load_categories()
+
 
     def move_category_as_children(self, parent_category_name: str, child_category_name: str, before_category_name: Optional[str] = None):
         """
