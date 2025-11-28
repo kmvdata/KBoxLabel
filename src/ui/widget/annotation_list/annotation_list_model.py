@@ -208,7 +208,7 @@ class AnnotationListModel(QStandardItemModel):
         # 检查是否试图创建循环引用
         parent_item = self.get_item_by_class_name(parent_category_name)
         child_item = self.get_item_by_class_name(child_category_name)
-        
+
         # 检查类别是否存在
         if not parent_item:
             raise ValueError(f"父类别 '{parent_category_name}' 不存在")
@@ -245,53 +245,18 @@ class AnnotationListModel(QStandardItemModel):
         # 查找要移动的类别和目标类别
         moved_item = self.get_item_by_class_name(moved_category_name)
         target_item = self.get_item_by_class_name(target_category_name)
-        
-        # 检查类别是否存在
-        if not moved_item:
-            raise ValueError(f"要移动的类别 '{moved_category_name}' 不存在")
-        if not target_item:
-            raise ValueError(f"目标类别 '{target_category_name}' 不存在")
-            
-        # 保存原始状态用于可能的回滚
-        original_parent_name = moved_item.parent_name
-        original_order = [(self.item(row).class_name, self.item(row).parent_name) 
-                         for row in range(self.rowCount())]
-        
-        try:
-            # 确保两个类别有相同的父级关系
-            if moved_item.parent_name != target_item.parent_name:
-                # 如果父级不同，需要调整移动类别的父级以匹配目标类别
-                moved_item.parent_name = target_item.parent_name
-                
-            # 重新排序 - 将moved_item放在target_item之前
-            moved_item_row = -1
-            target_item_row = -1
-            
-            # 查找行号
-            for row in range(self.rowCount()):
-                item = self.item(row)
-                if isinstance(item, AnnotationItem):
-                    if item.class_name == moved_category_name:
-                        moved_item_row = row
-                    elif item.class_name == target_category_name:
-                        target_item_row = row
-                        
-            if moved_item_row != -1 and target_item_row != -1:
-                # 从原位置移除
-                self.removeRow(moved_item_row)
-                # 调整目标索引（如果moved_item在target_item之前，移除后索引会变化）
-                adjusted_target_index = target_item_row - 1 if moved_item_row < target_item_row else target_item_row
-                # 在新位置插入
-                self.insertRow(adjusted_target_index, moved_item)
-            
-            # 保存类别到数据库
-            self.save_categories()
-        except Exception as e:
-            # 如果保存失败，回滚所有更改
-            moved_item.parent_name = original_parent_name
-            # 恢复原来的顺序
-            self.refresh_model()
-            raise e
+        # 保持同父关系
+        moved_item.parent_name = target_item.parent_name
+
+        source_row = moved_item.index().row()
+        dest_row = target_item.index().row()
+
+        # 使用moveRows移动行
+        self.moveRows(QModelIndex(), source_row, 1, QModelIndex(), dest_row)
+
+        # 保存到数据库
+        self.save_categories()
+
 
     def move_category_by_name_after(self, moved_category_name: str, target_category_name: str):
         """
