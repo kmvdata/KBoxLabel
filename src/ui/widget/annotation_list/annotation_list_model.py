@@ -201,7 +201,11 @@ class AnnotationListModel(QStandardItemModel):
             # 将"鸟"类别设置为"动物"类别的子类别，并放置在最后
             project_domain.move_category_as_children("动物", "鸟")
         """
-        # 查找父类别和子类别
+        # 检查是否试图将类别设置为自己的子类别
+        if parent_category_name == child_category_name:
+            raise ValueError("不能将类别设置为自己的子类别")
+            
+        # 检查是否试图创建循环引用
         parent_item = self.get_item_by_class_name(parent_category_name)
         child_item = self.get_item_by_class_name(child_category_name)
         
@@ -211,19 +215,20 @@ class AnnotationListModel(QStandardItemModel):
         if not child_item:
             raise ValueError(f"子类别 '{child_category_name}' 不存在")
             
-        # 检查是否试图将类别设置为自己的子类别
-        if parent_category_name == child_category_name:
-            raise ValueError("不能将类别设置为自己的子类别")
-            
-        # 检查是否试图创建循环引用
         if parent_item.parent_name == child_category_name:
             raise ValueError("不能创建循环引用")
             
-        # 更新子类别的父类别名称
+        # 先在内存中更新子类别的父类别名称
+        original_parent_name = child_item.parent_name
         child_item.parent_name = parent_category_name
         
-        # 保存类别到数据库
-        self.save_categories()
+        try:
+            # 保存类别到数据库
+            self.save_categories()
+        except Exception as e:
+            # 如果保存失败，回滚内存中的更改
+            child_item.parent_name = original_parent_name
+            raise e
 
     def move_category_by_name_before(self, moved_category_name: str, target_category_name: str):
         """
@@ -233,48 +238,60 @@ class AnnotationListModel(QStandardItemModel):
             moved_category_name (str): 要移动的类别名称
             target_category_name (str): 目标类别名称（将移动到此类别之前）
         """
+        # 检查是否是同一个类别
+        if moved_category_name == target_category_name:
+            raise ValueError("不能将类别移动到自己之前")
+            
         # 查找要移动的类别和目标类别
-        moved_item = None
-        target_item = None
-        moved_item_row = -1
-        target_item_row = -1
+        moved_item = self.get_item_by_class_name(moved_category_name)
+        target_item = self.get_item_by_class_name(target_category_name)
         
-        for row in range(self.rowCount()):
-            item = self.item(row)
-            if isinstance(item, AnnotationItem):
-                if item.class_name == moved_category_name:
-                    moved_item = item
-                    moved_item_row = row
-                elif item.class_name == target_category_name:
-                    target_item = item
-                    target_item_row = row
-                    
         # 检查类别是否存在
         if not moved_item:
             raise ValueError(f"要移动的类别 '{moved_category_name}' 不存在")
         if not target_item:
             raise ValueError(f"目标类别 '{target_category_name}' 不存在")
             
-        # 检查是否是同一个类别
-        if moved_category_name == target_category_name:
-            raise ValueError("不能将类别移动到自己之前")
-            
-        # 确保两个类别有相同的父级关系
-        if moved_item.parent_name != target_item.parent_name:
-            # 如果父级不同，需要调整移动类别的父级以匹配目标类别
-            moved_item.parent_name = target_item.parent_name
-            
-        # 重新排序 - 将moved_item放在target_item之前
-        if moved_item_row != -1 and target_item_row != -1:
-            # 从原位置移除
-            self.removeRow(moved_item_row)
-            # 调整目标索引（如果moved_item在target_item之前，移除后索引会变化）
-            adjusted_target_index = target_item_row - 1 if moved_item_row < target_item_row else target_item_row
-            # 在新位置插入
-            self.insertRow(adjusted_target_index, moved_item)
+        # 保存原始状态用于可能的回滚
+        original_parent_name = moved_item.parent_name
+        original_order = [(self.item(row).class_name, self.item(row).parent_name) 
+                         for row in range(self.rowCount())]
         
-        # 保存类别到数据库
-        self.save_categories()
+        try:
+            # 确保两个类别有相同的父级关系
+            if moved_item.parent_name != target_item.parent_name:
+                # 如果父级不同，需要调整移动类别的父级以匹配目标类别
+                moved_item.parent_name = target_item.parent_name
+                
+            # 重新排序 - 将moved_item放在target_item之前
+            moved_item_row = -1
+            target_item_row = -1
+            
+            # 查找行号
+            for row in range(self.rowCount()):
+                item = self.item(row)
+                if isinstance(item, AnnotationItem):
+                    if item.class_name == moved_category_name:
+                        moved_item_row = row
+                    elif item.class_name == target_category_name:
+                        target_item_row = row
+                        
+            if moved_item_row != -1 and target_item_row != -1:
+                # 从原位置移除
+                self.removeRow(moved_item_row)
+                # 调整目标索引（如果moved_item在target_item之前，移除后索引会变化）
+                adjusted_target_index = target_item_row - 1 if moved_item_row < target_item_row else target_item_row
+                # 在新位置插入
+                self.insertRow(adjusted_target_index, moved_item)
+            
+            # 保存类别到数据库
+            self.save_categories()
+        except Exception as e:
+            # 如果保存失败，回滚所有更改
+            moved_item.parent_name = original_parent_name
+            # 恢复原来的顺序
+            self.refresh_model()
+            raise e
 
     def move_category_by_name_after(self, moved_category_name: str, target_category_name: str):
         """
@@ -284,45 +301,57 @@ class AnnotationListModel(QStandardItemModel):
             moved_category_name (str): 要移动的类别名称
             target_category_name (str): 目标类别名称（将移动到此类别之后）
         """
+        # 检查是否是同一个类别
+        if moved_category_name == target_category_name:
+            raise ValueError("不能将类别移动到自己之后")
+            
         # 查找要移动的类别和目标类别
-        moved_item = None
-        target_item = None
-        moved_item_row = -1
-        target_item_row = -1
+        moved_item = self.get_item_by_class_name(moved_category_name)
+        target_item = self.get_item_by_class_name(target_category_name)
         
-        for row in range(self.rowCount()):
-            item = self.item(row)
-            if isinstance(item, AnnotationItem):
-                if item.class_name == moved_category_name:
-                    moved_item = item
-                    moved_item_row = row
-                elif item.class_name == target_category_name:
-                    target_item = item
-                    target_item_row = row
-                    
         # 检查类别是否存在
         if not moved_item:
             raise ValueError(f"要移动的类别 '{moved_category_name}' 不存在")
         if not target_item:
             raise ValueError(f"目标类别 '{target_category_name}' 不存在")
             
-        # 检查是否是同一个类别
-        if moved_category_name == target_category_name:
-            raise ValueError("不能将类别移动到自己之后")
-            
-        # 确保两个类别有相同的父级关系
-        if moved_item.parent_name != target_item.parent_name:
-            # 如果父级不同，需要调整移动类别的父级以匹配目标类别
-            moved_item.parent_name = target_item.parent_name
-            
-        # 重新排序 - 将moved_item放在target_item之后
-        if moved_item_row != -1 and target_item_row != -1:
-            # 从原位置移除
-            self.removeRow(moved_item_row)
-            # 调整目标索引（如果moved_item在target_item之前，移除后索引会变化）
-            adjusted_target_index = target_item_row if moved_item_row < target_item_row else target_item_row + 1
-            # 在新位置插入（目标之后）
-            self.insertRow(adjusted_target_index + 1, moved_item)
+        # 保存原始状态用于可能的回滚
+        original_parent_name = moved_item.parent_name
+        original_order = [(self.item(row).class_name, self.item(row).parent_name) 
+                         for row in range(self.rowCount())]
         
-        # 保存类别到数据库
-        self.save_categories()
+        try:
+            # 确保两个类别有相同的父级关系
+            if moved_item.parent_name != target_item.parent_name:
+                # 如果父级不同，需要调整移动类别的父级以匹配目标类别
+                moved_item.parent_name = target_item.parent_name
+                
+            # 重新排序 - 将moved_item放在target_item之后
+            moved_item_row = -1
+            target_item_row = -1
+            
+            # 查找行号
+            for row in range(self.rowCount()):
+                item = self.item(row)
+                if isinstance(item, AnnotationItem):
+                    if item.class_name == moved_category_name:
+                        moved_item_row = row
+                    elif item.class_name == target_category_name:
+                        target_item_row = row
+                        
+            if moved_item_row != -1 and target_item_row != -1:
+                # 从原位置移除
+                self.removeRow(moved_item_row)
+                # 调整目标索引（如果moved_item在target_item之前，移除后索引会变化）
+                adjusted_target_index = target_item_row if moved_item_row < target_item_row else target_item_row + 1
+                # 在新位置插入（目标之后）
+                self.insertRow(adjusted_target_index + 1, moved_item)
+            
+            # 保存类别到数据库
+            self.save_categories()
+        except Exception as e:
+            # 如果保存失败，回滚所有更改
+            moved_item.parent_name = original_parent_name
+            # 恢复原来的顺序
+            self.refresh_model()
+            raise e

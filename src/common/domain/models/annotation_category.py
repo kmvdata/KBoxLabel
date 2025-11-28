@@ -15,10 +15,7 @@ class AnnotationCategory(KOrmBase):
     id = Column(INTEGER, primary_key=True, comment='自增id')
     class_id = Column(INTEGER, nullable=False, unique=False, comment='类别ID')
     class_name = Column(String(64), nullable=False, unique=True, comment='类别名称')
-
-    color_r = Column(INTEGER, nullable=False, unique=False, comment='颜色R值')
-    color_g = Column(INTEGER, nullable=False, unique=False, comment='颜色G值')
-    color_b = Column(INTEGER, nullable=False, unique=False, comment='颜色B值')
+    color_name = Column(String(64), nullable=False, unique=True, comment='RGB颜色的16进制，格式如：#0a1b2d')
     parent_name = Column(String(64), nullable=True, unique=False, comment='父级类别名称')
     order = Column(INTEGER, nullable=False, unique=False, comment='排序')
     
