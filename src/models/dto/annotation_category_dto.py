@@ -1,7 +1,4 @@
-import hashlib
 from typing import Optional
-
-from PyQt5.QtGui import QColor
 
 
 class AnnotationCategoryDTO:

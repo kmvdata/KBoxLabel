@@ -198,11 +198,6 @@ class ImageCanvas(QGraphicsView):
         # 加载对应的txt标注文件
         self.load_annotations_on_image(image_path, pixmap.width(), pixmap.height())
 
-
-    # @property
-    # def categories(self) -> list[AnnotationCategoryDTO]:
-    #     return self.project_info.categories
-
     def load_annotations_on_image(self, image_path: Path, img_width: int, img_height: int):
         """从SQLite数据库加载与图片同名的kolo_item记录"""
         # 从数据库中查询所有匹配image_name的KoloItem对象

@@ -12,9 +12,7 @@ from PyQt5.QtWidgets import QLineEdit, QListView, QAbstractItemView, \
     QToolBar, QWidget, QHBoxLayout, QMenu, QAction, QMessageBox
 from ultralytics import YOLO
 
-from src.common.domain import AnnotationCategory
 from src.core.project_info import ProjectInfo
-from src.models.dto.annotation_category_dto import AnnotationCategoryDTO
 from src.ui.widget.annotation_list.annotation_delegate import AnnotationDelegate
 from src.ui.widget.annotation_list.annotation_item import AnnotationItem
 from src.ui.widget.annotation_list.annotation_list_model import AnnotationListModel, AnnotationDropArea

@@ -6,7 +6,6 @@ from PyQt5.QtWidgets import QStyledItemDelegate, QStyle
 from ultralytics import YOLO
 from ultralytics import YOLO
 
-from src.models.dto.annotation_category_dto import AnnotationCategoryDTO
 from src.ui.widget.annotation_list.annotation_item import AnnotationItem
 
 

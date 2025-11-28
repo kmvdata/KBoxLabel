@@ -1,5 +1,4 @@
 # annotation_list_model.py
-import typing
 from enum import Enum
 from typing import Optional
 
@@ -11,7 +10,6 @@ from ultralytics import YOLO
 
 from src.common.domain import AnnotationCategory
 from src.core.project_info import ProjectInfo
-from src.models.dto.annotation_category_dto import AnnotationCategoryDTO
 from src.ui.widget.annotation_list.annotation_item import AnnotationItem
 
 
