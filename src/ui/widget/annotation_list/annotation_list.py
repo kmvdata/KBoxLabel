@@ -12,6 +12,7 @@ from PyQt5.QtWidgets import QLineEdit, QListView, QAbstractItemView, \
     QToolBar, QWidget, QHBoxLayout, QMenu, QAction, QMessageBox
 from ultralytics import YOLO
 
+from src.common.domain import AnnotationCategory
 from src.core.project_info import ProjectInfo
 from src.models.dto.annotation_category_dto import AnnotationCategoryDTO
 from src.ui.widget.annotation_list.annotation_delegate import AnnotationDelegate
@@ -637,11 +638,6 @@ class AnnotationList(QListView):
         self.proxy_model.setFilterCaseSensitivity(Qt.CaseInsensitive)
         self.proxy_model.setFilterRole(Qt.DisplayRole)
 
-    def append_category(self, category: AnnotationCategoryDTO):
-        """添加类别"""
-        self.source_model.append_annotation(category)
-        pass
-
     def _handle_rename(self):
         """处理重命名操作"""
         if self.right_click_index and self.right_click_index.isValid():
@@ -775,13 +771,8 @@ class AnnotationList(QListView):
         try:
             model = YOLO(model_path)
             class_dict = model.names  # {0: 'person', 1: 'car', ...}
-
-            new_categories = [
-                AnnotationCategoryDTO(class_id=i, class_name=name)
-                for i, name in class_dict.items()
-            ]
-            for category in new_categories:
-                self.source_model.append_annotation(category)
+            for i, name in class_dict.items():
+                self.source_model.append_new_category(class_name=name, class_id=i)
             return True
         except Exception as e:
             print(f"加载YOLO模型失败: {str(e)}")

@@ -268,22 +268,12 @@ class ImageCanvas(QGraphicsView):
             rect_width = width * img_width
             rect_height = height * img_height
 
-            # 获取或创建类别
-            category = self.category_map.get(class_name)
-            if not category:
-                # 创建新类别
-                new_category = AnnotationCategoryDTO(
-                    class_id=len(self.category_map) + 1,
-                    class_name=class_name,
-                )
-                self.category_map[new_category.class_name] = new_category
-                category = new_category
-                # 添加到annotation_list
-                self.annotation_list.append_category(category)
+            # 添加到annotation_list
+            annotation_item = self.annotation_list.source_model.append_new_category(class_name)
 
 
             # 创建并添加AnnotationView
-            item = AnnotationView(x1, y1, rect_width, rect_height, category, self)
+            item = AnnotationView(x1, y1, rect_width, rect_height, annotation_item, self)
             self.scene.addItem(item)
             item.setFlags(item.flags() & ~QGraphicsItem.GraphicsItemFlag.ItemIsMovable)
             item.selected = False

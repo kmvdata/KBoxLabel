@@ -34,19 +34,6 @@ class AnnotationListModel(QStandardItemModel):
 
         self.load_categories()
 
-    def append_annotation(self, category: AnnotationCategoryDTO):
-        """添加带序号的标注项"""
-        # 检查是否已存在相同class_name的项
-        existing_item = self.get_item_by_class_name(category.class_name)
-        if existing_item is None:
-            # 不存在则添加
-            self.domain.append(category)
-            item = AnnotationItem(category)
-            self.appendRow(item)
-        else:
-            # 已存在则更新
-            existing_item.set_category(category)
-
     def insert_annotation_item(self, row: int, class_name: str, class_id: int, parent_name: str = None):
         """在指定位置插入标注项"""
         # 检查是否已存在相同class_name的项
@@ -105,29 +92,38 @@ class AnnotationListModel(QStandardItemModel):
     def count_kilo_items_for_category(self, category_name: str):
         return self.domain.count_kilo_items_for_category(category_name)
 
-    def append_new_category(self, class_name=None) -> AnnotationItem:
+    def append_new_category(self, class_name: Optional[str]=None, class_id: Optional[int]= None) -> AnnotationItem:
         """创建新的类别"""
         # 调用create_new_category_at_index实现，需要获取列表最后的index作为参数传入
-        return self.create_new_category_at_index(self.index(self.rowCount() - 1, 0), class_name)
+        return self.create_new_category_at_index(self.index(self.rowCount() - 1, 0), class_name, class_id)
 
-    def create_new_category_at_index(self, index: QModelIndex, class_name:Optional[str]=None) -> AnnotationItem:
+    def create_new_category_at_index(self,
+                                     index: QModelIndex,
+                                     class_name:Optional[str]=None,
+                                     class_id: Optional[int]= None) -> AnnotationItem:
         """在指定索引位置创建新的类别"""
+        # 如果已存在，则直接返回
+        exist_item = self.get_item_by_class_name(class_name)
+        if exist_item:
+            return exist_item
+
         # 使用domain方法获取最大ID
-        new_id = self.domain.get_max_category_id() + 1
+        if class_id is None:
+            class_id = self.domain.get_max_category_id() + 1
 
         if class_name is None:
-            class_name = f"新类别 {new_id}"
+            class_name = f"新类别 {class_id}"
 
         # 如果class_name已存在，则生成新的class_name
         while self.get_item_by_class_name(class_name):
-            new_id += 1
-            class_name = f"新类别 {new_id}"
+            class_id += 1
+            class_name = f"新类别 {class_id}"
 
         # 1. 创建AnnotationItem实例（根据AnnotationItem的构造参数调整）
         # 若AnnotationItem需要parent_name，可从index关联的父项获取，示例中默认None
         new_item = AnnotationItem(
             class_name=class_name,
-            class_id=new_id
+            class_id=class_id
         )
 
         # 2. 插入AnnotationItem到模型指定位置（处理父索引，适配树形/列表结构）
