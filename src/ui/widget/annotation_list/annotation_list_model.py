@@ -46,6 +46,8 @@ class AnnotationListModel(QStandardItemModel):
         # 收集所有item并构建类别列表
         categories: list[AnnotationCategory] = []
         last_order = 1000
+        parent_orders = {}  # 记录每个父类别的order值
+        
         for row in range(self.rowCount()):
             item = self.item(row)
             if isinstance(item, AnnotationItem):
@@ -57,10 +59,19 @@ class AnnotationListModel(QStandardItemModel):
                 sql_category.color_g = color.green()
                 sql_category.color_b = color.blue()
                 sql_category.parent_name = item.parent_name
+                
                 if item.parent_name is None:
+                    # 顶级类别，order间隔为1000
                     sql_category.order = (row + 1) * 1000
+                    parent_orders[item.class_name] = sql_category.order
                 else:
-                    sql_category.order = last_order + 1
+                    # 子类别，需要找到父类别的order值
+                    if item.parent_name in parent_orders:
+                        # 父类别已处理，基于父类别的order继续编号
+                        sql_category.order = parent_orders[item.parent_name] + len([c for c in categories if c.parent_name == item.parent_name]) + 1
+                    else:
+                        # 父类别尚未处理（理论上不应该发生），使用默认方案
+                        sql_category.order = last_order + 1
 
                 last_order = sql_category.order
                 categories.append(sql_category)
@@ -171,14 +182,14 @@ class AnnotationListModel(QStandardItemModel):
         """
         将一个类别移动为另一个类别的子类别，并可选择性地调整其在子类别列表中的位置。
 
-        此方法会将[child_category_name](file:///Users/kermit/Projects/KBoxLabel/src/common/domain/project_domain.py#L445-L445)设置为[parent_category_name](file:///Users/kermit/Projects/KBoxLabel/src/common/domain/project_domain.py#L445-L445)的子类别，
-        并根据[before_category_name](file:///Users/kermit/Projects/KBoxLabel/src/common/domain/project_domain.py#L445-L445)参数决定其在子类别列表中的位置。
+        此方法会将child_category_name设置为parent_category_name的子类别，
+        并根据before_category_name参数决定其在子类别列表中的位置。
 
         Args:
-            parent_category_name (str): 父类别的名称，将成为[child_category_name](file:///Users/kermit/Projects/KBoxLabel/src/common/domain/project_domain.py#L445-L445)的父类别
+            parent_category_name (str): 父类别的名称，将成为child_category_name的父类别
             child_category_name (str): 要移动的子类别的名称
-            before_category_name (Optional[str]): 可选参数，指定[child_category_name](file:///Users/kermit/Projects/KBoxLabel/src/common/domain/project_domain.py#L445-L445)应该放置在其后的类别名称。
-                                             如果为None，则[child_category_name](file:///Users/kermit/Projects/KBoxLabel/src/common/domain/project_domain.py#L445-L445)会被放置在父类别的最后位置。
+            before_category_name (Optional[str]): 可选参数，指定child_category_name应该放置在其后的类别名称。
+                                             如果为None，则child_category_name会被放置在父类别的最后位置。
 
         Raises:
             ValueError: 当任何指定的类别名称在当前类别列表中找不到时抛出此异常
@@ -190,7 +201,29 @@ class AnnotationListModel(QStandardItemModel):
             # 将"鸟"类别设置为"动物"类别的子类别，并放置在最后
             project_domain.move_category_as_children("动物", "鸟")
         """
-        pass
+        # 查找父类别和子类别
+        parent_item = self.get_item_by_class_name(parent_category_name)
+        child_item = self.get_item_by_class_name(child_category_name)
+        
+        # 检查类别是否存在
+        if not parent_item:
+            raise ValueError(f"父类别 '{parent_category_name}' 不存在")
+        if not child_item:
+            raise ValueError(f"子类别 '{child_category_name}' 不存在")
+            
+        # 检查是否试图将类别设置为自己的子类别
+        if parent_category_name == child_category_name:
+            raise ValueError("不能将类别设置为自己的子类别")
+            
+        # 检查是否试图创建循环引用
+        if parent_item.parent_name == child_category_name:
+            raise ValueError("不能创建循环引用")
+            
+        # 更新子类别的父类别名称
+        child_item.parent_name = parent_category_name
+        
+        # 保存类别到数据库
+        self.save_categories()
 
     def move_category_by_name_before(self, moved_category_name: str, target_category_name: str):
         """
@@ -200,7 +233,48 @@ class AnnotationListModel(QStandardItemModel):
             moved_category_name (str): 要移动的类别名称
             target_category_name (str): 目标类别名称（将移动到此类别之前）
         """
-        pass
+        # 查找要移动的类别和目标类别
+        moved_item = None
+        target_item = None
+        moved_item_row = -1
+        target_item_row = -1
+        
+        for row in range(self.rowCount()):
+            item = self.item(row)
+            if isinstance(item, AnnotationItem):
+                if item.class_name == moved_category_name:
+                    moved_item = item
+                    moved_item_row = row
+                elif item.class_name == target_category_name:
+                    target_item = item
+                    target_item_row = row
+                    
+        # 检查类别是否存在
+        if not moved_item:
+            raise ValueError(f"要移动的类别 '{moved_category_name}' 不存在")
+        if not target_item:
+            raise ValueError(f"目标类别 '{target_category_name}' 不存在")
+            
+        # 检查是否是同一个类别
+        if moved_category_name == target_category_name:
+            raise ValueError("不能将类别移动到自己之前")
+            
+        # 确保两个类别有相同的父级关系
+        if moved_item.parent_name != target_item.parent_name:
+            # 如果父级不同，需要调整移动类别的父级以匹配目标类别
+            moved_item.parent_name = target_item.parent_name
+            
+        # 重新排序 - 将moved_item放在target_item之前
+        if moved_item_row != -1 and target_item_row != -1:
+            # 从原位置移除
+            self.removeRow(moved_item_row)
+            # 调整目标索引（如果moved_item在target_item之前，移除后索引会变化）
+            adjusted_target_index = target_item_row - 1 if moved_item_row < target_item_row else target_item_row
+            # 在新位置插入
+            self.insertRow(adjusted_target_index, moved_item)
+        
+        # 保存类别到数据库
+        self.save_categories()
 
     def move_category_by_name_after(self, moved_category_name: str, target_category_name: str):
         """
@@ -210,4 +284,45 @@ class AnnotationListModel(QStandardItemModel):
             moved_category_name (str): 要移动的类别名称
             target_category_name (str): 目标类别名称（将移动到此类别之后）
         """
-        pass
+        # 查找要移动的类别和目标类别
+        moved_item = None
+        target_item = None
+        moved_item_row = -1
+        target_item_row = -1
+        
+        for row in range(self.rowCount()):
+            item = self.item(row)
+            if isinstance(item, AnnotationItem):
+                if item.class_name == moved_category_name:
+                    moved_item = item
+                    moved_item_row = row
+                elif item.class_name == target_category_name:
+                    target_item = item
+                    target_item_row = row
+                    
+        # 检查类别是否存在
+        if not moved_item:
+            raise ValueError(f"要移动的类别 '{moved_category_name}' 不存在")
+        if not target_item:
+            raise ValueError(f"目标类别 '{target_category_name}' 不存在")
+            
+        # 检查是否是同一个类别
+        if moved_category_name == target_category_name:
+            raise ValueError("不能将类别移动到自己之后")
+            
+        # 确保两个类别有相同的父级关系
+        if moved_item.parent_name != target_item.parent_name:
+            # 如果父级不同，需要调整移动类别的父级以匹配目标类别
+            moved_item.parent_name = target_item.parent_name
+            
+        # 重新排序 - 将moved_item放在target_item之后
+        if moved_item_row != -1 and target_item_row != -1:
+            # 从原位置移除
+            self.removeRow(moved_item_row)
+            # 调整目标索引（如果moved_item在target_item之前，移除后索引会变化）
+            adjusted_target_index = target_item_row if moved_item_row < target_item_row else target_item_row + 1
+            # 在新位置插入（目标之后）
+            self.insertRow(adjusted_target_index + 1, moved_item)
+        
+        # 保存类别到数据库
+        self.save_categories()
