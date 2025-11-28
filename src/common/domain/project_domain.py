@@ -1,14 +1,11 @@
 from pathlib import Path
 from typing import Optional
 
-from PyQt5.QtGui import QColor
-
 from src.common.domain.abs_sqlite_domain import AbsSqliteDomain
 from src.common.domain.models.annotation_category import AnnotationCategory as SQLAnnotationCategory, AnnotationCategory
 from src.common.domain.models.kolo_item import KoloItem
 from src.common.domain.models.kv_config import KVConfig
 from src.common.god.ksnowflake import KSnowflake
-from src.models.dto.annotation_category_dto import AnnotationCategoryDTO
 
 
 class ProjectDomain(AbsSqliteDomain):
@@ -70,37 +67,6 @@ class ProjectDomain(AbsSqliteDomain):
         finally:
             session.close()
             
-    def save_categories(self):
-        """
-        将类别列表保存到数据库中
-        """
-        # 开始事务
-        session = self.db_session()
-        try:
-            # 清除现有的所有类别
-            session.query(SQLAnnotationCategory).delete()
-
-            # 添加所有当前类别
-            for category in self.categories:
-                sql_category = SQLAnnotationCategory()
-                sql_category.class_id = category.class_id
-                sql_category.class_name = category.class_name
-                sql_category.color_r = category.color.red()
-                sql_category.color_g = category.color.green()
-                sql_category.color_b = category.color.blue()
-                sql_category.parent_name = category.parent_name
-                sql_category.order = category.order
-                session.add(sql_category)
-
-            # 提交事务
-            session.commit()
-        except Exception as e:
-            # 回滚事务
-            session.rollback()
-            raise e
-        finally:
-            session.close()
-
     def rename_image_for_kolo_item(self, old_img_name: str, new_img_name: str):
         """
         在数据库中，把kolo_item表中image_name=old_img_name的项目，全部改成image_name=new_img_name
@@ -314,80 +280,6 @@ class ProjectDomain(AbsSqliteDomain):
             print(f"统计数据库中kolo_item数量时出错: {str(e)}")
             return 0
 
-    def refresh_order_entire_list(self):
-        """根据parent_name指向的父子关系以及整个self.categories列表当前顺序，重新设置每个category的order值"""
-        # 创建类别名称到类别对象的映射
-        category_map = {cat.class_name: cat for cat in self.categories}
-        
-        # 分离一级和二级类别
-        top_level_categories = []
-        second_level_categories = []
-        
-        for cat in self.categories:
-            if cat.parent_name is None:
-                top_level_categories.append(cat)
-            else:
-                second_level_categories.append(cat)
-        
-        # 为一级类别分配order值 (1000, 2000, 3000...)
-        order_value = 1000
-        for cat in top_level_categories:
-            cat.order = order_value
-            order_value += 1000
-        
-        # 处理二级类别
-        # 构建父类别到其子类别的映射
-        parent_to_children = {}
-        invalid_second_level = []  # 存储无效的二级类别
-        
-        for cat in second_level_categories:
-            parent_name = cat.parent_name
-            if parent_name in category_map:
-                # 有效的二级类别
-                if parent_name not in parent_to_children:
-                    parent_to_children[parent_name] = []
-                parent_to_children[parent_name].append(cat)
-            else:
-                # 无效的二级类别，清除parent_name
-                cat.parent_name = None
-                invalid_second_level.append(cat)
-        
-        # 为有效的二级类别分配order值
-        for parent_name, children in parent_to_children.items():
-            parent_category = category_map[parent_name]
-            # 从父类order+1开始，每个子类间隔为1
-            child_order = parent_category.order + 1
-            for child in children:
-                child.order = child_order
-                child_order += 1
-        
-        # 为无效的二级类别（现在是一级类别）分配order值
-        if invalid_second_level:
-            # 找到最后一个一级类别的order值，继续递增
-            last_order = 0
-            if top_level_categories:
-                last_order = top_level_categories[-1].order
-            else:
-                # 如果还没有一级类别，从1000开始
-                last_order = 0
-            
-            order_value = last_order + 1000
-            for cat in invalid_second_level:
-                cat.order = order_value
-                order_value += 1000
-                # 同时添加到一级类别列表中，保证顺序正确
-                top_level_categories.append(cat)
-
-        self.save_categories()
-
-    def insert_category(self, index: int, category: AnnotationCategoryDTO):
-        self.categories.insert(index, category)
-        self.refresh_order_entire_list()
-
-    def append(self, category: AnnotationCategoryDTO):
-        self.categories.append(category)
-        self.refresh_order_entire_list()
-
     def delete_category(self, category_name: str):
         """
         删除指定类别的kolo项
@@ -437,50 +329,7 @@ class ProjectDomain(AbsSqliteDomain):
             # 将"鸟"类别设置为"动物"类别的子类别，并放置在最后
             project_domain.move_category_as_children("动物", "鸟")
         """
-        # 检查参数合法性，确保所有涉及的类别都存在于当前类别列表中
-        category_names = {cat.class_name for cat in self.categories}
-        if parent_category_name not in category_names:
-            raise ValueError(f"Parent category '{parent_category_name}' not found")
-        if child_category_name not in category_names:
-            raise ValueError(f"Child category '{child_category_name}' not found")
-        if before_category_name is not None and before_category_name not in category_names:
-            raise ValueError(f"Before category '{before_category_name}' not found")
-        
-        # 查找要移动的子类别对象
-        child_category = None
-        for cat in self.categories:
-            if cat.class_name == child_category_name:
-                child_category = cat
-                break
-        
-        # 设置为父类的子项
-        child_category.parent_name = parent_category_name
-        
-        # 如果指定了before_category_name，则调整顺序
-        if before_category_name is not None:
-            # 找到目标位置并重新排列
-            self.refresh_order_entire_list()
-            
-            # 查找before_category和child_category在列表中的位置
-            before_index = None
-            child_index = None
-            for i, cat in enumerate(self.categories):
-                if cat.class_name == before_category_name:
-                    before_index = i
-                elif cat.class_name == child_category_name:
-                    child_index = i
-            
-            # 如果before_category在child_category之前，需要将child_category移到before_category之后
-            if before_index is not None and child_index is not None and before_index < child_index:
-                # 重新排列列表，将子类别移动到指定位置之后
-                self.categories.remove(child_category)
-                self.categories.insert(before_index + 1, child_category)
-        else:
-            # 没有指定before_category_name，只需设置parent_name即可
-            pass
-            
-        # 重新计算并更新所有类别的顺序值
-        self.refresh_order_entire_list()
+        pass
 
     def move_category_by_name_before(self, moved_category_name: str, target_category_name: str):
         """
@@ -490,27 +339,7 @@ class ProjectDomain(AbsSqliteDomain):
             moved_category_name (str): 要移动的类别名称
             target_category_name (str): 目标类别名称（将移动到此类别之前）
         """
-        # 查找要移动的类别和目标类别
-        moved_category, target_category = self._find_categories_by_name(moved_category_name, target_category_name)
-        
-        if moved_category == target_category:
-            return  # 位置相同，无需移动
-            
-        # 获取目标的父级
-        target_parent_name = target_category.parent_name
-        
-        # 设置移动项的父级与目标项相同
-        moved_category.parent_name = target_parent_name
-        
-        # 更新所有子项的父级为target_parent_name
-        moved_children = []
-        for cat in self.categories:
-            if cat.parent_name == moved_category_name:
-                cat.parent_name = target_parent_name
-                moved_children.append(cat)
-        
-        # 重新排序整个列表
-        self.refresh_order_entire_list()
+        pass
 
     def move_category_by_name_after(self, moved_category_name: str, target_category_name: str):
         """
@@ -520,47 +349,7 @@ class ProjectDomain(AbsSqliteDomain):
             moved_category_name (str): 要移动的类别名称
             target_category_name (str): 目标类别名称（将移动到此类别之后）
         """
-        # 查找要移动的类别和目标类别
-        moved_category, target_category = self._find_categories_by_name(moved_category_name, target_category_name)
-            
-        # 获取目标的父级
-        target_parent_name = target_category.parent_name
-        
-        # 设置移动项的父级与目标项相同
-        moved_category.parent_name = target_parent_name
-        
-        # 更新所有子项的父级为target_parent_name
-        moved_children = []
-        for cat in self.categories:
-            if cat.parent_name == moved_category_name:
-                cat.parent_name = target_parent_name
-                moved_children.append(cat)
-        
-        # 调整位置 - 将移动项放在目标项之后
-        target_index = self.categories.index(target_category)
-        moved_index = self.categories.index(moved_category)
-        
-        if target_index < moved_index:
-            # 如果目标在移动项之前，移动项的新位置是目标项位置
-            self.categories.remove(moved_category)
-            self.categories.insert(target_index, moved_category)
-            
-            # 同时移动所有子项
-            for child in moved_children:
-                self.categories.remove(child)
-                self.categories.insert(target_index + 1, child)
-        else:
-            # 如果目标在移动项之后，移动项的新位置是目标项位置+1
-            self.categories.remove(moved_category)
-            self.categories.insert(target_index, moved_category)
-            
-            # 同时移动所有子项
-            for child in moved_children:
-                self.categories.remove(child)
-                self.categories.insert(target_index + 1, child)
-        
-        # 重新排序整个列表
-        self.refresh_order_entire_list()
+        pass
 
     def move_category_to_position(self, moved_category_name: str, target_position: int):
         """
@@ -570,34 +359,7 @@ class ProjectDomain(AbsSqliteDomain):
             moved_category_name (str): 要移动的类别名称
             target_position (int): 目标位置索引
         """
-        # 查找要移动的类别
-        moved_category = None
-        moved_index = -1
-        for i, cat in enumerate(self.categories):
-            if cat.class_name == moved_category_name:
-                moved_category = cat
-                moved_index = i
-                break
-        
-        if moved_category is None:
-            raise ValueError(f"Category {moved_category_name} not found")
-        
-        # 如果目标位置超出范围，则放在末尾
-        if target_position >= len(self.categories):
-            target_position = len(self.categories) - 1
-        elif target_position < 0:
-            target_position = 0
-            
-        # 如果位置相同，则无需移动
-        if moved_index == target_position:
-            return
-            
-        # 移动类别到新位置
-        self.categories.remove(moved_category)
-        self.categories.insert(target_position, moved_category)
-        
-        # 重新排序整个列表
-        self.refresh_order_entire_list()
+        pass
 
     def convert_child_to_top_level(self, category_name: str):
         """
@@ -606,52 +368,7 @@ class ProjectDomain(AbsSqliteDomain):
         Args:
             category_name (str): 要转换的类别名称
         """
-        # 查找类别
-        category = None
-        for cat in self.categories:
-            if cat.class_name == category_name:
-                category = cat
-                break
-        
-        if category is None:
-            raise ValueError(f"Category {category_name} not found")
-        
-        # 设置为顶级类别
-        category.parent_name = None
-        
-        # 重新排序整个列表
-        self.refresh_order_entire_list()
-
-    def _find_categories_by_name(self, first_category_name: str, second_category_name: str) -> tuple[AnnotationCategoryDTO, AnnotationCategoryDTO]:
-        """
-        根据两个类别名称查找对应的类别对象
-
-        Args:
-            first_category_name (str): 第一个类别名称
-            second_category_name (str): 第二个类别名称
-
-        Returns:
-            tuple[AnnotationCategoryDTO, AnnotationCategoryDTO]: 两个类别对象
-
-        Raises:
-            ValueError: 当任何一个类别名称找不到时抛出此异常
-        """
-        first_category = None
-        second_category = None
-
-        for cat in self.categories:
-            if cat.class_name == first_category_name:
-                first_category = cat
-            elif cat.class_name == second_category_name:
-                second_category = cat
-
-        if first_category is None:
-            raise ValueError(f"Category {first_category_name} not found")
-
-        if second_category is None:
-            print(f"Category {second_category_name} not found")
-
-        return first_category, second_category
+        pass
 
     def get_max_category_id(self):
         """

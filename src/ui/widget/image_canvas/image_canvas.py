@@ -9,10 +9,9 @@ from PyQt5.QtGui import QPixmap, QPen, QColor, QPainter, QBrush, QKeySequence, Q
 from PyQt5.QtWidgets import (QGraphicsView, QGraphicsScene, QGraphicsPixmapItem, QAction,
                              QToolBar, QSizePolicy, QMenu, QFileDialog, QMessageBox, QToolButton, QGraphicsItem)
 
-from src.common.god.korm_base import KOrmBase
-from src.models.dto.annotation_category_dto import AnnotationCategoryDTO
-from src.core.project_info import ProjectInfo
 from src.common.domain.models.kolo_item import KoloItem
+from src.common.god.korm_base import KOrmBase
+from src.core.project_info import ProjectInfo
 from src.ui.widget.annotation_list.annotation_item import AnnotationItem
 from src.ui.widget.annotation_list.annotation_list import AnnotationList
 from src.ui.widget.image_canvas.annotation_view import AnnotationView

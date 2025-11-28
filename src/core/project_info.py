@@ -1,10 +1,9 @@
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional
 
+from src.common.domain.models.kolo_item import KoloItem
 from src.common.domain.project_domain import ProjectDomain
 from src.core.yolo.yolo_executor import YOLOExecutor
-from src.models.dto.annotation_category_dto import AnnotationCategoryDTO
-from src.common.domain.models.kolo_item import KoloItem
 
 
 class ProjectInfo:
@@ -94,20 +93,3 @@ class ProjectInfo:
 
     def exec_yolo(self, img_path: Path, save_to_db: bool = False)-> list[KoloItem]:
         return self.yolo_executor.exec_yolo(img_path, save_to_db)
-
-
-    def find_annotation_by_name(self, name: str) -> Optional[AnnotationCategoryDTO]:
-        """根据类别名称查找标注类别"""
-        for category in self.categories:
-            if category.class_name == name:
-                return category
-        return None  # 未找到时返回None
-
-    def find_annotation_by_id(self, class_id: int) -> Optional[AnnotationCategoryDTO]:
-        """根据类别ID查找标注类别"""
-        # 注意：原方法定义的参数名有误，已更正为class_id（原参数名name不合理）
-        for category in self.categories:
-            if category.class_id == class_id:
-                return category
-        return None  # 未找到时返回None
-
