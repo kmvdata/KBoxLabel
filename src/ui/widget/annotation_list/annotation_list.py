@@ -781,16 +781,17 @@ class AnnotationList(QListView):
 
     def select_category_by_name(self, class_name: str):
         """根据类别名称选中对应的列表项"""
-        for i, category in enumerate(self.source_model.domain.categories):
-            if category.class_name == class_name:
-                proxy_index = self.proxy_model.mapFromSource(self.source_model.index(i, 0))
-                self.selectionModel().select(
-                    proxy_index,
-                    QItemSelectionModel.SelectionFlag.ClearAndSelect
-                )
-                self.scrollTo(proxy_index)
-                return True
-        return False
+        annotation_item = self.source_model.get_item_by_class_name(class_name)
+        if not annotation_item:
+            return False
+
+        proxy_index = self.proxy_model.mapFromSource(self.source_model.index(annotation_item.row(), 0))
+        self.selectionModel().select(
+            proxy_index,
+            QItemSelectionModel.SelectionFlag.ClearAndSelect
+        )
+        self.scrollTo(proxy_index)
+        return True
 
     def paintEvent(self, event):
         """重写绘制事件以添加拖拽指示器"""

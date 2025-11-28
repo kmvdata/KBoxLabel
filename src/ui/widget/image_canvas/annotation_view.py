@@ -256,7 +256,6 @@ class AnnotationView(QGraphicsRectItem):
         self.mouse_operation_in_progress = True
         # 只更新当前项，其他项会在set_selected中更新
         self.update()
-        print(f'set_selected: {self.category} - {self.get_outer_rect()}')
         super().mousePressEvent(event)  # 继续默认事件处理
 
         # 添加10ms睡眠

@@ -233,14 +233,8 @@ class ImageCanvas(QGraphicsView):
                 rect_height = height * img_height
 
                 # 创建AnnotationView并添加到场景
-                item = AnnotationView(x1, y1, rect_width, rect_height, category, self)
+                item = AnnotationView(x1, y1, rect_width, rect_height, annotation_item, self)
                 self.scene.addItem(item)
-
-                # 把category_map转换为数组，调用 self.project_info.domain.add_categories(new_categories)
-                # 确保新增的类别被保存到数据库中
-                new_categories = [category for category in self.category_map.values()]
-                self.project_info.domain.add_categories(new_categories)
-
         except Exception as e:
             print(f"从数据库加载标注信息错误: {e}")
 
@@ -587,8 +581,8 @@ class ImageCanvas(QGraphicsView):
                 if isinstance(item, AnnotationView):
                     annotations.append(item)
 
-            # 按class_id排序
-            annotations.sort(key=lambda _item: _item.category.class_name)
+            # 按class_name排序
+            annotations.sort(key=lambda _item: _item.class_name)
 
             # 创建kolo_item_list用于存储KoloItem对象
             kolo_item_list = []
@@ -612,7 +606,7 @@ class ImageCanvas(QGraphicsView):
                 kolo_item_list.append(KoloItem(
                     kid=KOrmBase.snowflake.gen_kid(),
                     image_name=image_name,
-                    class_name=item.category.class_name,
+                    class_name=item.class_name,
                     x_center=x_center,
                     y_center=y_center,
                     width=norm_width,
