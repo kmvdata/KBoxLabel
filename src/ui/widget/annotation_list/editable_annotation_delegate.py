@@ -147,7 +147,6 @@ class EditableAnnotationDelegate(AnnotationDelegate):
             if class_id > 0:
                 success = model.setData(index, class_id, Qt.UserRole + 1)
                 
-                # 如果是修改ID，同时更新project_info.categories中的对应项
                 if success:
                     # 获取修改项的class_name
                     class_name = model.data(index, Qt.UserRole + 2)

@@ -71,8 +71,8 @@ class AnnotationList(QListView):
 
         # 连接信号
         self.clicked.connect(self._handle_item_click)  # type: ignore
-        self.selectionModel().selectionChanged.connect(self._handle_selection_change)  # type: ignore
-        self.source_model.dataChanged.connect(self._handle_model_data_changed)
+        # self.selectionModel().selectionChanged.connect(self._handle_selection_change)  # type: ignore
+        # self.source_model.dataChanged.connect(self._handle_model_data_changed)
         
         # 加载类别数据
         self.source_model.refresh_model()
@@ -333,7 +333,7 @@ class AnnotationList(QListView):
             print(f"[Drag] Calculated target row: {target_row}")
         
         # 确保target_row在有效范围内
-        max_row = len(self.project_info.categories)
+        max_row = self.source_model.rowCount()
         print(f"[Drag] Max row: {max_row}")
         if target_row > max_row:
             target_row = max_row
@@ -382,13 +382,13 @@ class AnnotationList(QListView):
                 
         # 如果在所有项目之后，插入到末尾
         print("[Drag] Position after all items, inserting at end")
-        return len(self.project_info.categories)
+        return self.source_model.rowCount()
 
     def _get_drop_indicator_position(self, target_row):
         """获取拖拽指示器的位置"""
         print(f"[Drag] Getting drop indicator position for target row: {target_row}")
         # 确保target_row在有效范围内
-        max_row = len(self.project_info.categories)
+        max_row = self.source_model.rowCount()
         if target_row > max_row:
             target_row = max_row
             
@@ -535,7 +535,7 @@ class AnnotationList(QListView):
         # 计算插入位置
         # 如果 drag_target_row 为 -1，则插入到末尾
         if self.drag_target_row == -1:
-            target_position = len(self.project_info.categories)
+            target_position = self.source_model.rowCount()
         else:
             target_position = self.drag_target_row
             
@@ -552,34 +552,6 @@ class AnnotationList(QListView):
         # 不能将类别拖放到自己身上
         if dragged_class_name == target_class_name:
             return False
-            
-        # 检查是否会形成循环引用（不能将父项拖到自己的子项上）
-        current_parent_name = target_class_name
-        while current_parent_name is not None:
-            # 查找当前parent_name对应的类别
-            parent_category = None
-            for cat in self.project_info.categories:
-                if cat.class_name == current_parent_name:
-                    parent_category = cat
-                    break
-                    
-            if parent_category is None:
-                break
-                
-            # 如果发现循环引用，返回False
-            if parent_category.parent_name == dragged_class_name:
-                return False
-                
-            current_parent_name = parent_category.parent_name
-            
-        # 检查目标是否已经是子项（只允许一级嵌套）
-        for cat in self.project_info.categories:
-            if cat.class_name == target_class_name:
-                # 目标已经是子项，不允许再作为父项
-                if cat.parent_name is not None:
-                    return False
-                break
-        
         return True
 
     def _handle_item_click(self, clicked_index):
@@ -590,32 +562,6 @@ class AnnotationList(QListView):
         if not self.selectionModel().isSelected(clicked_index):
             self.selectionModel().clearSelection()
             self.selectionModel().select(clicked_index, QItemSelectionModel.SelectionFlag.ClearAndSelect)
-
-    def _handle_selection_change(self, selected, deselected):
-        if selected.indexes():
-            source_index = self.proxy_model.mapToSource(selected.indexes()[0])
-            # if 0 <= source_index.row() < len(self.project_info.categories):
-            #     self.annotation_selected.emit(self.project_info.categories[source_index.row()])  # type: ignore
-
-    def _handle_model_data_changed(self, top_left, bottom_right, roles=None):
-        """处理模型数据变化，同步更新self.project_info.categories"""
-        for row_index in range(top_left.row(), bottom_right.row() + 1):
-            proxy_index = self.proxy_model.index(row_index, 0)
-            source_index = self.proxy_model.mapToSource(proxy_index)
-            row = source_index.row()
-
-            if 0 <= row < len(self.project_info.categories):
-                if roles is None or Qt.UserRole + 1 in roles:
-                    new_id = self.source_model.data(source_index, Qt.UserRole + 1)
-                    self.project_info.categories[row].class_id = new_id
-
-                if roles is None or Qt.DisplayRole in roles:
-                    new_name = self.source_model.data(source_index, Qt.DisplayRole)
-                    self.project_info.categories[row].class_name = new_name
-                    # 根据新名称重新生成颜色
-                    self.project_info.categories[row].color = self.project_info.categories[row].gen_color()
-                    # 更新模型中的颜色数据
-                    self.source_model.set_color(source_index, self.project_info.categories[row].color)
 
     def get_selected_annotation_item(self) -> Optional[AnnotationItem]:
         """获取当前选中的完整类别对象"""
@@ -758,8 +704,6 @@ class AnnotationList(QListView):
             proxy_index,
             QItemSelectionModel.SelectionFlag.ClearAndSelect
         )
-
-        self.source_model.domain.refresh_order_entire_list()
 
 
     def load_categories_from_yolo_model(self, model_path):

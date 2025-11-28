@@ -513,25 +513,6 @@ class ProjectWindow(QMainWindow):
         按照图片列表顺序逐一处理，将标注信息转换为YOLO格式，显示进度条和取消按钮
         使用分页加载图片名称，避免一次性加载过大数据
         """
-        # 创建类别名称到ID的映射
-        class_name_to_id = {category.class_name: category.class_id for category in self.project_info.categories}
-        
-        # 构建类别层级映射
-        # 创建从子类到父类的映射
-        child_to_parent_map = {}
-        # 获取顶层类别（没有父类的类别）
-        top_level_classes = {}
-        class_name_to_category = {}
-        
-        for category in self.project_info.categories:
-            class_name_to_category[category.class_name] = category
-            if category.parent_name is None:
-                # 顶层类别
-                top_level_classes[category.class_name] = category.class_id
-            else:
-                # 子类别
-                child_to_parent_map[category.class_name] = category.parent_name
-        
         # 获取总图片数
         total_images = self.project_info.domain.count_image_names_from_kilo_item()
         
