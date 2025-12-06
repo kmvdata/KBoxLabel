@@ -175,7 +175,7 @@ class AnnotationListModel(QStandardItemModel):
             self.move_category_by_name_after(dragged_category_name, target_category_name)
         
         # 重新刷新模型以反映更改
-        self.refresh_model()
+        # self.refresh_model()
 
     def move_category_as_children(self, parent_category_name: str, child_category_name: str,
                                   before_category_name: Optional[str] = None):
@@ -241,7 +241,7 @@ class AnnotationListModel(QStandardItemModel):
         # 检查是否是同一个类别
         if moved_category_name == target_category_name:
             raise ValueError("不能将类别移动到自己之前")
-            
+
         # 查找要移动的类别和目标类别
         moved_item = self.get_item_by_class_name(moved_category_name)
         target_item = self.get_item_by_class_name(target_category_name)
@@ -251,8 +251,10 @@ class AnnotationListModel(QStandardItemModel):
         source_row = moved_item.index().row()
         dest_row = target_item.index().row()
 
-        # 使用moveRows移动行
+        # 正确的移动方式：使用 beginMoveRows 和 endMoveRows
+        self.beginMoveRows(QModelIndex(), source_row, source_row, QModelIndex(), dest_row)
         self.moveRows(QModelIndex(), source_row, 1, QModelIndex(), dest_row)
+        self.endMoveRows()
 
         # 保存到数据库
         self.save_categories()
