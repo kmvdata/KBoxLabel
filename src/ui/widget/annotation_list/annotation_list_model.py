@@ -270,8 +270,8 @@ class AnnotationListModel(QAbstractListModel):
         if dragged_item and target_item and dragged_item != target_item:
             # 确保移动后成为顶级类别
             dragged_item.parent_name = target_item.parent_name
-            dragged_index = self.index(self.items.index(dragged_item))
-            self._move_item(dragged_item, self.items.index(target_item))
+            target_index = self.items.index(target_item)
+            self._move_item(dragged_item, target_index)
             self.save_categories()
 
     def move_category_by_name_after(self, dragged_name: str, target_name: str):
@@ -282,8 +282,8 @@ class AnnotationListModel(QAbstractListModel):
         if dragged_item and target_item and dragged_item != target_item:
             # 确保移动后成为顶级类别
             dragged_item.parent_name = target_item.parent_name
-            target_index = self.items.index(target_item)
-            self._move_item(dragged_item, target_index + 1)
+            target_index = self.items.index(target_item) + 1
+            self._move_item(dragged_item, target_index)
             self.save_categories()
 
     def _move_item(self, item: AnnotationItem, new_position: int):
