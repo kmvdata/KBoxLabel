@@ -318,7 +318,7 @@ class AnnotationList(QListView):
         if not (0 <= source_index.row() < self.source_model.rowCount()):
             print("[Drag] Source index out of range, aborting drag")
             return None
-        return typing.cast(AnnotationItem, self.source_model.itemFromIndex(source_index))
+        return typing.cast(AnnotationItem, self.source_model.item_from_index(source_index))
 
     def _handle_drop_on_gap(self, event, pos, dragged_class_name: str, dragged_parent_name: Optional[str], before_row=None):
         """处理拖拽到间隙的情况"""
@@ -569,7 +569,7 @@ class AnnotationList(QListView):
         if selected:
             source_index = self.proxy_model.mapToSource(selected[0])
             # 从source_model中获取对应的AnnotationItem实例（关键修复）
-            selected_item = self.source_model.itemFromIndex(source_index)
+            selected_item = self.source_model.item_from_index(source_index)
             # 确保获取的是AnnotationItem类型（可选类型校验）
             if isinstance(selected_item, AnnotationItem):
                 return selected_item
