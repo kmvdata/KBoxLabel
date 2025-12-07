@@ -1,4 +1,5 @@
 # annotation_list_model.py
+import time
 from enum import Enum
 from typing import Optional, List, Any
 
@@ -225,6 +226,8 @@ class AnnotationListModel(QAbstractListModel):
         elif drop_area == AnnotationDropArea.BOTTOM:
             # 将dragged_category_name移动到target_category_name之后
             self.move_category_by_name_after(dragged_category_name, target_category_name)
+
+        self.refresh_model()
 
     def move_category_as_children(self, parent_category_name: str, child_category_name: str,
                                   before_category_name: Optional[str] = None):
