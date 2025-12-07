@@ -229,8 +229,7 @@ class AnnotationListModel(QAbstractListModel):
 
         self.refresh_model()
 
-    def move_category_as_children(self, parent_category_name: str, child_category_name: str,
-                                  before_category_name: Optional[str] = None):
+    def move_category_as_children(self, parent_category_name: str, child_category_name: str):
         """
         将一个类别移动为另一个类别的子类别，并可选择性地调整其在子类别列表中的位置。
         """
@@ -248,19 +247,54 @@ class AnnotationListModel(QAbstractListModel):
         if not child_item:
             raise ValueError(f"子类别 '{child_category_name}' 不存在")
 
-        # 更新子类别 parent_name
-        child_index = self.index(self.items.index(child_item))
-        child_item.parent_name = parent_category_name
-        self.dataChanged.emit(child_index, child_index, [Qt.UserRole + 3])
+        # 获取真正的parent_name
+        if parent_item.parent_name is None:
+            parent_name = parent_item.class_name
+        else:
+            parent_name = parent_item.parent_name
 
-        # 如果指定了要放在某个子类别之前
-        if before_category_name:
-            before_item = self.get_item_by_class_name(before_category_name)
-            if before_item and before_item.parent_name == parent_category_name:
-                # 先移除再插入到指定位置
-                self._move_item(child_item, self.items.index(before_item))
+        # 如果child_item.parent_name是None
+        if child_item.parent_name is None:
+            # 直接把child_item.parent_name设置为parent_name
+            child_index = self.index(self.items.index(child_item))
+            child_item.parent_name = parent_name
+            self.dataChanged.emit(child_index, child_index, [Qt.UserRole + 3])
+            
+            # 在列表中把child_item放到parent_item后
+            parent_index = self.items.index(parent_item)
+            self._move_item(child_item, parent_index + 1)
+            
+            self.save_categories()
+            return
 
+        # 如果child_item.parent_name不是None
+        # 检查是否存在二级元素
+        children_to_move = []
+        for item in self.items:
+            # 把parent_name为child_item.class_name的元素和child_item.parent_name都设置为parent_name
+            if item.parent_name == child_item.class_name or item == child_item:
+                children_to_move.append(item)
+        
+        # 设置它们的parent_name为parent_name
+        for item in children_to_move:
+            item_index = self.index(self.items.index(item))
+            item.parent_name = parent_name
+            self.dataChanged.emit(item_index, item_index, [Qt.UserRole + 3])
+        
+        # 把这些元素按照当前顺序放到一起，全部插入到parent_item后面
+        parent_index = self.items.index(parent_item)
+        # 先移除所有需要移动的项
+        for item in reversed(children_to_move):  # 反向移除避免索引变化问题
+            self.items.remove(item)
+        
+        # 再插入到parent_item后面
+        insert_index = parent_index
+        for item in children_to_move:
+            self.items.insert(insert_index, item)
+            insert_index += 1
+            
         self.save_categories()
+        return
 
     def move_category_by_name_before(self, dragged_name: str, target_name: str):
         """将拖拽的类别移动到目标类别之前"""
