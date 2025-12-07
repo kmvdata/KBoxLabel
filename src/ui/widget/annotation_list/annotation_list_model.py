@@ -296,8 +296,15 @@ class AnnotationListModel(QAbstractListModel):
         self.save_categories()
         return
 
-    def move_category_by_name_before(self, dragged_name: str, target_name: str):
-        """将拖拽的类别移动到目标类别之前"""
+    def move_category_by_name(self, dragged_name: str, target_name: str, after: bool = False):
+        """
+        将拖拽的类别移动到目标类别之前或之后
+        
+        Args:
+            dragged_name (str): 被拖拽的类别名称
+            target_name (str): 目标类别名称
+            after (bool): 如果为True，移动到目标类别之后；否则移动到目标类别之前
+        """
         dragged_item = self.get_item_by_class_name(dragged_name)
         target_item = self.get_item_by_class_name(target_name)
 
@@ -309,7 +316,10 @@ class AnnotationListModel(QAbstractListModel):
             dragged_item.parent_name = target_item.parent_name
             
             # 计算目标位置
-            target_index = self.items.index(target_item)
+            if after:
+                target_index = self.items.index(target_item) + 1  # 移动到目标之后
+            else:
+                target_index = self.items.index(target_item)      # 移动到目标之前
             
             # 如果有子项，需要一起移动
             if children_items:
@@ -333,44 +343,14 @@ class AnnotationListModel(QAbstractListModel):
                 self._move_item(dragged_item, target_index)
                 
             self.save_categories()
+
+    def move_category_by_name_before(self, dragged_name: str, target_name: str):
+        """将拖拽的类别移动到目标类别之前"""
+        self.move_category_by_name(dragged_name, target_name, after=False)
 
     def move_category_by_name_after(self, dragged_name: str, target_name: str):
         """将拖拽的类别移动到目标类别之后"""
-        dragged_item = self.get_item_by_class_name(dragged_name)
-        target_item = self.get_item_by_class_name(target_name)
-
-        if dragged_item and target_item and dragged_item != target_item:
-            # 查找所有以dragged_item为父项的子项
-            children_items = [item for item in self.items if item.parent_name == dragged_name]
-            
-            # 确保移动后成为顶级类别
-            dragged_item.parent_name = target_item.parent_name
-            
-            # 计算目标位置（在目标之后）
-            target_index = self.items.index(target_item) + 1
-            
-            # 如果有子项，需要一起移动
-            if children_items:
-                # 先移除dragged_item和所有子项
-                all_items_to_move = [dragged_item] + children_items
-                for item in all_items_to_move:
-                    old_index = self.items.index(item)
-                    self.items.pop(old_index)
-                    # 如果移除的项目在目标位置之前，需要调整目标索引
-                    if old_index < target_index:
-                        target_index -= 1
-                
-                # 在目标位置插入dragged_item和所有子项
-                for i, item in enumerate(all_items_to_move):
-                    self.items.insert(target_index + i, item)
-                    
-                # 发出数据变更信号
-                self.layoutChanged.emit()
-            else:
-                # 没有子项，使用原来的移动方法
-                self._move_item(dragged_item, target_index)
-                
-            self.save_categories()
+        self.move_category_by_name(dragged_name, target_name, after=True)
 
     def _move_item(self, item: AnnotationItem, new_position: int):
         """将项目移动到新位置"""
