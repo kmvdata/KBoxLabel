@@ -269,11 +269,8 @@ class AnnotationListModel(QAbstractListModel):
 
         if dragged_item and target_item and dragged_item != target_item:
             # 确保移动后成为顶级类别
-            if dragged_item.parent_name is not None:
-                dragged_index = self.index(self.items.index(dragged_item))
-                dragged_item.parent_name = None
-                self.dataChanged.emit(dragged_index, dragged_index, [Qt.UserRole + 3])
-
+            dragged_item.parent_name = target_item.parent_name
+            dragged_index = self.index(self.items.index(dragged_item))
             self._move_item(dragged_item, self.items.index(target_item))
             self.save_categories()
 
@@ -284,11 +281,7 @@ class AnnotationListModel(QAbstractListModel):
 
         if dragged_item and target_item and dragged_item != target_item:
             # 确保移动后成为顶级类别
-            if dragged_item.parent_name is not None:
-                dragged_index = self.index(self.items.index(dragged_item))
-                dragged_item.parent_name = None
-                self.dataChanged.emit(dragged_index, dragged_index, [Qt.UserRole + 3])
-
+            dragged_item.parent_name = target_item.parent_name
             target_index = self.items.index(target_item)
             self._move_item(dragged_item, target_index + 1)
             self.save_categories()
