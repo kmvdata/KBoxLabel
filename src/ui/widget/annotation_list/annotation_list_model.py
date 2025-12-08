@@ -178,7 +178,7 @@ class AnnotationListModel(QAbstractListModel):
         """
         if drop_area == AnnotationDropArea.CENTER:
             # 将dragged_category_name作为target_category_name的子类别
-            self.move_category_as_children(target_category_name, dragged_category_name)
+            self.move_category_as_children(dragged_category_name, target_category_name)
         elif drop_area == AnnotationDropArea.TOP:
             # 将dragged_category_name移动到target_category_name之前
             self.move_category_by_name(dragged_category_name, target_category_name, after=False)
@@ -189,71 +189,43 @@ class AnnotationListModel(QAbstractListModel):
         self.save_categories()
         self.refresh_model()
 
-    def move_category_as_children(self, parent_category_name: str, child_category_name: str):
+    def move_category_as_children(self, dragged_category_name: str, target_category_name: str):
         """
-        将一个类别移动为另一个类别的子类别，并可选择性地调整其在子类别列表中的位置。
+        将拖拽的类别移动到目标类别之前或之后
+
+        Args:
+            dragged_category_name (str): 被拖拽的类别名称
+            target_category_name (str): 目标类别名称
+            after (bool): 如果为True，移动到目标类别之后；否则移动到目标类别之前
         """
-        # 检查是否试图将类别设置为自己的子类别
-        if parent_category_name == child_category_name:
-            raise ValueError("不能将类别设置为自己的子类别")
+        dragged_item = self.get_item_by_class_name(dragged_category_name)
+        target_item = self.get_item_by_class_name(target_category_name)
 
-        # 查找父类别和子类别
-        parent_item = self.get_item_by_class_name(parent_category_name)
-        child_item = self.get_item_by_class_name(child_category_name)
-
-        # 检查类别是否存在
-        if not parent_item:
-            raise ValueError(f"父类别 '{parent_category_name}' 不存在")
-        if not child_item:
-            raise ValueError(f"子类别 '{child_category_name}' 不存在")
-
-        # 获取真正的parent_name
-        if parent_item.parent_name is None:
-            parent_name = parent_item.class_name
-        else:
-            parent_name = parent_item.parent_name
-
-        # 如果child_item.parent_name是None
-        if child_item.parent_name is None:
-            # 直接把child_item.parent_name设置为parent_name
-            child_index = self.index(self.items.index(child_item))
-            child_item.parent_name = parent_name
-            self.dataChanged.emit(child_index, child_index, [Qt.UserRole + 3])
-            
-            # 在列表中把child_item放到parent_item后
-            parent_index = self.items.index(parent_item)
-            self._move_item(child_item, parent_index + 1)
-            
+        if dragged_item is None or target_item is None:
+            print(f"无法找到对应的类别:{target_category_name if target_item is None else dragged_category_name}")
             return
 
-        # 如果child_item.parent_name不是None
-        # 检查是否存在二级元素
-        children_to_move = []
-        for item in self.items:
-            # 把parent_name为child_item.class_name的元素和child_item.parent_name都设置为parent_name
-            if item.parent_name == child_item.class_name or item == child_item:
-                children_to_move.append(item)
-        
-        # 设置它们的parent_name为parent_name
-        for item in children_to_move:
-            item_index = self.index(self.items.index(item))
-            item.parent_name = parent_name
-            self.dataChanged.emit(item_index, item_index, [Qt.UserRole + 3])
-        
-        # 把这些元素按照当前顺序放到一起，全部插入到parent_item后面
-        parent_index = self.items.index(parent_item)
-        # 先移除所有需要移动的项
-        for item in reversed(children_to_move):  # 反向移除避免索引变化问题
-            self.items.remove(item)
-        
-        # 再插入到parent_item后面
-        insert_index = parent_index
-        for item in children_to_move:
-            self.items.insert(insert_index, item)
-            insert_index += 1
-            
-        self.save_categories()
-        return
+        if dragged_item == target_item:
+            print("不能将类别移动到自身")
+            return
+        # 先用pop的方式从self.items中获取拖拽项目及其子项目
+        all_items_to_move = self.pop_category_with_children(dragged_category_name)
+
+        # 如果target_item是二级item
+        if target_item.parent_name is not None:
+            # 如果是二级item，就把all_items_to_move中所有item.parent_name全部设置成target_item.parent_name
+            for item in all_items_to_move:
+                item.parent_name = target_item.parent_name
+        else:
+            # 如果是一级item，就把all_items_to_move中所有item.parent_name全部设置为target_item.class_name
+            for item in all_items_to_move:
+                item.parent_name = target_item.class_name
+
+        # 计算目标位置(直接拖拽到item上的情况，全部插入到这个item之后)
+        target_index = self.items.index(target_item) + 1
+
+        # 把数组中所有item，插入到target_item之前或者之后的位置
+        self.insert_category_with_children(all_items_to_move, target_index)
 
     def move_category_by_name(self, dragged_category_name: str, target_category_name: str, after: bool = False):
         """
@@ -291,20 +263,6 @@ class AnnotationListModel(QAbstractListModel):
             # 把数组中所有item，插入到target_item之前或者之后的位置
             self.insert_category_with_children(all_items_to_move, target_index)
 
-    def _move_item(self, item: AnnotationItem, new_position: int):
-        """将项目移动到新位置"""
-        old_position = self.items.index(item)
-        if old_position == new_position:
-            return
-
-        # 调整新位置以适应列表边界
-        new_position = max(0, min(new_position, len(self.items) - 1))
-
-        # 开始移动操作
-        self.beginMoveRows(QModelIndex(), old_position, old_position, QModelIndex(), new_position)
-        # 从列表中移除并插入到新位置
-        self.items.insert(new_position, self.items.pop(old_position))
-        self.endMoveRows()
 
     def pop_category_with_children(self, category_name: str) -> list[AnnotationItem]:
         """
@@ -394,8 +352,16 @@ class AnnotationListModel(QAbstractListModel):
 
         # 收集所有item并构建类别列表
         categories: list[AnnotationCategory] = []
-        last_order = 1000
+        last_parent_order = 0
         parent_orders = {}  # 记录每个父类别的order值
+
+        # 首先确定所有顶层item排序的order值
+        for item in self.items:
+            if item.parent_name is None:
+                # 顶级类别
+                last_parent_order += 10000
+                item.order = last_parent_order
+                parent_orders[item.class_name] = (item.order, 0)
 
         for item in self.items:
             sql_category = AnnotationCategory()
@@ -407,21 +373,22 @@ class AnnotationListModel(QAbstractListModel):
             sql_category.color_b = color.blue()
             sql_category.parent_name = item.parent_name
 
-            if item.parent_name is None:
-                # 顶级类别，order间隔为1000
-                sql_category.order = (self.items.index(item) + 1) * 1000
-                parent_orders[item.class_name] = sql_category.order
-            else:
-                # 子类别，需要找到父类别的order值
-                if item.parent_name in parent_orders:
-                    # 父类别已处理，基于父类别的order继续编号
-                    sql_category.order = parent_orders[item.parent_name] + len(
-                        [c for c in categories if c.parent_name == item.parent_name]) + 1
-                else:
-                    # 父类别尚未处理（理论上不应该发生），使用默认方案
-                    sql_category.order = last_order + 1
 
-            last_order = sql_category.order
+            if item.parent_name is None:
+                parent_order, child_order = parent_orders[item.class_name]
+                sql_category.order = parent_order
+            else: # item.parent_name not None
+                try:
+                    parent_order, child_order = parent_orders[item.parent_name]
+
+                    child_order += 1
+                    sql_category.order = parent_order + child_order
+                    parent_orders[item.parent_name] = (parent_order, child_order)
+                except Exception as e:
+                    print(f"获取父类类别的order值失败: {str(e)} - parent_name: {item.parent_name} class_name: {item.class_name}")
+                    print(f'处理item失败： {item.class_name}')
+
+
             categories.append(sql_category)
 
         # 保存到数据库

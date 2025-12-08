@@ -17,6 +17,9 @@ class AnnotationItem(QStandardItem):
         # 保存指向模型的引用，以便获取准确的行号
         self._model = None
 
+        # 默认没有order赋值，仅作为排序辅助值使用
+        self.order = 0
+
     def set_category(self, class_name: str, class_id: int, parent_name: str = None):
         self.setData(self._generate_color_from_class_name(class_name), Qt.UserRole)
         self.setData(class_id, Qt.UserRole + 1)
@@ -48,6 +51,14 @@ class AnnotationItem(QStandardItem):
     @parent_name.setter  # 这里要使用@property装饰的属性名来关联setter
     def parent_name(self, parent_name: str):  # 补充参数类型注解
         self.setData(parent_name, Qt.UserRole + 3)
+
+    @property
+    def order(self) -> int:
+        return self.data(Qt.UserRole + 4)
+
+    @order.setter
+    def order(self, order: int):
+        self.setData(order, Qt.UserRole + 4)
 
     @property
     def class_color(self) -> QColor:
