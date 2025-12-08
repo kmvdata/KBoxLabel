@@ -92,50 +92,9 @@ class AnnotationListModel(QAbstractListModel):
         # 根据categories内容创建AnnotationItem
         for category in categories:
             item = AnnotationItem(category.class_name, category.class_id, category.parent_name)
+            item.set_model(self)  # 设置模型引用
             self.items.append(item)
         self.endResetModel()
-
-    def save_categories(self):
-        """保存类别列表到数据库"""
-        # 按顺序遍历所有的annotation_item，由items生成对应的annotation_category orm对象
-        # 然后按照当前顺序，给这些对象的order赋值，从1000开始，每个平级的item的order间隔为1000
-        # 如果是二级item，则间隔为1，同一个父item下的二级item，第一个二级item以其父item.order+1起始，依次类推。
-        # 最后，调用数据库方法resave_all_categories，保存生成的annotation_category。
-
-        # 收集所有item并构建类别列表
-        categories: list[AnnotationCategory] = []
-        last_order = 1000
-        parent_orders = {}  # 记录每个父类别的order值
-
-        for item in self.items:
-            sql_category = AnnotationCategory()
-            sql_category.class_id = item.class_id
-            sql_category.class_name = item.class_name
-            color = item.class_color
-            sql_category.color_r = color.red()
-            sql_category.color_g = color.green()
-            sql_category.color_b = color.blue()
-            sql_category.parent_name = item.parent_name
-
-            if item.parent_name is None:
-                # 顶级类别，order间隔为1000
-                sql_category.order = (self.items.index(item) + 1) * 1000
-                parent_orders[item.class_name] = sql_category.order
-            else:
-                # 子类别，需要找到父类别的order值
-                if item.parent_name in parent_orders:
-                    # 父类别已处理，基于父类别的order继续编号
-                    sql_category.order = parent_orders[item.parent_name] + len(
-                        [c for c in categories if c.parent_name == item.parent_name]) + 1
-                else:
-                    # 父类别尚未处理（理论上不应该发生），使用默认方案
-                    sql_category.order = last_order + 1
-
-            last_order = sql_category.order
-            categories.append(sql_category)
-
-        # 保存到数据库
-        self.domain.resave_all_categories(categories)
 
     def get_item_by_class_name(self, class_name: str) -> Optional[AnnotationItem]:
         """根据class_name获取对应的item"""
@@ -197,6 +156,7 @@ class AnnotationListModel(QAbstractListModel):
             class_name=class_name,
             class_id=class_id
         )
+        new_item.set_model(self)  # 设置模型引用
 
         # 插入AnnotationItem到模型指定位置
         insert_row = index.row() + 1 if index.isValid() else 0
@@ -418,7 +378,52 @@ class AnnotationListModel(QAbstractListModel):
         
         # 在指定位置插入类别项
         for i, category in enumerate(categories):
+            category.set_model(self)  # 确保模型引用正确设置
             self.items.insert(row + i, category)
             
         self.endInsertRows()
         self.save_categories()
+
+
+    def save_categories(self):
+        """保存类别列表到数据库"""
+        # 按顺序遍历所有的annotation_item，由items生成对应的annotation_category orm对象
+        # 然后按照当前顺序，给这些对象的order赋值，从1000开始，每个平级的item的order间隔为1000
+        # 如果是二级item，则间隔为1，同一个父item下的二级item，第一个二级item以其父item.order+1起始，依次类推。
+        # 最后，调用数据库方法resave_all_categories，保存生成的annotation_category。
+
+        # 收集所有item并构建类别列表
+        categories: list[AnnotationCategory] = []
+        last_order = 1000
+        parent_orders = {}  # 记录每个父类别的order值
+
+        for item in self.items:
+            sql_category = AnnotationCategory()
+            sql_category.class_id = item.class_id
+            sql_category.class_name = item.class_name
+            color = item.class_color
+            sql_category.color_r = color.red()
+            sql_category.color_g = color.green()
+            sql_category.color_b = color.blue()
+            sql_category.parent_name = item.parent_name
+
+            if item.parent_name is None:
+                # 顶级类别，order间隔为1000
+                sql_category.order = (self.items.index(item) + 1) * 1000
+                parent_orders[item.class_name] = sql_category.order
+            else:
+                # 子类别，需要找到父类别的order值
+                if item.parent_name in parent_orders:
+                    # 父类别已处理，基于父类别的order继续编号
+                    sql_category.order = parent_orders[item.parent_name] + len(
+                        [c for c in categories if c.parent_name == item.parent_name]) + 1
+                else:
+                    # 父类别尚未处理（理论上不应该发生），使用默认方案
+                    sql_category.order = last_order + 1
+
+            last_order = sql_category.order
+            categories.append(sql_category)
+
+        # 保存到数据库
+        self.domain.resave_all_categories(categories)
+

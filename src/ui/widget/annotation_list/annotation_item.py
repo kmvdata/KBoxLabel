@@ -14,6 +14,8 @@ class AnnotationItem(QStandardItem):
     def __init__(self, class_name: str, class_id: int, parent_name: str = None):
         super().__init__(class_name)
         self.set_category(class_name, class_id, parent_name)
+        # 保存指向模型的引用，以便获取准确的行号
+        self._model = None
 
     def set_category(self, class_name: str, class_id: int, parent_name: str = None):
         self.setData(self._generate_color_from_class_name(class_name), Qt.UserRole)
@@ -50,6 +52,24 @@ class AnnotationItem(QStandardItem):
     @property
     def class_color(self) -> QColor:
         return self.data(Qt.UserRole)
+
+    def set_model(self, model):
+        """设置模型引用"""
+        self._model = model
+        
+    def actual_row(self):
+        """获取item在模型中的实际行号"""
+        if self._model is not None:
+            # 通过模型查找该item的实际行号
+            items = self._model.items
+            try:
+                return items.index(self)
+            except ValueError:
+                # 如果item不在模型列表中，返回-1
+                return -1
+        else:
+            # 如果没有设置模型引用，回退到默认行为
+            return self.row()
 
     @staticmethod
     def gen_sql_annotation_category(class_name: str, class_id: int, parent_name: str = None) -> AnnotationCategory:
@@ -110,6 +130,3 @@ class AnnotationItem(QStandardItem):
         b = max(60, min(b, 220))
 
         return QColor(r, g, b)
-
-
-
