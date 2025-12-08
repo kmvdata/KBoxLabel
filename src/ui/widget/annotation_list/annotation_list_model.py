@@ -366,3 +366,80 @@ class AnnotationListModel(QAbstractListModel):
         # 从列表中移除并插入到新位置
         self.items.insert(new_position, self.items.pop(old_position))
         self.endMoveRows()
+
+    def pop_category_with_children(self, category_name: str) -> list[AnnotationItem]:
+        """
+        从指定类别中弹出类别项及其所有子项
+        
+        Args:
+            category_name (str): 类别名称
+        
+        Returns:
+            list[AnnotationItem]: 弹出的类别项及其子项列表，按类别项在前，子项在后的顺序排列
+        """
+        # 查找类别项本身
+        category_item = self.get_item_by_class_name(category_name)
+        if not category_item:
+            return []
+        
+        # 查找所有子项
+        children_items = [item for item in self.items if item.parent_name == category_name]
+        
+        # 合并类别项和子项
+        items_to_pop = [category_item] + children_items
+        
+        # 从self.items中移除这些项
+        # 首先需要获取要移除项的索引，以便调用beginRemoveRows
+        indices_to_remove = []
+        for item in items_to_pop:
+            try:
+                index = self.items.index(item)
+                indices_to_remove.append(index)
+            except ValueError:
+                # 如果项目不在列表中，忽略它
+                pass
+        
+        # 如果有要移除的项，则通知模型开始移除操作
+        if indices_to_remove:
+            # 对索引进行排序，确保从最大的索引开始移除，避免索引变化影响
+            indices_to_remove.sort(reverse=True)
+            
+            # 由于可能不是连续的行，需要多次调用beginRemoveRows/endRemoveRows
+            # 或者一次性移除所有项，这里采用一次性移除的方式
+            min_row = min(indices_to_remove)
+            max_row = max(indices_to_remove)
+            
+            self.beginRemoveRows(QModelIndex(), min_row, max_row)
+            # 从self.items中移除这些项
+            for item in items_to_pop:
+                if item in self.items:
+                    self.items.remove(item)
+            self.endRemoveRows()
+        
+        return items_to_pop
+
+    def insert_category_with_children(self, categories: list[AnnotationItem], row: int, parent_name: Optional[str] = None):
+        """
+        在指定行插入类别项列表
+        
+        如果parent_name为None，则按照原先顺序直接插入类别项；
+        如果parent_name不为None，则将所有插入项的parent_name设置为指定值后再插入。
+        
+        Args:
+            categories (list[AnnotationItem]): 要插入的类别项列表
+            row (int): 插入的行索引
+            parent_name (Optional[str]): 父类别名称，用于设置插入项的层级关系
+        """
+        self.beginInsertRows(QModelIndex(), row, row + len(categories) - 1)
+        
+        # 如果指定了parent_name，则更新所有插入项的parent_name
+        if parent_name is not None:
+            for category in categories:
+                category.parent_name = parent_name
+        
+        # 在指定位置插入类别项
+        for i, category in enumerate(categories):
+            self.items.insert(row + i, category)
+            
+        self.endInsertRows()
+        self.save_categories()
