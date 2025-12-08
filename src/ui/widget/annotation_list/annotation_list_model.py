@@ -1,5 +1,4 @@
 # annotation_list_model.py
-import time
 from enum import Enum
 from typing import Optional, List, Any
 
@@ -227,6 +226,7 @@ class AnnotationListModel(QAbstractListModel):
             # 将dragged_category_name移动到target_category_name之后
             self.move_category_by_name(dragged_category_name, target_category_name, after=True)
 
+        self.save_categories()
         self.refresh_model()
 
     def move_category_as_children(self, parent_category_name: str, child_category_name: str):
@@ -264,7 +264,6 @@ class AnnotationListModel(QAbstractListModel):
             parent_index = self.items.index(parent_item)
             self._move_item(child_item, parent_index + 1)
             
-            self.save_categories()
             return
 
         # 如果child_item.parent_name不是None
