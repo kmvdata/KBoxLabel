@@ -39,6 +39,7 @@ class AnnotationView(QGraphicsRectItem):
         self.opposite_color: Optional[QColor] = None
         self.current_color: Optional[QColor] = None
         self.class_name: Optional[str] = None
+        self.class_id: Optional[int] = None
         self.set_annotation_item(annotation_item)
         self.setAcceptDrops(True)  # 启用拖放接受
 
@@ -85,6 +86,7 @@ class AnnotationView(QGraphicsRectItem):
 
     def set_annotation_item(self, annotation_item: AnnotationItem):
         self.class_name = annotation_item.class_name
+        self.class_id = annotation_item.class_id
         # 保存当前颜色和相反颜色供绘制使用
         self.current_color = annotation_item.class_color
         self.opposite_color = self.get_opposite_color(self.current_color)
@@ -544,12 +546,12 @@ class AnnotationView(QGraphicsRectItem):
     def to_yolo_format(self, img_width: int, img_height: int) -> Tuple[int, Decimal, Decimal, Decimal, Decimal]:
         """转换为YOLO格式"""
         x_center, y_center, width, height = self._calculate_normalized_coordinates(img_width, img_height)
-        return self.category.class_id, x_center, y_center, width, height
+        return self.class_id, x_center, y_center, width, height
 
     def to_kolo_format(self, img_width: int, img_height: int) -> Tuple[str, Decimal, Decimal, Decimal, Decimal]:
         """转换为KOLO格式"""
         x_center, y_center, width, height = self._calculate_normalized_coordinates(img_width, img_height)
-        return StringUtil.string_to_base64(self.category.class_name), x_center, y_center, width, height
+        return StringUtil.string_to_base64(self.class_name), x_center, y_center, width, height
 
     # 添加拖放事件处理
     def dragEnterEvent(self, event):
@@ -611,12 +613,16 @@ class AnnotationView(QGraphicsRectItem):
         self.set_selected_flag_internal(selected)
         self.bring_to_top()
         self.update()
+        
+        # 同步更新annotation_list中的选中状态
+        if self.image_canvas and self.image_canvas.annotation_list:
+            self.image_canvas.annotation_list.select_category_by_name(self.class_name)
 
     def clicked_with_shift(self):
         # 修改这里，确保同步更新annotation_list
         self.set_selected_flag_internal(not self.isSelected())
         if self.isSelected() and self.image_canvas and self.image_canvas.annotation_list:
-            self.image_canvas.annotation_list.select_category_by_name(self.category.class_name)
+            self.image_canvas.annotation_list.select_category_by_name(self.class_name)
         self.update()
 
     def set_needs_save_annotation(self):

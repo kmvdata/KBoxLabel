@@ -434,6 +434,12 @@ class ImageCanvas(QGraphicsView):
                     self.annotation_list.selectionModel().clearSelection()
                 # 取消画布上所有标注的选中状态
                 self.unselect_all_annotations()
+            elif is_annotation and not shift_pressed:
+                # 如果点击的是标注且没有按住Shift键，选中标注并同步更新annotation_list
+                if isinstance(clicked_item, AnnotationView):
+                    clicked_item.select_annotation_view()
+                elif clicked_item.parentItem() and isinstance(clicked_item.parentItem(), AnnotationView):
+                    clicked_item.parentItem().select_annotation_view()
 
         # 处理框选完成后的标注选择
         if self.rubberBandRect().isValid() and not self.drawing:
