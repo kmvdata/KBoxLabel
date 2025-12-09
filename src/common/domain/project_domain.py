@@ -1,8 +1,8 @@
 from pathlib import Path
 from typing import Optional
 
+from src.common.domain import AnnotationCategory
 from src.common.domain.abs_sqlite_domain import AbsSqliteDomain
-from src.common.domain.models.annotation_category import AnnotationCategory as SQLAnnotationCategory, AnnotationCategory
 from src.common.domain.models.kolo_item import KoloItem
 from src.common.domain.models.kv_config import KVConfig
 from src.common.god.ksnowflake import KSnowflake
@@ -105,13 +105,13 @@ class ProjectDomain(AbsSqliteDomain):
             updated_count_class = session.query(AnnotationCategory).filter(
                 AnnotationCategory.class_name == old_class_name
             ).update({AnnotationCategory.class_name: new_class_name})
-            print(f"第一次事务：因 class_name 匹配更新 {updated_count_class} 条 AnnotationCategory 记录")
+            print(f"第一次事务：因 class_name 匹配更新 {updated_count_class} 条AnnotationCategory 记录")
 
             # 第二次事务：更新 parent_name（独立事务，避免自引用冲突）
             updated_count_parent = session.query(AnnotationCategory).filter(
                 AnnotationCategory.parent_name == old_class_name
             ).update({AnnotationCategory.parent_name: new_class_name})
-            print(f"第二次事务：因 parent_name 匹配更新 {updated_count_parent} 条 AnnotationCategory 记录")
+            print(f"第二次事务：因 parent_name 匹配更新 {updated_count_parent} 条AnnotationCategory 记录")
 
             # 第三次事务：更新 KoloItem（如果需要，也可独立，但通常无冲突）
             kolo_updated = session.query(KoloItem).filter(
@@ -313,20 +313,20 @@ class ProjectDomain(AbsSqliteDomain):
         session = self.db_session()
         try:
             # 查询annotation_category表中最大的class_id值
-            max_id = session.query(SQLAnnotationCategory.class_id).order_by(SQLAnnotationCategory.class_id.desc()).first()
+            max_id = session.query(AnnotationCategory.class_id).order_by(AnnotationCategory.class_id.desc()).first()
             return max_id[0] if max_id else 0
         finally:
             session.close()
 
-    def query_all_categories(self) -> list[SQLAnnotationCategory]:
+    def query_all_categories(self) -> list[AnnotationCategory]:
         """
         查询annotation_category表中的所有数据
         :return: 所有数据列表
         """
         with self.db_session() as session:
-            return session.query(SQLAnnotationCategory).order_by(SQLAnnotationCategory.order).all()
+            return session.query(AnnotationCategory).order_by(AnnotationCategory.order).all()
 
-    def resave_all_categories(self, sql_annotation_category_list: list[SQLAnnotationCategory]):
+    def resave_all_categories(self, sql_annotation_category_list: list[AnnotationCategory]):
         """
         重新保存所有类别
         首先删除SQLAnnotationCategory表中全部的数据，然后保存传入的所有对象。
@@ -334,7 +334,7 @@ class ProjectDomain(AbsSqliteDomain):
         try:
             with self.db_session() as session:
                 # 删除所有现有类别
-                session.query(SQLAnnotationCategory).delete()
+                session.query(AnnotationCategory).delete()
 
                 # 批量添加（高效）
                 if sql_annotation_category_list:
@@ -346,15 +346,3 @@ class ProjectDomain(AbsSqliteDomain):
             # 上下文管理器的__exit__会自动处理rollback（取决于db_session的实现）
             # 若自定义上下文管理器未处理，可手动捕获并抛出
             raise e
-
-
-
-
-
-
-
-
-
-
-
-
