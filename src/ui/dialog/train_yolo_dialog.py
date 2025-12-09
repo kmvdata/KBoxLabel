@@ -85,18 +85,18 @@ class TrainConfigDialog(QDialog):
         button_layout.addStretch()
         
         self.cancel_button = QPushButton("取消")
-        self.start_button = QPushButton("确认训练")
-        self.start_button.setDefault(True)
+        self.finish_button = QPushButton("完成")
+        self.finish_button.setDefault(True)
         
         button_layout.addWidget(self.cancel_button)
-        button_layout.addWidget(self.start_button)
+        button_layout.addWidget(self.finish_button)
         main_layout.addLayout(button_layout)
         
         self.setLayout(main_layout)
         
         # 连接信号
         self.cancel_button.clicked.connect(self.reject)
-        self.start_button.clicked.connect(self.accept)
+        self.finish_button.clicked.connect(self.accept)
 
     def populate_data_stats(self):
         """填充数据统计信息"""
@@ -119,43 +119,6 @@ class TrainConfigDialog(QDialog):
             self.train_samples_label.setText("未知")
             self.val_samples_label.setText("未知")
             self.classes_label.setText("未知")
-
-
-class TrainingThread(QThread):
-    """训练线程，避免界面冻结"""
-    progress_updated = pyqtSignal(str)
-    training_finished = pyqtSignal(bool, str)
-
-    def __init__(self, trainer, source_dir, model_name, epochs, imgsz, batch_size, data_dir, categories):
-        super().__init__()
-        self.trainer = trainer
-        self.source_dir = source_dir
-        self.model_name = model_name
-        self.epochs = epochs
-        self.imgsz = imgsz
-        self.batch_size = batch_size
-        self.data_dir = data_dir
-        self.categories = categories
-
-    def run(self):
-        try:
-            self.progress_updated.emit("开始训练...")
-            # 从categories中提取类别名称
-            class_names = [category.class_name for category in self.categories]
-            result = self.trainer.train(
-                source_dir=self.source_dir,
-                model_name=self.model_name,
-                epochs=self.epochs,
-                imgsz=self.imgsz,
-                batch_size=self.batch_size,
-                data_dir=self.data_dir,
-                class_names=class_names,
-                categories=self.categories
-            )
-            self.training_finished.emit(True, result)
-        except Exception as e:
-            logging.error(f"Training error: {e}")
-            self.training_finished.emit(False, str(e))
 
 
 class TrainYoloDialog(QDialog):
@@ -212,7 +175,7 @@ class TrainYoloDialog(QDialog):
         
         # 连接信号
         self.cancel_button.clicked.connect(self.reject)
-        self.start_button.clicked.connect(self.start_training_process)
+        self.start_button.clicked.connect(self.prepare_training_data)
 
     def select_directory(self):
         """选择训练数据目录"""
@@ -224,8 +187,8 @@ class TrainYoloDialog(QDialog):
             self.start_button.setEnabled(True)
             self.train_data_dir = Path(directory)
 
-    def start_training_process(self):
-        """开始训练流程"""
+    def prepare_training_data(self):
+        """准备训练数据"""
         if not hasattr(self, 'train_data_dir'):
             QMessageBox.warning(self, "错误", "请先选择训练数据目录")
             return
@@ -258,26 +221,15 @@ class TrainYoloDialog(QDialog):
             )
             
             if config_dialog.exec_() == QDialog.Accepted:
-                # 开始训练
-                self.start_button.setEnabled(False)
-                self.progress_bar.setValue(60)
-                self.progress_bar.setFormat("正在训练...")
-                self.log_text_edit.append("正在开始训练...")
-                
-                # 在单独线程中进行训练
-                self.training_thread = TrainingThread(
-                    trainer,
-                    source_dir,
+                # 显示训练命令而不是直接训练
+                self.show_training_command(
+                    self.train_data_dir,
                     config_dialog.model_combo.currentText(),
                     config_dialog.epochs_spin.value(),
                     config_dialog.imgsz_spin.value(),
                     config_dialog.batch_spin.value(),
-                    self.train_data_dir,
-                    categories  # 传入categories而不是class_names
+                    class_names
                 )
-                self.training_thread.progress_updated.connect(self.update_progress)
-                self.training_thread.training_finished.connect(self.on_training_finished)
-                self.training_thread.start()
             else:
                 self.progress_bar.setVisible(False)
                 self.start_button.setEnabled(True)
@@ -286,19 +238,25 @@ class TrainYoloDialog(QDialog):
             self.progress_bar.setVisible(False)
             self.start_button.setEnabled(True)
 
-    def update_progress(self, message):
-        """更新进度"""
-        self.log_text_edit.append(message)
-
-    def on_training_finished(self, success, result):
-        """训练完成处理"""
+    def show_training_command(self, data_dir, model_name, epochs, imgsz, batch_size, class_names):
+        """显示训练命令"""
         self.progress_bar.setValue(100)
-        if success:
-            self.progress_bar.setFormat("训练完成")
-            self.log_text_edit.append(f"训练完成: {result}")
-            QMessageBox.information(self, "训练完成", f"训练已完成，结果保存在: {result}")
-        else:
-            self.progress_bar.setFormat("训练失败")
-            self.log_text_edit.append(f"训练失败: {result}")
-            QMessageBox.critical(self, "训练失败", f"训练过程中出现错误: {result}")
-        self.start_button.setEnabled(True)
+        self.progress_bar.setFormat("数据准备完成")
+        
+        # 构造训练命令
+        command = f"yolo detect train model={model_name} data={data_dir}/dataset.yaml epochs={epochs} imgsz={imgsz} batch={batch_size}"
+        
+        # 在日志中显示命令
+        self.log_text_edit.append("=" * 50)
+        self.log_text_edit.append("数据准备已完成！")
+        self.log_text_edit.append("请在终端中运行以下命令来开始训练：")
+        self.log_text_edit.append("=" * 50)
+        self.log_text_edit.append(command)
+        self.log_text_edit.append("=" * 50)
+        self.log_text_edit.append("注意：您可能需要根据实际情况调整命令参数")
+        
+        # 禁用开始按钮
+        self.start_button.setEnabled(False)
+        
+        # 提示用户
+        QMessageBox.information(self, "数据准备完成", f"训练数据已准备完成，请查看日志获取训练命令。\n数据保存在: {data_dir}")
