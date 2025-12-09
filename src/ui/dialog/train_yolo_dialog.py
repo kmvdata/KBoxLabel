@@ -163,12 +163,12 @@ class TrainConfigDialog(QDialog):
 
 
 class TrainYoloDialog(QDialog):
-    """YOLO训练主对话框"""
+    """YOLO数据集对话框"""
     
     def __init__(self, project_window, parent=None):
         super().__init__(parent)
         self.project_window = project_window
-        self.setWindowTitle("训练YOLO模型")
+        self.setWindowTitle("YOLO数据集")
         self.setMinimumSize(600, 500)
         self.init_ui()
 
@@ -205,7 +205,11 @@ class TrainYoloDialog(QDialog):
         # 按钮
         button_layout = QHBoxLayout()
         button_layout.addStretch()
+        self.cancel_button = QPushButton("取消")
+        self.open_folder_button = QPushButton("打开数据集")
         self.start_button = QPushButton("创建训练数据集")
+        button_layout.addWidget(self.cancel_button)
+        button_layout.addWidget(self.open_folder_button)
         button_layout.addWidget(self.start_button)
         layout.addLayout(button_layout)
         
@@ -218,8 +222,13 @@ class TrainYoloDialog(QDialog):
         self.train_data_dir = default_train_dir
         self.start_button.setEnabled(True)
         
+        # 隐藏打开数据集按钮，初始只显示取消和开始按钮
+        self.open_folder_button.setVisible(False)
+        
         # 连接信号
         self.start_button.clicked.connect(self.prepare_training_data)
+        self.cancel_button.clicked.connect(self.reject)
+        self.open_folder_button.clicked.connect(self.open_dataset_folder)
 
     def select_directory(self):
         """选择训练数据目录"""
@@ -238,6 +247,10 @@ class TrainYoloDialog(QDialog):
             return
             
         try:
+            # 禁用开始按钮，启用取消按钮
+            self.start_button.setEnabled(False)
+            self.cancel_button.setEnabled(True)
+            
             # 准备训练数据
             self.progress_bar.setVisible(True)
             self.progress_bar.setFormat("正在准备训练数据...")
@@ -300,10 +313,35 @@ class TrainYoloDialog(QDialog):
             else:
                 self.progress_bar.setVisible(False)
                 self.start_button.setEnabled(True)
+                self.cancel_button.setEnabled(True)
         except Exception as e:
             QMessageBox.critical(self, "错误", f"准备训练数据时出错: {str(e)}")
             self.progress_bar.setVisible(False)
             self.start_button.setEnabled(True)
+            self.cancel_button.setEnabled(True)
+
+    def open_dataset_folder(self):
+        """打开数据集文件夹"""
+        try:
+            folder_path = self.train_data_dir.absolute()
+            
+            import platform
+            system = platform.system()
+            
+            if system == "Windows":
+                # Windows系统使用explorer打开文件夹
+                import subprocess
+                subprocess.Popen(["explorer", str(folder_path)])
+            elif system == "Darwin":
+                # macOS系统使用open命令在Finder中打开
+                import subprocess
+                subprocess.Popen(["open", str(folder_path)])
+            else:
+                # Linux系统使用xdg-open命令打开文件夹
+                import subprocess
+                subprocess.Popen(["xdg-open", str(folder_path)])
+        except Exception as e:
+            QMessageBox.critical(self, "错误", f"无法打开文件夹: {str(e)}")
 
     def show_training_command(self, data_dir, model_name, epochs, imgsz, batch_size, class_names):
         """显示训练命令"""
@@ -323,7 +361,10 @@ class TrainYoloDialog(QDialog):
         self.log_text_edit.append("注意：您可能需要根据实际情况调整命令参数")
         self.log_text_edit.append(f"数据保存在: {data_dir}")
         
-        # 更改按钮文字为"完成"
+        # 更改按钮状态：隐藏取消按钮，显示打开数据集按钮，启用完成按钮
+        self.cancel_button.setVisible(False)
+        self.open_folder_button.setVisible(True)
         self.start_button.setText("完成")
+        self.start_button.setEnabled(True)
         self.start_button.clicked.disconnect()
         self.start_button.clicked.connect(self.accept)

@@ -47,7 +47,7 @@ class MainMenuBar(QMenuBar):
         self.coco_action = QAction("Coco格式", self)
         
         # 训练子菜单动作
-        self.train_yolo_action = QAction("训练YOLO", self)
+        self.train_yolo_action = QAction("YOLO数据集", self)
 
         self.create_menus()
         self.connect_signals()
