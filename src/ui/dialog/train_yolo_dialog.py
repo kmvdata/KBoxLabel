@@ -84,18 +84,15 @@ class TrainConfigDialog(QDialog):
         button_layout = QHBoxLayout()
         button_layout.addStretch()
         
-        self.cancel_button = QPushButton("取消")
         self.finish_button = QPushButton("完成")
         self.finish_button.setDefault(True)
         
-        button_layout.addWidget(self.cancel_button)
         button_layout.addWidget(self.finish_button)
         main_layout.addLayout(button_layout)
         
         self.setLayout(main_layout)
         
         # 连接信号
-        self.cancel_button.clicked.connect(self.reject)
         self.finish_button.clicked.connect(self.accept)
 
     def populate_data_stats(self):
@@ -164,17 +161,14 @@ class TrainYoloDialog(QDialog):
         # 按钮
         button_layout = QHBoxLayout()
         button_layout.addStretch()
-        self.cancel_button = QPushButton("取消")
-        self.start_button = QPushButton("开始准备数据")
+        self.start_button = QPushButton("创建训练数据集")
         self.start_button.setEnabled(False)
-        button_layout.addWidget(self.cancel_button)
         button_layout.addWidget(self.start_button)
         layout.addLayout(button_layout)
         
         self.setLayout(layout)
         
         # 连接信号
-        self.cancel_button.clicked.connect(self.reject)
         self.start_button.clicked.connect(self.prepare_training_data)
 
     def select_directory(self):
@@ -214,6 +208,15 @@ class TrainYoloDialog(QDialog):
             self.train_data_dir.mkdir(parents=True, exist_ok=True)
             trainer.organize_training_data(source_dir, self.train_data_dir, categories=categories)
             
+            # 生成数据集YAML配置文件
+            self.progress_bar.setValue(40)
+            self.log_text_edit.append("正在生成数据集配置文件...")
+            # 如果提供了categories，只使用顶层类别生成yaml
+            if categories:
+                top_level_class_names = [cat.class_name for cat in categories if cat.parent_name is None]
+                class_names = top_level_class_names
+            YOLOTrainer.prepare_dataset_yaml(self.train_data_dir, class_names)
+            
             # 显示配置对话框
             self.progress_bar.setValue(50)
             config_dialog = TrainConfigDialog(
@@ -244,7 +247,7 @@ class TrainYoloDialog(QDialog):
         self.progress_bar.setFormat("数据准备完成")
         
         # 构造训练命令
-        command = f"yolo detect train model={model_name} data={data_dir}/dataset.yaml epochs={epochs} imgsz={imgsz} batch={batch_size}"
+        command = f"yolo detect train model={model_name} data={data_dir.absolute()}/dataset.yaml epochs={epochs} imgsz={imgsz} batch={batch_size}"
         
         # 在日志中显示命令
         self.log_text_edit.append("=" * 50)
@@ -255,8 +258,10 @@ class TrainYoloDialog(QDialog):
         self.log_text_edit.append("=" * 50)
         self.log_text_edit.append("注意：您可能需要根据实际情况调整命令参数")
         
-        # 禁用开始按钮
-        self.start_button.setEnabled(False)
+        # 更改按钮文字为"完成"
+        self.start_button.setText("完成")
+        self.start_button.clicked.disconnect()
+        self.start_button.clicked.connect(self.accept)
         
         # 提示用户
         QMessageBox.information(self, "数据准备完成", f"训练数据已准备完成，请查看日志获取训练命令。\n数据保存在: {data_dir}")
