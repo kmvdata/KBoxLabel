@@ -543,6 +543,12 @@ class ProjectWindow(QMainWindow):
         按照图片列表顺序逐一处理，将标注信息转换为YOLO格式，显示进度条和取消按钮
         使用分页加载图片名称，避免一次性加载过大数据
         """
+        # 获取类别映射表
+        category_map = self.gen_category_map()
+        
+        # 创建类别名称到ID的映射
+        class_name_to_id = {category.class_name: category.class_id for category in category_map.values()}
+        
         # 获取总图片数
         total_images = self.project_info.domain.count_image_names_from_kilo_item()
         
@@ -570,11 +576,12 @@ class ProjectWindow(QMainWindow):
                     # 处理类别层级映射
                     class_name = item.class_name
                     # 如果这是一个子类别，映射到父类别
-                    if class_name in child_to_parent_map:
-                        class_name = child_to_parent_map[class_name]
+                    mapped_category = category_map.get(class_name)
+                    if mapped_category:
+                        class_name = mapped_category.class_name
                     
                     # 获取类别ID（使用映射后的类别名称）
-                    class_id = top_level_classes.get(class_name, -1)
+                    class_id = class_name_to_id.get(class_name, -1)
                     if class_id == -1:
                         print(f"警告: 未找到类别 '{class_name}' 的ID，跳过该标注")
                         continue
@@ -724,6 +731,9 @@ class ProjectWindow(QMainWindow):
 
         output_path = Path(output_dir)
 
+        # 获取类别映射表
+        category_map = self.gen_category_map()
+        
         # 准备COCO数据结构
         coco_data = {
             "info": {
@@ -744,16 +754,19 @@ class ProjectWindow(QMainWindow):
             "categories": []
         }
 
-        # 添加类别信息
-        for category in self.project_info.categories:
-            coco_data["categories"].append({
-                "id": category.class_id,
-                "name": category.class_name,
-                "supercategory": ""
-            })
+        # 添加类别信息（去重处理）
+        added_categories = set()
+        for category in category_map.values():
+            if category.class_name not in added_categories:
+                coco_data["categories"].append({
+                    "id": category.class_id,
+                    "name": category.class_name,
+                    "supercategory": category.parent_name or ""
+                })
+                added_categories.add(category.class_name)
 
         # 创建类别名称到ID的映射
-        class_name_to_id = {category.class_name: category.class_id for category in self.project_info.categories}
+        class_name_to_id = {category.class_name: category.class_id for category in category_map.values()}
 
         # 创建image_name到id的映射
         image_name_to_id = {}
@@ -787,10 +800,17 @@ class ProjectWindow(QMainWindow):
 
             # 处理每个标注项
             for item in kolo_items:
-                # 获取类别ID
-                class_id = class_name_to_id.get(item.class_name, -1)
+                # 处理类别层级映射
+                class_name = item.class_name
+                # 如果这是一个子类别，映射到父类别
+                mapped_category = category_map.get(class_name)
+                if mapped_category:
+                    class_name = mapped_category.class_name
+                
+                # 获取类别ID（使用映射后的类别名称）
+                class_id = class_name_to_id.get(class_name, -1)
                 if class_id == -1:
-                    print(f"警告: 未找到类别 '{item.class_name}' 的ID，跳过该标注")
+                    print(f"警告: 未找到类别 '{class_name}' 的ID，跳过该标注")
                     continue
 
                 # 转换为COCO格式的边界框 [x, y, width, height]
