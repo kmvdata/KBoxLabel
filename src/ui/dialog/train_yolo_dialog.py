@@ -237,7 +237,7 @@ class TrainYoloDialog(QDialog):
             self.log_text_edit.append("正在准备训练数据...")
             
             # 获取类别列表和类别名称
-            categories = self.project_window.project_info.categories
+            categories = self.project_window.project_info.domain.query_all_categories()
             class_names = [category.class_name for category in categories]
             
             # 创建训练器
@@ -273,7 +273,7 @@ class TrainYoloDialog(QDialog):
                     config_dialog.imgsz_spin.value(),
                     config_dialog.batch_spin.value(),
                     self.train_data_dir,
-                    class_names
+                    categories  # 传入categories而不是class_names
                 )
                 self.training_thread.progress_updated.connect(self.update_progress)
                 self.training_thread.training_finished.connect(self.on_training_finished)
