@@ -48,7 +48,8 @@ class YOLOExecutor:
             if not model_path.exists():
                 error_msg = f"YOLO model file not found: {str(model_path)}"
                 logging.error(error_msg)
-                raise FileNotFoundError(error_msg)
+                self.clear_model()
+                return False
 
             # 加载模型
             self.yolo_model = YOLO(str(model_path))

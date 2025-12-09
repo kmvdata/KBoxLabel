@@ -699,9 +699,16 @@ class ImageCanvas(QGraphicsView):
 
     def _load_yolo_model_async(self, model_path: Optional[Path] =None):
         # 开始加载模型
-        self.project_info.load_yolo_model(model_path)
-        self.run_action.setEnabled(self.project_info.is_model_loaded)
-        self.run_tool_button.setEnabled(self.project_info.is_model_loaded)
+        is_loaded = self.project_info.load_yolo_model(model_path)
+        self.run_action.setEnabled(is_loaded)
+        self.run_tool_button.setEnabled(is_loaded)
+        
+        # 如果加载失败，给用户提示
+        if not is_loaded and model_path is not None:
+            QMessageBox.warning(
+                self, "Load Failed",
+                f"Failed to load model. Model file may not exist or is invalid."
+            )
 
     def delete_yolo_model(self):
         """删除已选择的YOLO模型配置"""

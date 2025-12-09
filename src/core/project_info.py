@@ -73,8 +73,7 @@ class ProjectInfo:
             return False
 
         # 尝试加载模型
-        self.yolo_executor.load_yolo(model_path)
-        is_loaded = self.yolo_executor.is_model_loaded()
+        is_loaded = self.yolo_executor.load_yolo(model_path)
 
         if is_loaded:
             # 加载成功，保存路径到数据库
@@ -83,7 +82,7 @@ class ProjectInfo:
             # 加载失败，清空数据库中的模型路径
             self.domain.delete_model_path()
             
-        return None
+        return is_loaded
 
     def delete_yolo_model(self):
         """删除YOLO模型并清空数据库中的模型路径"""
