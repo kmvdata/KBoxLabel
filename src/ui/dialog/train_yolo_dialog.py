@@ -292,11 +292,9 @@ class TrainYoloDialog(QDialog):
         self.log_text_edit.append(command)
         self.log_text_edit.append("=" * 50)
         self.log_text_edit.append("注意：您可能需要根据实际情况调整命令参数")
+        self.log_text_edit.append(f"数据保存在: {data_dir}")
         
         # 更改按钮文字为"完成"
         self.start_button.setText("完成")
         self.start_button.clicked.disconnect()
         self.start_button.clicked.connect(self.accept)
-        
-        # 提示用户
-        QMessageBox.information(self, "数据准备完成", f"训练数据已准备完成，请查看日志获取训练命令。\n数据保存在: {data_dir}")
