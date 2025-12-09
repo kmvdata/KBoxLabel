@@ -153,6 +153,7 @@ class TrainConfigDialog(QDialog):
             self.train_samples_label.setText(str(train_samples))
             self.val_samples_label.setText(str(val_samples))
             self.classes_label.setText(", ".join(self.class_names) if self.class_names else "无类别")
+            
         except Exception as e:
             logging.error(f"Error calculating data stats: {e}")
             self.total_samples_label.setText("未知")
@@ -256,6 +257,20 @@ class TrainYoloDialog(QDialog):
             # 确保训练数据目录存在
             self.train_data_dir.mkdir(parents=True, exist_ok=True)
             trainer.organize_training_data(source_dir, self.train_data_dir, categories=categories)
+            
+            # 计算实际生成的数据量
+            train_images_dir = self.train_data_dir / "train" / "images"
+            val_images_dir = self.train_data_dir / "val" / "images"
+            
+            train_count = len(list(train_images_dir.glob("*"))) if train_images_dir.exists() else 0
+            val_count = len(list(val_images_dir.glob("*"))) if val_images_dir.exists() else 0
+            total_count = train_count + val_count
+            
+            # 在日志中显示实际生成的数据量
+            self.log_text_edit.append(f"实际生成数据量:")
+            self.log_text_edit.append(f"  总样本数: {total_count}")
+            self.log_text_edit.append(f"  训练集数量: {train_count}")
+            self.log_text_edit.append(f"  验证集数量: {val_count}")
             
             # 生成数据集YAML配置文件
             self.progress_bar.setValue(40)
