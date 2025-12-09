@@ -127,15 +127,29 @@ class TrainConfigDialog(QDialog):
     def populate_data_stats(self):
         """填充数据统计信息"""
         try:
-            # 获取txt文件数量作为样本数
-            txt_files = list(self.train_data_dir.glob("*.txt"))
+            # 获取源目录（项目目录）中的txt文件
+            source_dir = self.project_window.project_info.path
+            txt_files = list(source_dir.glob("*.txt"))
             total_samples = len(txt_files)
             
-            # 默认8:2分割
-            train_samples = int(total_samples * 0.8)
-            val_samples = total_samples - train_samples
+            # 支持的图片格式
+            image_extensions = {'.jpg', '.jpeg', '.png', '.bmp', '.tiff'}
             
-            self.total_samples_label.setText(str(total_samples))
+            # 计算有效样本数（有对应图片文件的标签文件）
+            valid_samples = 0
+            for txt_file in txt_files:
+                stem = txt_file.stem
+                for ext in image_extensions:
+                    image_file = source_dir / f"{stem}{ext}"
+                    if image_file.exists():
+                        valid_samples += 1
+                        break
+            
+            # 默认8:2分割
+            train_samples = int(valid_samples * 0.8)
+            val_samples = valid_samples - train_samples
+            
+            self.total_samples_label.setText(str(valid_samples))
             self.train_samples_label.setText(str(train_samples))
             self.val_samples_label.setText(str(val_samples))
             self.classes_label.setText(", ".join(self.class_names) if self.class_names else "无类别")
