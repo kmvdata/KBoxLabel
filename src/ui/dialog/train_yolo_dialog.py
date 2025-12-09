@@ -9,6 +9,9 @@ import logging
 
 from src.core.yolo.yolo_trainer import YOLOTrainer
 
+# 添加PIL库用于获取图片尺寸
+from PIL import Image
+
 
 class TrainConfigDialog(QDialog):
     """训练配置确认对话框"""
@@ -68,7 +71,9 @@ class TrainConfigDialog(QDialog):
         self.imgsz_spin = QSpinBox()
         self.imgsz_spin.setRange(32, 4096)
         self.imgsz_spin.setSingleStep(32)
-        self.imgsz_spin.setValue(640)
+        # 设置默认图片尺寸为项目第一张图片的尺寸
+        default_imgsz = self.get_first_image_size()
+        self.imgsz_spin.setValue(default_imgsz)
         params_layout.addRow("图片尺寸:", self.imgsz_spin)
         
         # 批次大小
@@ -84,7 +89,7 @@ class TrainConfigDialog(QDialog):
         button_layout = QHBoxLayout()
         button_layout.addStretch()
         
-        self.finish_button = QPushButton("完成")
+        self.finish_button = QPushButton("开始生成")
         self.finish_button.setDefault(True)
         
         button_layout.addWidget(self.finish_button)
@@ -94,6 +99,30 @@ class TrainConfigDialog(QDialog):
         
         # 连接信号
         self.finish_button.clicked.connect(self.accept)
+
+    def get_first_image_size(self):
+        """获取项目中第一张图片的尺寸"""
+        try:
+            # 获取项目路径
+            project_path = self.project_window.project_info.path
+            
+            # 查找项目中的图片文件
+            image_extensions = {'.jpg', '.jpeg', '.png', '.bmp', '.tiff'}
+            for ext in image_extensions:
+                first_image = next(project_path.rglob(f"*{ext}"), None)
+                if first_image:
+                    # 使用PIL获取图片尺寸
+                    with Image.open(first_image) as img:
+                        width, height = img.size
+                        # 返回较长的一边
+                        return max(width, height)
+            
+            # 如果没找到图片，返回默认值640
+            return 640
+        except Exception as e:
+            logging.warning(f"无法获取第一张图片的尺寸: {e}")
+            # 出现异常时返回默认值640
+            return 640
 
     def populate_data_stats(self):
         """填充数据统计信息"""
@@ -162,11 +191,17 @@ class TrainYoloDialog(QDialog):
         button_layout = QHBoxLayout()
         button_layout.addStretch()
         self.start_button = QPushButton("创建训练数据集")
-        self.start_button.setEnabled(False)
         button_layout.addWidget(self.start_button)
         layout.addLayout(button_layout)
         
         self.setLayout(layout)
+        
+        # 设置默认训练目录路径
+        project_path = self.project_window.project_info.path
+        default_train_dir = project_path.parent / f"train_{project_path.name}"
+        self.dir_line_edit.setText(str(default_train_dir))
+        self.train_data_dir = default_train_dir
+        self.start_button.setEnabled(True)
         
         # 连接信号
         self.start_button.clicked.connect(self.prepare_training_data)
