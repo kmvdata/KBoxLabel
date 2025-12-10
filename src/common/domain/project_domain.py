@@ -346,3 +346,32 @@ class ProjectDomain(AbsSqliteDomain):
             # 上下文管理器的__exit__会自动处理rollback（取决于db_session的实现）
             # 若自定义上下文管理器未处理，可手动捕获并抛出
             raise e
+
+    def gen_category_map(self) -> dict[str, AnnotationCategory]:
+        """
+        从项目信息中加载所有标注类别，并构建一个映射字典。
+
+        返回:
+            dict[str, AnnotationCategory]: 以类别名称为键，AnnotationCategory 对象为值的字典。
+            如果某个类别有父类别（parent_name），则其值会被替换为其父类别的 AnnotationCategory 对象。
+
+        注意事项:
+            - 此方法假定 self.project_info.categories 包含所有可用的类别信息
+            - 父类别引用必须形成有效的树状结构，不支持循环引用
+            - 若父类别不存在，则保留原始类别对象
+        """
+        # 初始化类别映射字典
+        category_map = {}
+
+        # 第一步：建立基础映射（类别名称 -> AnnotationCategory 对象）
+        all_categories = self.query_all_categories()
+        for category in all_categories:
+            category_map[category.class_name] = category
+        # 第二步：遍历category_map，并更新父类别引用
+        for category in all_categories:
+            if category.parent_name:
+                parent_category = category_map.get(category.parent_name)
+                if parent_category:
+                    category_map[category.class_name] = parent_category
+        print(f'category_map -> {category_map}')
+        return category_map

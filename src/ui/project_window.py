@@ -137,35 +137,6 @@ class ProjectWindow(QMainWindow):
         # 窗口加载完成后自动选中第一个元素
         QTimer.singleShot(0, self.select_first_image)
 
-    def gen_category_map(self) -> dict[str, AnnotationCategory]:
-        """
-        从项目信息中加载所有标注类别，并构建一个映射字典。
-
-        返回:
-            dict[str, AnnotationCategory]: 以类别名称为键，AnnotationCategory 对象为值的字典。
-            如果某个类别有父类别（parent_name），则其值会被替换为其父类别的 AnnotationCategory 对象。
-
-        注意事项:
-            - 此方法假定 self.project_info.categories 包含所有可用的类别信息
-            - 父类别引用必须形成有效的树状结构，不支持循环引用
-            - 若父类别不存在，则保留原始类别对象
-        """
-        # 初始化类别映射字典
-        category_map = {}
-
-        # 第一步：建立基础映射（类别名称 -> AnnotationCategory 对象）
-        all_categories = self.project_info.domain.query_all_categories()
-        for category in all_categories:
-            category_map[category.class_name] = category
-        # 第二步：遍历category_map，并更新父类别引用
-        for category in all_categories:
-            if category.parent_name:
-                parent_category = category_map.get(category.parent_name)
-                if parent_category:
-                    category_map[category.class_name] = parent_category
-        print(f'category_map -> {category_map}')
-        return category_map
-
     def select_first_image(self):
         """选中图片列表中的第一个元素"""
         model = self.image_list.model
@@ -544,7 +515,7 @@ class ProjectWindow(QMainWindow):
         使用分页加载图片名称，避免一次性加载过大数据
         """
         # 获取类别映射表
-        category_map = self.gen_category_map()
+        category_map = self.project_info.domain.gen_category_map()
         
         # 创建类别名称到ID的映射
         class_name_to_id = {category.class_name: category.class_id for category in category_map.values()}
@@ -732,7 +703,7 @@ class ProjectWindow(QMainWindow):
         output_path = Path(output_dir)
 
         # 获取类别映射表
-        category_map = self.gen_category_map()
+        category_map = self.project_info.domain.gen_category_map()
         
         # 准备COCO数据结构
         coco_data = {
