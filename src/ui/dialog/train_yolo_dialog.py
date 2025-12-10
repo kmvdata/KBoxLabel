@@ -269,7 +269,7 @@ class TrainYoloDialog(QDialog):
             self.log_text_edit.append("正在组织训练数据...")
             # 确保训练数据目录存在
             self.train_data_dir.mkdir(parents=True, exist_ok=True)
-            trainer.organize_training_data(source_dir, self.train_data_dir, categories=categories)
+            trainer.organize_training_data(source_dir, self.train_data_dir, self.project_window.project_info.domain)
             
             # 计算实际生成的数据量
             train_images_dir = self.train_data_dir / "train" / "images"
