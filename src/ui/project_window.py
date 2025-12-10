@@ -266,8 +266,6 @@ class ProjectWindow(QMainWindow):
 
         # 连接菜单栏的信号到本地处理函数
         self.menu_bar.importImagesRequested.connect(self.handle_import_images)  # type line: ignore
-        self.menu_bar.exportToYoloRequested.connect(self.export_project_to_yolo)  # type: ignore
-        self.menu_bar.exportToCocoRequested.connect(self.export_project_to_coco)  # type: ignore
         self.menu_bar.closeRequested.connect(self.handle_close_request)  # type: ignore
         self.menu_bar.editActionRequested.connect(self.handle_edit_action)  # type: ignore
         # 连接训练YOLO信号
