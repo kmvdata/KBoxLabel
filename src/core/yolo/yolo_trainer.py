@@ -204,8 +204,15 @@ class YOLOTrainer:
                 # 如果不是顶层类别，跳过该行（相当于过滤掉非顶层类别）
                 
             # 写入处理后的标签文件
-            with open(dst_label_path, 'w') as dst_file:
-                dst_file.writelines(processed_lines)
+            # 只有当有处理后的行时才写入，否则复制原文件
+            if processed_lines:
+                with open(dst_label_path, 'w') as dst_file:
+                    dst_file.writelines(processed_lines)
+            else:
+                # 如果没有有效的标签行，复制原文件
+                import shutil
+                shutil.copy2(src_label_path, dst_label_path)
+                logging.warning(f"标签文件 {src_label_path} 中没有有效的顶层类别标签，已复制原始文件")
                 
         except Exception as e:
             logging.warning(f"处理标签文件 {src_label_path} 时出错: {e}")

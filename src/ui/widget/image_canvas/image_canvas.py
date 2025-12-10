@@ -1095,10 +1095,10 @@ class ImageCanvas(QGraphicsView):
             
             # 为每个AnnotationView添加菜单项到一级菜单
             for annotation in sorted_annotations:
-                action = QAction(annotation.category.class_name, self)
+                action = QAction(annotation.class_name, self)
                 # 确保在选择时取消其他项的选中状态，并同步更新annotation_list
                 action.triggered.connect(  # type: ignore
-                    lambda checked, ann=annotation: self.select_single_annotation(ann) or print('kkkkkkk')
+                    lambda checked, ann=annotation: self.select_single_annotation(ann)
                 )
                 context_menu.addAction(action)
 
