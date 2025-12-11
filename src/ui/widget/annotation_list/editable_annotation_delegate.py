@@ -1,7 +1,7 @@
 # annotation_list.py
 
 from PyQt5.QtCore import Qt, QRect
-from PyQt5.QtWidgets import QLineEdit, QSpinBox, QWidget, QMessageBox, QProgressDialog
+from PyQt5.QtWidgets import QLineEdit, QWidget, QMessageBox, QProgressDialog
 from ultralytics import YOLO
 
 from src.core.project_info import ProjectInfo
@@ -14,7 +14,7 @@ from src.ui.widget.annotation_list.annotation_delegate import AnnotationDelegate
 class EditableAnnotationDelegate(AnnotationDelegate):
     """支持编辑的委托类，通过右键菜单触发编辑"""
     EDIT_TYPE_TEXT = "text"
-    EDIT_TYPE_ID = "id"
+    # 删除 EDIT_TYPE_ID = "id"
 
     def __init__(self, project_info: ProjectInfo, row_height=56, parent=None):
         super().__init__(row_height, parent)
@@ -33,12 +33,7 @@ class EditableAnnotationDelegate(AnnotationDelegate):
             editor.setPlaceholderText("输入类别名称")
             return editor
 
-        elif self.current_edit_type == self.EDIT_TYPE_ID:
-            editor = QSpinBox(parent)
-            editor.setMinimum(1)
-            editor.setButtonSymbols(QSpinBox.NoButtons)
-            return editor
-
+        # 删除与EDIT_TYPE_ID相关的代码
         return None
 
     def get_edit_rects(self, option, index):
@@ -49,7 +44,7 @@ class EditableAnnotationDelegate(AnnotationDelegate):
         category_name = index.data(Qt.DisplayRole)
 
         if not all([category_color, category_name, class_id is not None]):
-            return {"text": QRect(), "id": QRect()}
+            return {"text": QRect()}
 
         # 计算各区域尺寸
         color_size = self.row_height - 2 * self.MARGIN
@@ -66,22 +61,14 @@ class EditableAnnotationDelegate(AnnotationDelegate):
             self.row_height
         )
 
-        # id区域
-        id_rect = QRect(
-            option.rect.right() - color_size - self.MARGIN,
-            option.rect.top() + self.MARGIN,
-            color_size,
-            color_size
-        )
-
-        return {"text": name_rect, "id": id_rect}
+        # 删除id_rect相关代码
+        return {"text": name_rect}
 
     def setEditorData(self, editor, index):
         """设置编辑器数据"""
         if isinstance(editor, QLineEdit):
             editor.setText(index.data(Qt.DisplayRole))
-        elif isinstance(editor, QSpinBox):
-            editor.setValue(index.data(Qt.UserRole + 1))
+        # 删除与QSpinBox相关的代码
 
     def setModelData(self, editor, model, index):
         """将编辑器数据保存到模型"""
@@ -142,15 +129,7 @@ class EditableAnnotationDelegate(AnnotationDelegate):
                     # 名称重复，不保存更改
                     pass
 
-        elif isinstance(editor, QSpinBox):
-            class_id = editor.value()
-            if class_id > 0:
-                success = model.setData(index, class_id, Qt.UserRole + 1)
-                
-                if success:
-                    # 获取修改项的class_name
-                    class_name = model.data(index, Qt.UserRole + 2)
-                    self.domain.change_category_class_id(class_name, class_id)
+        # 删除与QSpinBox相关的代码
 
     def updateEditorGeometry(self, editor, option, index):
         """更新编辑器几何形状"""
@@ -158,8 +137,7 @@ class EditableAnnotationDelegate(AnnotationDelegate):
 
         if self.current_edit_type == self.EDIT_TYPE_TEXT:
             editor.setGeometry(edit_rects["text"])
-        elif self.current_edit_type == self.EDIT_TYPE_ID:
-            editor.setGeometry(edit_rects["id"])
+        # 删除与EDIT_TYPE_ID相关的代码
 
         editor.setVisible(True)
         editor.setFocus()

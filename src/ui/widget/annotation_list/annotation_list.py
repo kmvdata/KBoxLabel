@@ -597,11 +597,6 @@ class AnnotationList(QListView):
             self.delegate.original_name = current_name
             self.edit(self.right_click_index)
 
-    def _handle_modify_id(self):
-        """处理修改ID操作"""
-        if self.right_click_index and self.right_click_index.isValid():
-            self.delegate.current_edit_type = EditableAnnotationDelegate.EDIT_TYPE_ID
-            self.edit(self.right_click_index)
 
     def _handle_delete(self):
         """处理删除操作"""
@@ -656,9 +651,6 @@ class AnnotationList(QListView):
         rename_action.triggered.connect(self._handle_rename) # type: ignore
         rename_action.setEnabled(index.isValid())  # 只有选中项时可用
 
-        modify_id_action = QAction("修改ID", self)
-        modify_id_action.triggered.connect(self._handle_modify_id) # type:ignore
-        modify_id_action.setEnabled(index.isValid())  # 只有选中项时可用
 
         delete_action = QAction("删除", self)
         delete_action.triggered.connect(self._handle_delete)  # type:ignore
@@ -668,7 +660,6 @@ class AnnotationList(QListView):
         menu.addAction(add_action)
         menu.addSeparator()
         menu.addAction(rename_action)
-        menu.addAction(modify_id_action)
         menu.addAction(delete_action)
         
         # 添加分隔线
