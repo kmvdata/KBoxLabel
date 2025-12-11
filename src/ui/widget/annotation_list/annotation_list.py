@@ -670,6 +670,14 @@ class AnnotationList(QListView):
         menu.addAction(rename_action)
         menu.addAction(modify_id_action)
         menu.addAction(delete_action)
+        
+        # 添加分隔线
+        menu.addSeparator()
+        
+        # 添加统计菜单项
+        statistics_action = QAction("统计", self)
+        statistics_action.triggered.connect(self._handle_statistics)  # type:ignore
+        menu.addAction(statistics_action)
 
         # 显示菜单
         menu.exec_(event.globalPos())
@@ -705,6 +713,14 @@ class AnnotationList(QListView):
             QItemSelectionModel.SelectionFlag.ClearAndSelect
         )
 
+    def _handle_statistics(self):
+        """处理统计操作"""
+        # 导入统计对话框
+        from src.ui.dialog.statistics_dialog import StatisticsDialog
+        
+        # 创建并显示统计对话框
+        dialog = StatisticsDialog(self.project_info, self)
+        dialog.exec_()
 
     def load_categories_from_yolo_model(self, model_path):
         """
