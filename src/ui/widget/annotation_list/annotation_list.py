@@ -626,14 +626,11 @@ class AnnotationList(QListView):
             if reply != QMessageBox.Yes:
                 return
 
-            try:
-                self.source_model.delete_category_by_index(source_index)
-            except Exception as e:
-                QMessageBox.critical(self, "删除失败", f"删除类别时出错: {str(e)}")
-                return
-                
-
-
+        try:
+            self.source_model.delete_category_by_index(source_index)
+        except Exception as e:
+            QMessageBox.critical(self, "删除失败", f"删除类别时出错: {str(e)}")
+            return
 
     def contextMenuEvent(self, event):
         """重写右键菜单事件"""
