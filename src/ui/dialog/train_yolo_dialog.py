@@ -1,7 +1,7 @@
 from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QGroupBox, QLabel,
     QComboBox, QSpinBox, QPushButton, QProgressBar, QFormLayout,
-    QTextEdit, QFileDialog, QMessageBox, QLineEdit
+    QTextEdit, QFileDialog, QMessageBox, QLineEdit, QTreeWidget, QTreeWidgetItem, QHeaderView, QFrame
 )
 from PyQt5.QtCore import Qt, QThread, pyqtSignal
 from pathlib import Path
@@ -22,7 +22,8 @@ class TrainConfigDialog(QDialog):
         self.train_data_dir = train_data_dir
         self.class_names = class_names
         self.setWindowTitle("训练配置确认")
-        self.setMinimumWidth(500)
+        self.setMinimumWidth(600)
+        self.setMinimumHeight(400)
         self.init_ui()
         self.populate_data_stats()
 
@@ -32,23 +33,33 @@ class TrainConfigDialog(QDialog):
         main_layout.setSpacing(15)
         main_layout.setContentsMargins(20, 20, 20, 20)
 
-        # 数据统计区域
-        stats_group = QGroupBox("数据统计")
-        stats_layout = QFormLayout()
-        stats_layout.setSpacing(10)
+        # 标题
+        title_label = QLabel("标注类别统计")
+        title_label.setAlignment(Qt.AlignCenter)
+        title_label.setStyleSheet("font-size: 16px; font-weight: bold; margin-bottom: 10px;")
+        main_layout.addWidget(title_label)
         
-        self.total_samples_label = QLabel()
-        self.train_samples_label = QLabel()
-        self.val_samples_label = QLabel()
-        self.classes_label = QLabel()
-        
-        stats_layout.addRow("总样本数:", self.total_samples_label)
-        stats_layout.addRow("训练集数量:", self.train_samples_label)
-        stats_layout.addRow("验证集数量:", self.val_samples_label)
-        stats_layout.addRow("类别列表:", self.classes_label)
-        
-        stats_group.setLayout(stats_layout)
-        main_layout.addWidget(stats_group)
+        # 分隔线
+        line = QFrame()
+        line.setFrameShape(QFrame.HLine)
+        line.setFrameShadow(QFrame.Sunken)
+        main_layout.addWidget(line)
+
+        # 数据统计区域 - 使用树形控件显示详细统计信息
+        self.tree = QTreeWidget()
+        self.tree.setHeaderLabels(["类别名称", "类别ID", "标注数量"])
+        self.tree.header().setSectionResizeMode(QHeaderView.Stretch)
+        self.tree.setAlternatingRowColors(True)
+        self.tree.setStyleSheet("""
+            QTreeWidget {
+                border: 1px solid #d0d0d0;
+                border-radius: 4px;
+            }
+            QTreeWidget::item {
+                padding: 5px;
+            }
+        """)
+        main_layout.addWidget(self.tree)
 
         # 训练参数区域
         params_group = QGroupBox("训练参数")
@@ -126,40 +137,60 @@ class TrainConfigDialog(QDialog):
 
     def populate_data_stats(self):
         """填充数据统计信息"""
-        try:
-            # 获取源目录（项目目录）中的txt文件
-            source_dir = self.project_window.project_info.path
-            txt_files = list(source_dir.glob("*.txt"))
-            total_samples = len(txt_files)
-            
-            # 支持的图片格式
-            image_extensions = {'.jpg', '.jpeg', '.png', '.bmp', '.tiff'}
-            
-            # 计算有效样本数（有对应图片文件的标签文件）
-            valid_samples = 0
-            for txt_file in txt_files:
-                stem = txt_file.stem
-                for ext in image_extensions:
-                    image_file = source_dir / f"{stem}{ext}"
-                    if image_file.exists():
-                        valid_samples += 1
-                        break
-            
-            # 默认8:2分割
-            train_samples = int(valid_samples * 0.8)
-            val_samples = valid_samples - train_samples
-            
-            self.total_samples_label.setText(str(valid_samples))
-            self.train_samples_label.setText(str(train_samples))
-            self.val_samples_label.setText(str(val_samples))
-            self.classes_label.setText(", ".join(self.class_names) if self.class_names else "无类别")
-            
-        except Exception as e:
-            logging.error(f"Error calculating data stats: {e}")
-            self.total_samples_label.setText("未知")
-            self.train_samples_label.setText("未知")
-            self.val_samples_label.setText("未知")
-            self.classes_label.setText("未知")
+        # 获取所有类别，按order字段排序
+        categories = self.project_window.project_info.domain.query_all_categories()
+        
+        # 创建类别映射和父子关系
+        category_map = {cat.class_name: cat for cat in categories}
+        parent_children_map = {}
+        
+        # 构建父子关系映射
+        for category in categories:
+            if category.parent_name:
+                if category.parent_name not in parent_children_map:
+                    parent_children_map[category.parent_name] = []
+                parent_children_map[category.parent_name].append(category)
+            # 确保所有类别都在映射中，即使它们没有子项
+            elif category.class_name not in parent_children_map:
+                parent_children_map[category.class_name] = []
+        
+        # 添加顶级类别及其子类别
+        for category in categories:
+            # 只处理顶级类别（没有父类别的类别）
+            if not category.parent_name:
+                # 创建顶级项
+                top_level_item = QTreeWidgetItem(self.tree)
+                top_level_item.setText(0, category.class_name)
+                top_level_item.setText(1, str(category.class_id))
+                
+                # 获取该类别自身的标注数量
+                self_count = self.project_window.project_info.domain.count_kilo_items_for_category(category.class_name)
+                
+                # 统计该类别及其子类别的标注数量
+                total_count = self_count
+                
+                # 添加子类别
+                children = parent_children_map.get(category.class_name, [])
+                for child in children:
+                    child_item = QTreeWidgetItem(top_level_item)
+                    child_item.setText(0, "  └─ " + child.class_name)  # 添加缩进来表示层级关系
+                    child_item.setText(1, str(child.class_id))
+                    
+                    # 获取子类别的标注数量
+                    child_count = self.project_window.project_info.domain.count_kilo_items_for_category(child.class_name)
+                    child_item.setText(2, str(child_count))
+                    
+                    # 累加到总计数中
+                    total_count += child_count
+                
+                # 显示统计数据：如果有子类别则显示"M - N"格式，否则只显示总数
+                if children:
+                    top_level_item.setText(2, f"{total_count} - {self_count}")
+                else:
+                    top_level_item.setText(2, str(total_count))
+                
+        # 展开所有项
+        self.tree.expandAll()
 
 
 class TrainYoloDialog(QDialog):
@@ -247,14 +278,27 @@ class TrainYoloDialog(QDialog):
             return
             
         try:
+            # 检查目录是否存在
+            if self.train_data_dir.exists():
+                reply = QMessageBox.question(
+                    self, 
+                    '目录已存在', 
+                    f'目录 "{self.train_data_dir}" 已存在，是否覆盖？\n注意：这将覆盖该目录下的所有内容。',
+                    QMessageBox.Yes | QMessageBox.No, 
+                    QMessageBox.No
+                )
+                
+                if reply == QMessageBox.No:
+                    return
+            
             # 禁用开始按钮，启用取消按钮
             self.start_button.setEnabled(False)
             self.cancel_button.setEnabled(True)
             
             # 准备训练数据
             self.progress_bar.setVisible(True)
-            self.progress_bar.setFormat("正在准备训练数据...")
-            self.log_text_edit.append("正在准备训练数据...")
+            self.progress_bar.setFormat("正在统计数据...")
+            self.log_text_edit.append("正在统计训练数据...")
             
             # 获取类别列表和类别名称
             categories = self.project_window.project_info.domain.query_all_categories()
@@ -263,59 +307,63 @@ class TrainYoloDialog(QDialog):
             # 创建训练器
             trainer = YOLOTrainer()
             
-            # 组织训练数据
-            source_dir = self.project_window.project_info.path
-            self.progress_bar.setValue(20)
-            self.log_text_edit.append("正在组织训练数据...")
-            # 确保训练数据目录存在
-            self.train_data_dir.mkdir(parents=True, exist_ok=True)
-            trainer.organize_training_data(source_dir, self.train_data_dir, self.project_window.project_info.domain)
-            
-            # 计算实际生成的数据量
-            train_images_dir = self.train_data_dir / "train" / "images"
-            val_images_dir = self.train_data_dir / "val" / "images"
-            
-            train_count = len(list(train_images_dir.glob("*"))) if train_images_dir.exists() else 0
-            val_count = len(list(val_images_dir.glob("*"))) if val_images_dir.exists() else 0
-            total_count = train_count + val_count
-            
-            # 在日志中显示实际生成的数据量
-            self.log_text_edit.append(f"实际生成数据量:")
-            self.log_text_edit.append(f"  总样本数: {total_count}")
-            self.log_text_edit.append(f"  训练集数量: {train_count}")
-            self.log_text_edit.append(f"  验证集数量: {val_count}")
-            
-            # 生成数据集YAML配置文件
-            self.progress_bar.setValue(40)
-            self.log_text_edit.append("正在生成数据集配置文件...")
-            # 如果提供了categories，只使用顶层类别生成yaml
-            if categories:
-                top_level_class_names = [cat.class_name for cat in categories if cat.parent_name is None]
-                class_names = top_level_class_names
-            YOLOTrainer.prepare_dataset_yaml(self.train_data_dir, class_names)
-            
             # 显示配置对话框
-            self.progress_bar.setValue(50)
             config_dialog = TrainConfigDialog(
                 self.project_window, self.train_data_dir, class_names, self
             )
             
             if config_dialog.exec_() == QDialog.Accepted:
-                # 显示训练命令而不是直接训练
-                self.show_training_command(
-                    self.train_data_dir,
-                    config_dialog.model_combo.currentText(),
-                    config_dialog.epochs_spin.value(),
-                    config_dialog.imgsz_spin.value(),
-                    config_dialog.batch_spin.value(),
-                    class_names
-                )
+                # 用户确认开始生成，现在开始实际生成过程
+                self.generate_training_data(trainer, categories)
             else:
                 self.progress_bar.setVisible(False)
                 self.start_button.setEnabled(True)
                 self.cancel_button.setEnabled(True)
         except Exception as e:
             QMessageBox.critical(self, "错误", f"准备训练数据时出错: {str(e)}")
+            self.progress_bar.setVisible(False)
+            self.start_button.setEnabled(True)
+            self.cancel_button.setEnabled(True)
+
+    def generate_training_data(self, trainer, categories):
+        """生成训练数据"""
+        try:
+            # 更新进度条
+            self.progress_bar.setValue(20)
+            self.progress_bar.setFormat("正在组织训练数据...")
+            self.log_text_edit.append("正在组织训练数据...")
+            
+            # 确保训练数据目录存在
+            self.train_data_dir.mkdir(parents=True, exist_ok=True)
+            
+            # 组织训练数据
+            source_dir = self.project_window.project_info.path
+            trainer.organize_training_data(source_dir, self.train_data_dir, self.project_window.project_info.domain)
+            
+            # 更新进度
+            self.progress_bar.setValue(60)
+            self.progress_bar.setFormat("正在生成配置文件...")
+            self.log_text_edit.append("正在生成数据集配置文件...")
+            
+            # 生成数据集YAML配置文件
+            # 如果提供了categories，只使用顶层类别生成yaml
+            if categories:
+                top_level_class_names = [cat.class_name for cat in categories if cat.parent_name is None]
+                class_names = top_level_class_names
+            YOLOTrainer.prepare_dataset_yaml(self.train_data_dir, class_names)
+            
+            # 完成
+            self.progress_bar.setValue(100)
+            self.progress_bar.setFormat("数据准备完成")
+            self.log_text_edit.append("数据准备已完成！")
+            
+            # 显示训练命令而不是直接训练
+            self.show_training_command(
+                self.train_data_dir,
+                class_names
+            )
+        except Exception as e:
+            QMessageBox.critical(self, "错误", f"生成训练数据时出错: {str(e)}")
             self.progress_bar.setVisible(False)
             self.start_button.setEnabled(True)
             self.cancel_button.setEnabled(True)
@@ -343,13 +391,10 @@ class TrainYoloDialog(QDialog):
         except Exception as e:
             QMessageBox.critical(self, "错误", f"无法打开文件夹: {str(e)}")
 
-    def show_training_command(self, data_dir, model_name, epochs, imgsz, batch_size, class_names):
+    def show_training_command(self, data_dir, class_names):
         """显示训练命令"""
-        self.progress_bar.setValue(100)
-        self.progress_bar.setFormat("数据准备完成")
-        
         # 构造训练命令
-        command = f"yolo detect train model={model_name} data={data_dir.absolute()}/dataset.yaml epochs={epochs} imgsz={imgsz} batch={batch_size}"
+        command = f"yolo detect train model=yolov8s.pt data={data_dir.absolute()}/dataset.yaml epochs=100 imgsz=640 batch=16"
         
         # 在日志中显示命令
         self.log_text_edit.append("=" * 50)
