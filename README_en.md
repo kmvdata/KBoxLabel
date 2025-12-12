@@ -1,33 +1,61 @@
 # KBoxLabel
 
-KBoxLabel is a PyQt5-based image annotation tool designed for object detection tasks. It provides an intuitive graphical interface and supports importing and exporting annotations in multiple formats, including COCO and YOLO.
+KBoxLabel is a professional image annotation tool developed based on PyQt5, specially designed for object detection tasks in computer vision. It provides an intuitive graphical interface and supports multiple annotation formats to help users efficiently complete image annotation work. KBoxLabel is particularly suitable for machine learning engineers, researchers, and data scientists preparing training datasets.
 
 ![main_window.png](docs/images/main_window.png)
 
 ## Table of Contents
-- [Key Features](#key-features)
+- [Core Features](#core-features)
+- [Unique Advantages](#unique-advantages)
 - [Installation Guide](#installation-guide)
+- [Quick Start](#quick-start)
 - [Usage Guide](#usage-guide)
+- [Automatic Annotation](#automatic-annotation)
+- [Data Export](#data-export)
 - [Contributing](#contributing)
 - [License](#license)
 - [Contact](#contact)
 
-## Key Features
+## Core Features
 
 ### Graphical Interface and Operations
 - Intuitive and easy-to-use interface built with PyQt5
 - Cross-platform support (Windows, macOS, and Linux)
 - Rich keyboard shortcuts to improve annotation efficiency
+- Support for managing multiple project windows simultaneously
+- Real-time saving of annotation data to SQLite database
 
 ### Annotation Support
 - Rectangle annotation support suitable for object detection tasks
 - Import and export support for COCO and YOLO formats
 - Integrated YOLOv8 model for automatic annotation capabilities
+- Support for hierarchical category management (parent-child category relationships)
+- Visual editing and adjustment of annotations
 
 ### Project Management
 - Fully adopts SQLite3 database for storing project configurations and annotation data
 - Supports simultaneously opening and managing multiple project windows
 - Automatically saves annotations to SQLite database
+- Support for project data backup and migration
+
+## Unique Advantages
+
+### Intelligent Automatic Annotation
+KBoxLabel integrates the advanced YOLOv8 object detection model, which can automatically identify objects in images and generate annotation boxes, greatly improving annotation efficiency. Users can enjoy one-click automatic annotation by simply loading a pre-trained model.
+
+### Hierarchical Category Management
+Supports parent-child category structures, allowing users to create complex category systems. For example, "Vehicle" can be created as a parent category with "Car", "Truck", and "Motorcycle" as child categories. When exporting data, child categories will be automatically mapped to their parent categories, simplifying the data processing workflow.
+
+### Multi-format Data Export
+Supports exporting to industry-standard COCO and YOLO formats, seamlessly connecting with mainstream deep learning frameworks such as TensorFlow and PyTorch, facilitating model training.
+
+### Efficient Operation Experience
+Provides rich keyboard shortcuts and mouse operation support:
+- Ctrl+Mouse Wheel: Image zoom
+- Arrow keys: Fine-tune annotation box position
+- Shift+Arrow keys: Adjust annotation box edges
+- Ctrl+Shift+Arrow keys: Adjust annotation box size
+- Box selection supports simultaneous operation of multiple annotation boxes
 
 ## Installation Guide
 
@@ -59,7 +87,7 @@ bash ./app/pip_install.sh
 pip install -r app/requirements.txt
 ```
 
-## Usage Guide
+## Quick Start
 
 ### Launch the Application
 ```bash
@@ -73,21 +101,74 @@ python src/main.py
 4. Perform image annotation
 5. Save and export annotation data
 
+## Usage Guide
+
+### Project Management
+- Click "New Project" to create a new project and select the project save directory
+- Click "Open Project" to open an existing project
+- Quickly access historical projects from the "Recently Opened Projects" list
+
+### Image Management
+- Use the "Import Images" function to add images to the project
+- Browse all images in the left image list
+- Right-click on images for operations such as renaming and deleting
+- Support jumping to specified images or the last annotated image
+
+### Annotation Category Management
+- Manage annotation categories in the right category list
+- Support adding, deleting, and renaming categories
+- Adjust category order through drag and drop
+- Support setting parent-child category relationships
+
+### Image Annotation Operations
+1. Select the category to annotate in the category list
+2. Hold down the left mouse button in the image area to drag and create an annotation box
+3. Adjust the position and size of the annotation box via mouse or keyboard
+4. Right-click on the annotation box for operations such as deletion and sending to back
+
 ### Keyboard Shortcuts
 - `Delete` / `Backspace`: Delete selected annotations
 - `Ctrl+S`: Save annotations
-- `Ctrl+Mouse Wheel`: Zoom image
+- `Ctrl+Mouse Wheel`: Image zoom
+- `Shift+Ctrl+Mouse Wheel`: Image zoom (more precise)
 - Arrow keys: Fine-tune selected annotation positions
 - `Shift+Arrow Keys`: Adjust the four sides of selected annotations
 - `Ctrl+Shift+Arrow Keys`: Adjust the size of selected annotations
-- `Shift+Ctrl+Mouse Wheel`: Zoom image
 
-### Auto Annotation Feature
-1. Click the "Config" button on the toolbar to configure the model
+## Automatic Annotation
+
+KBoxLabel integrates powerful automatic annotation functionality, utilizing the YOLOv8 model to quickly generate high-quality initial annotations:
+
+### Configure Automatic Annotation
+1. Click the "Config" button in the toolbar
 2. Select the YOLOv8 model file (.pt format)
-3. Click the "Run" button to execute automatic annotation
+3. Configure parameters such as confidence threshold and IOU threshold
 
-### Data Storage
+### Execute Automatic Annotation
+1. Right-click on images in the image list
+2. Select "Run" to perform automatic annotation on a single image
+3. Select "Run All" to perform automatic annotation on all images
+
+### Automatic Annotation Parameter Descriptions
+- **Confidence Threshold**: Filter low-confidence detection results. Higher values make results more reliable but may miss detections
+- **IOU Threshold**: Intersection-over-Union threshold for non-maximum suppression to remove duplicate detections
+- **Batch Size**: Number of images processed at once, affecting processing speed and memory usage
+- **Input Size**: Model input image dimensions, affecting detection accuracy and speed
+
+## Data Export
+
+KBoxLabel supports exporting to multiple standard formats to meet the needs of different deep learning frameworks:
+
+### COCO Format Export
+1. Click menu bar "File" -> "Export" -> "Export as COCO"
+2. Select export directory
+3. The system will automatically generate an annotations.json file
+
+### YOLO Format Export
+1. Click menu bar "File" -> "Export" -> "Export as YOLO"
+2. The system will generate corresponding .txt annotation files in the same directory as each image
+
+### Data Storage Structure
 All project data (including annotation information, category configurations, etc.) is stored in the SQLite database in the `.kboxlabel` folder under the project directory, containing:
 - Annotation information (`kolo_item` table)
 - Annotation categories (`annotation_category` table)
