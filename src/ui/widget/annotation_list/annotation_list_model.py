@@ -363,24 +363,23 @@ class AnnotationListModel(QAbstractListModel):
                 item.order = last_parent_order
                 parent_orders[item.class_name] = (item.order, 0)
 
+        new_class_id = 0
+        parent_class_id = 0
         for item in self.items:
             sql_category = AnnotationCategory()
-            sql_category.class_id = item.class_id
             sql_category.class_name = item.class_name
-            color = item.class_color
-            sql_category.color_r = color.red()
-            sql_category.color_g = color.green()
-            sql_category.color_b = color.blue()
+            sql_category.color_name = item.class_color.name()
             sql_category.parent_name = item.parent_name
-
-
             if item.parent_name is None:
                 parent_order, child_order = parent_orders[item.class_name]
                 sql_category.order = parent_order
+                sql_category.class_id = new_class_id
+                parent_class_id = new_class_id
+                new_class_id += 1
             else: # item.parent_name not None
                 try:
+                    sql_category.class_id = parent_class_id
                     parent_order, child_order = parent_orders[item.parent_name]
-
                     child_order += 1
                     sql_category.order = parent_order + child_order
                     parent_orders[item.parent_name] = (parent_order, child_order)

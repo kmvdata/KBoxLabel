@@ -345,6 +345,7 @@ class ProjectDomain(AbsSqliteDomain):
         except Exception as e:
             # 上下文管理器的__exit__会自动处理rollback（取决于db_session的实现）
             # 若自定义上下文管理器未处理，可手动捕获并抛出
+            print(f"重新保存类别时出错: {str(e)}")
             raise e
 
     def gen_category_map(self) -> dict[str, AnnotationCategory]:

@@ -510,7 +510,6 @@ class AnnotationList(QListView):
             elif self.drag_target_row != -1 or True:  # 总是处理这种情况
                 print(f"[Drag] Drop on gap, reordering items. Target row: {self.drag_target_row}")
                 # 放置在间隙，重新排序
-                self._reorder_items(dragged_class_name, dragged_parent_name)
                 event.acceptProposedAction()
                     
         print("[Drag] Calling super().dropEvent()")
@@ -524,33 +523,9 @@ class AnnotationList(QListView):
         self.viewport().update()
         print("[Drag] Drop event finished, state reset")
 
-    def _reorder_items(self, dragged_class_name, dragged_parent_name=None):
-        """重新排序项目"""
-        print(f"[Drag] Reordering items, dragged class name: {dragged_class_name}, parent name: {dragged_parent_name}")
-        
-        # 如果是从子项变为一级项，更新其属性
-        if self.is_dragging_child_to_gap:
-            print("[Drag] Converting child item to top-level item")
-            # 使用domain方法将子项转换为顶级项
-            self.source_model.domain.convert_child_to_top_level(dragged_class_name)
-            print("[Drag] Set item as top-level (parent=None)")
-        
-        # 计算插入位置
-        # 如果 drag_target_row 为 -1，则插入到末尾
-        if self.drag_target_row == -1:
-            target_position = self.source_model.rowCount()
-        else:
-            target_position = self.drag_target_row
-            
-        # 使用domain方法移动类别到指定位置
-        self.source_model.domain.move_category_to_position(dragged_class_name, target_position)
 
-        # 更新模型
-        self.source_model.refresh_model()
-        
-        print("[Drag] Categories saved")
-
-    def _can_drop_category(self, dragged_class_name: str, target_class_name: str) -> bool:
+    @staticmethod
+    def _can_drop_category(dragged_class_name: str, target_class_name: str) -> bool:
         """检查是否可以将dragged_class拖放到target_class上"""
         # 不能将类别拖放到自己身上
         if dragged_class_name == target_class_name:
