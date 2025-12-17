@@ -103,6 +103,9 @@ class YOLOTrainer:
         # 处理验证集
         self._process_image_set(val_image_names, source_dir, data_dir / "val", 
                                image_extensions, category_map, class_name_to_id, project_domain)
+        
+        # 生成README.md文件
+        self._generate_readmes(data_dir)
 
     def _process_image_set(self, image_names: List[str], source_dir: Path, target_dir: Path,
                           image_extensions: set, category_map: Dict, class_name_to_id: Dict, 
@@ -249,3 +252,34 @@ class YOLOTrainer:
             # 出错时直接复制原文件
             import shutil
             shutil.copy2(src_label_path, dst_label_path)
+
+    def _generate_readmes(self, data_dir: Path):
+        """
+        在训练数据目录中生成README.md和README_en.md文件
+        
+        Args:
+            data_dir: 训练数据目录路径
+        """
+        # 生成中文README
+        readme_cn_path = Path(__file__).parent / "README.md"
+        destination_cn_path = data_dir / "README.md"
+        
+        # 生成英文README
+        readme_en_path = Path(__file__).parent / "README_en.md"
+        destination_en_path = data_dir / "README_en.md"
+        
+        # 复制中文README文件
+        if readme_cn_path.exists():
+            import shutil
+            shutil.copy2(readme_cn_path, destination_cn_path)
+            logging.info(f"已生成 README.md 文件: {destination_cn_path}")
+        else:
+            logging.warning(f"README.md 模板文件不存在: {readme_cn_path}")
+            
+        # 复制英文README文件
+        if readme_en_path.exists():
+            import shutil
+            shutil.copy2(readme_en_path, destination_en_path)
+            logging.info(f"已生成 README_en.md 文件: {destination_en_path}")
+        else:
+            logging.warning(f"README_en.md 模板文件不存在: {readme_en_path}")
