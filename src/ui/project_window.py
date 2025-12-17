@@ -283,7 +283,7 @@ class ProjectWindow(QMainWindow):
 
             # 更新UI
             self.setWindowTitle(self.window_title)
-            self.statusBar().showMessage(f"已打开项目: {project_path}", 5000)
+            self.set_left_status(f"已打开项目: {project_path}")
 
             # 加载项目图片
             self.handle_import_images()
@@ -335,7 +335,7 @@ class ProjectWindow(QMainWindow):
     def handle_image_click(self, image_path):
         """处理图片点击事件，打印图片路径并更新界面状态"""
         print(f"选中的图片路径: {image_path}")
-        self.statusBar().showMessage(f"已选择图片: {image_path}")
+        self.set_left_status(f"已选择图片: {image_path}")
 
     def create_statusbar(self):
         """创建底部状态栏"""
@@ -367,7 +367,7 @@ class ProjectWindow(QMainWindow):
         else:
             # 未选中任何图片
             status_text = f"共加载 {total_count} 张图片，未选中任何图片"
-        self.statusBar().showMessage(status_text)
+        self.set_left_status(status_text)
 
     def handle_import_images(self):
         """处理图片导入功能"""
@@ -377,7 +377,6 @@ class ProjectWindow(QMainWindow):
 
             # 更新状态栏
             count = self.image_list.model.rowCount()
-            self.statusBar().showMessage(f"已加载 {count} 张图片", 3000)
             self.set_left_status(f"已加载 {count} 张图片")
             
             # 自动跳转到最后一个有标注的图片
