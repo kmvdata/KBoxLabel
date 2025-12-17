@@ -62,7 +62,7 @@ class YOLOTrainer:
             
         return yaml_path
 
-    def organize_training_data(self, source_dir: Path, data_dir: Path, project_domain, split_ratio: float = 0.8):
+    def organize_training_data(self, source_dir: Path, data_dir: Path, project_domain, split_ratio: float = 0.8, progress_callback=None):
         """
         整理训练数据，从数据库中获取映射关系，按照图片名分组获取kolo_item，
         并根据映射表创建yolo格式的txt文本
@@ -72,6 +72,7 @@ class YOLOTrainer:
             data_dir: 目标数据目录
             project_domain: 项目数据库域对象
             split_ratio: 训练集占比
+            progress_callback: 进度回调函数，用于报告处理进度
         """
         # 支持的图片格式
         image_extensions = {'.jpg', '.jpeg', '.png', '.bmp', '.tiff'}
@@ -97,19 +98,25 @@ class YOLOTrainer:
         val_image_names = all_image_names[split_index:]
         
         # 处理训练集
+        if progress_callback:
+            progress_callback("开始处理训练集数据...", 30)
         self._process_image_set(train_image_names, source_dir, data_dir / "train", 
-                               image_extensions, category_map, class_name_to_id, project_domain)
+                               image_extensions, category_map, class_name_to_id, project_domain, 
+                               progress_callback=progress_callback, set_name="训练集")
         
         # 处理验证集
+        if progress_callback:
+            progress_callback("开始处理验证集数据...", 60)
         self._process_image_set(val_image_names, source_dir, data_dir / "val", 
-                               image_extensions, category_map, class_name_to_id, project_domain)
+                               image_extensions, category_map, class_name_to_id, project_domain,
+                               progress_callback=progress_callback, set_name="验证集")
         
         # 生成README.md文件
         self._generate_readmes(data_dir)
 
     def _process_image_set(self, image_names: List[str], source_dir: Path, target_dir: Path,
                           image_extensions: set, category_map: Dict, class_name_to_id: Dict, 
-                          project_domain):
+                          project_domain, progress_callback=None, set_name=""):
         """
         处理图片集，生成对应的YOLO标签文件和复制图片
         
@@ -121,12 +128,20 @@ class YOLOTrainer:
             category_map: 类别映射
             class_name_to_id: 类别名称到ID的映射
             project_domain: 项目数据库域对象
+            progress_callback: 进度回调函数，用于报告处理进度
+            set_name: 数据集名称（训练集或验证集）
         """
         # 确保目标目录存在
         (target_dir / "images").mkdir(parents=True, exist_ok=True)
         (target_dir / "labels").mkdir(parents=True, exist_ok=True)
         
-        for image_name in image_names:
+        total_images = len(image_names)
+        for idx, image_name in enumerate(image_names, 1):
+            # 报告进度
+            if progress_callback:
+                progress_callback(f"正在处理{set_name}图片 {idx}/{total_images}: {image_name}", 
+                                  30 + (60 if set_name == "验证集" else 0) + int((idx / total_images) * 30))
+            
             # 查找对应的图片文件
             image_file = None
             for ext in image_extensions:

@@ -295,10 +295,22 @@ class TrainYoloDialog(QDialog):
             
             # 组织训练数据
             source_dir = self.project_window.project_info.path
-            trainer.organize_training_data(source_dir, self.train_data_dir, self.project_window.project_info.domain)
+            
+            # 定义进度回调函数
+            def progress_callback(message, percentage):
+                self.progress_bar.setValue(percentage)
+                self.progress_bar.setFormat(message)
+                self.log_text_edit.append(message)
+                # 处理事件队列，确保UI更新
+                from PyQt5.QtWidgets import QApplication
+                QApplication.processEvents()
+            
+            trainer.organize_training_data(source_dir, self.train_data_dir, 
+                                         self.project_window.project_info.domain,
+                                         progress_callback=progress_callback)
             
             # 更新进度
-            self.progress_bar.setValue(60)
+            self.progress_bar.setValue(90)
             self.progress_bar.setFormat("正在生成配置文件...")
             self.log_text_edit.append("正在生成数据集配置文件...")
             
