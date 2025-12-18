@@ -4,10 +4,10 @@ from typing import Optional, TYPE_CHECKING
 
 from PIL import Image  # 用于获取图像尺寸
 
-from src.models.sql.kolo_item import KoloItem
+from src.common.domain.models.kolo_item import KoloItem
 
 if TYPE_CHECKING:
-    from src.models.dto.ref_project_info import RefProjectInfo
+    from src.core.project_info import ProjectInfo
 
 
 class YOLOExecutor:
@@ -15,11 +15,11 @@ class YOLOExecutor:
     
     yolo_model_path_key = "yolo_model_path"  # 类属性，固定值为"yolo_model_path"
 
-    def __init__(self, parent: 'RefProjectInfo' = None):
+    def __init__(self, parent: 'ProjectInfo' = None):
         self.yolo_model = None  # 存储加载好的YOLO模型
         self.model_name = None  # 存储模型名称
         self.yolo_model_path: Optional[Path] = None  # 实例属性，存储加载的模型路径
-        self.parent: Optional['RefProjectInfo'] = parent  # RefProjectInfo类型的父对象
+        self.parent: Optional['ProjectInfo'] = parent  # RefProjectInfo类型的父对象
 
     def is_model_loaded(self) -> bool:
         """
@@ -48,7 +48,8 @@ class YOLOExecutor:
             if not model_path.exists():
                 error_msg = f"YOLO model file not found: {str(model_path)}"
                 logging.error(error_msg)
-                raise FileNotFoundError(error_msg)
+                self.clear_model()
+                return False
 
             # 加载模型
             self.yolo_model = YOLO(str(model_path))
@@ -115,39 +116,6 @@ class YOLOExecutor:
                 detection_results.append(kolo_item)
         return detection_results
 
-    def load_kolo_item_from_db(self, img_path: Path) -> list[KoloItem]:
-        try:
-            # 创建数据库会话
-            with self.parent.sqlite_db.db_session() as session:
-                # 从数据库读取image_name为img_path.name的行
-                kolo_items = session.query(KoloItem).filter(KoloItem.image_name == img_path.name).all()
-                logging.debug(f"从数据库加载到 {len(kolo_items)} 个Kolo项目")
-                return kolo_items
-        except Exception as e:
-            logging.error(f"从数据库加载Kolo项目时出错: {str(e)}")
-            return []
-
-    def delete_kolo_item_for_image(self, img_path: Path):
-        try:
-            # 创建数据库会话
-            with self.parent.sqlite_db.db_session() as session:
-                # 删除image_name为img_path.name的所有行
-                deleted_count = session.query(KoloItem).filter(KoloItem.image_name == img_path.name).delete()
-                session.commit()  # 确保提交事务
-                logging.debug(f"从数据库删除了 {deleted_count} 个Kolo项目")
-        except Exception as e:
-            logging.error(f"从数据库删除Kolo项目时出错: {str(e)}")
-
-    def save_kolo_item_to_db(self, kolo_items: list[KoloItem]):
-        try:
-            with self.parent.sqlite_db.db_session() as session:
-                # 批量插入KoloItem对象
-                session.add_all(kolo_items)
-                session.commit()  # 确保提交事务
-                logging.debug(f"保存了 {len(kolo_items)} 个Kolo项目到数据库")
-        except Exception as e:
-            logging.error(f"保存Kolo项目到数据库时出错: {str(e)}")
-
     def exec_yolo(self, img_path: Path, save_to_db: bool = False)-> list[KoloItem]:
         """使用yolo识别目标，从.kolo文件读取现有数据，合并结果"""
         # 保留原有参数检查逻辑
@@ -175,18 +143,17 @@ class YOLOExecutor:
             img_height,
             img_path.name
         )
-        logging.debug(f"YOLO检测到 {len(detection_results)} 个目标")
+        len_detections = len(detection_results)
 
         # 从数据库加载项目并添加到检测结果中
-        kolo_items_in_db = self.load_kolo_item_from_db(img_path)
+        kolo_items_in_db = self.parent.domain.load_kolo_items_for_image(img_path.name)
         detection_results.extend(kolo_items_in_db)
 
         # 合并相似结果并返回
         merged_results = self.merge_similar_detections(detection_results)
-        logging.debug(f"合并后最终结果数量: {len(merged_results)}")
         if save_to_db:
             # 保存结果到数据库
-            self.save_kolo_item_to_db(merged_results)
+            self.parent.domain.restore_kolo_item_for_image(merged_results, img_path.name)
         return merged_results
 
     @staticmethod

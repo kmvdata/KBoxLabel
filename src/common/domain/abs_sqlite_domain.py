@@ -10,14 +10,16 @@ from typing import Annotated
 from sqlalchemy import engine_from_config, text, func
 from sqlalchemy.orm import scoped_session, sessionmaker
 
+from src.common.domain import gen_sql_tables
 from src.common.god.business_exception import BusinessException
 from src.common.god.common_error import CommonError
 from src.common.god.logger import logger
 
 
-class SqliteDB(object):
+class AbsSqliteDomain(object):
 
     def __init__(self, db_path: Path):
+        gen_sql_tables(db_path)
         self.db_path = None
         self.db_engine = None
         self.db_session = None

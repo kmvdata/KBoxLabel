@@ -5,7 +5,19 @@
 # 获取系统信息
 OS=$(uname -s)
 ARCH=$(uname -m)
-echo -e "\033[1;34m[INFO] 检测到系统: $OS ($ARCH)\033[0m"
+
+# 检查是否在WSL环境中
+if grep -qE "(Microsoft|WSL)" /proc/version >/dev/null 2>&1; then
+    IS_WSL=true
+else
+    IS_WSL=false
+fi
+
+if [ "$IS_WSL" = true ]; then
+    echo -e "\033[1;34m[INFO] 检测到系统: $OS ($ARCH) on WSL\033[0m"
+else
+    echo -e "\033[1;34m[INFO] 检测到系统: $OS ($ARCH)\033[0m"
+fi
 
 # 定义核心依赖包列表（不含平台特定包）
 core_packages=(
@@ -26,7 +38,13 @@ conditional_packages=()
 # 根据平台设置opencv版本
 case $OS in
     Linux)
-        opencv_package="opencv-python-headless"  # Linux使用无头版本
+        if [ "$IS_WSL" = true ]; then
+            opencv_package="opencv-python"  # WSL使用标准版本以便支持GUI
+            echo -e "\033[1;34m[INFO] 检测到WSL环境，使用标准opencv-python以支持GUI显示\033[0m"
+        else
+            opencv_package="opencv-python-headless"  # 普通Linux使用无头版本
+            echo -e "\033[1;34m[INFO] 检测到普通Linux环境，使用opencv-python-headless\033[0m"
+        fi
         ;;
     Darwin)
         opencv_package="opencv-python"           # macOS使用标准版本
@@ -45,15 +63,15 @@ esac
 # 合并所有需要安装的包
 all_packages=("${core_packages[@]}" "$opencv_package" "${conditional_packages[@]}")
 
-# 使用国内镜像源加速安装
-MIRROR_URL="https://pypi.tuna.tsinghua.edu.cn/simple"
+# 使用阿里云镜像源加速安装
+MIRROR_URL="https://mirrors.aliyun.com/pypi/simple"
 
 echo -e "\033[1;34m[INFO] 开始安装KBoxLabel依赖 (共${#all_packages[@]}个包)\033[0m"
 echo -e "\033[1;34m[INFO] 安装列表: ${all_packages[*]}\033[0m"
 
 # 升级pip并安装依赖
 python -m pip install --upgrade pip
-python -m pip install -i "$MIRROR_URL" --trusted-host pypi.tuna.tsinghua.edu.cn "${all_packages[@]}"
+python -m pip install -i "$MIRROR_URL" --trusted-host mirrors.aliyun.com "${all_packages[@]}"
 
 # 验证安装结果（处理可能的版本后缀）
 echo -e "\n\033[1;32m[验证] 已安装包列表：\033[0m"

@@ -6,22 +6,21 @@ from src.common.god.korm_base import KOrmBase
 class AnnotationCategory(KOrmBase):
     __tablename__ = 'annotation_category'
     __table_args__ = (
-        Index('idx_class_id', 'class_id'),
-        Index('idx_class_name', 'class_name'),
+        Index('annotation_category_idx_class_id', 'class_id'),
+        Index('annotation_category_idx_class_name', 'class_name'),
+        Index('annotation_category_idx_parent_name', 'parent_name'),
         {'comment': '标注类别表'}
     )
 
     id = Column(INTEGER, primary_key=True, comment='自增id')
     class_id = Column(INTEGER, nullable=False, unique=False, comment='类别ID')
-    class_name = Column(String(64), nullable=False, comment='类别名称')
-
-    color_r = Column(INTEGER, nullable=False, unique=False, comment='颜色R值')
-    color_g = Column(INTEGER, nullable=False, unique=False, comment='颜色G值')
-    color_b = Column(INTEGER, nullable=False, unique=False, comment='颜色B值')
+    class_name = Column(String(64), nullable=False, unique=True, comment='类别名称')
+    color_name = Column(String(64), nullable=False, unique=True, comment='RGB颜色的16进制，格式如：#0a1b2d')
+    parent_name = Column(String(64), nullable=True, unique=False, comment='父级类别名称')
+    order = Column(INTEGER, nullable=False, unique=False, comment='排序')
     
     create_time = Column(DateTime, nullable=False, server_default=text("CURRENT_TIMESTAMP"), comment='创建时间')
     update_time = Column(DateTime,
                          default=func.current_timestamp(),  # 插入时默认当前时间
                          onupdate=func.current_timestamp(),  # 更新时自动更新为当前时间
                          comment='更新时间')
-

@@ -14,10 +14,10 @@ from PyQt5.QtWidgets import QMenuBar, QAction, QMenu, QFileDialog, QMessageBox, 
 class MainMenuBar(QMenuBar):
     # 定义菜单动作的信号 - 确保使用正确的信号名称
     importImagesRequested: pyqtSignal = pyqtSignal()
-    exportToYoloRequested: pyqtSignal = pyqtSignal()
-    exportToCocoRequested: pyqtSignal = pyqtSignal()
     closeRequested: pyqtSignal = pyqtSignal()
     editActionRequested: pyqtSignal = pyqtSignal()
+    # 新增训练相关的信号
+    trainYoloRequested: pyqtSignal = pyqtSignal()
 
     # 最近项目列表的最大长度
     MAX_RECENT_PROJECTS = 5
@@ -40,9 +40,8 @@ class MainMenuBar(QMenuBar):
         self.import_action = QAction("导入图片", self)
         self.close_action = QAction("关闭", self)
 
-        # 导出子菜单动作
-        self.yolo_action = QAction("Yolo格式", self)
-        self.coco_action = QAction("Coco格式", self)
+        # 训练子菜单动作
+        self.train_yolo_action = QAction("YOLO数据集", self)
 
         self.create_menus()
         self.connect_signals()
@@ -57,13 +56,12 @@ class MainMenuBar(QMenuBar):
         file_menu.addAction(self.new_action)
         file_menu.addMenu(self.recent_projects_menu)  # 添加最近项目子菜单
         file_menu.addAction(self.import_action)
-
-        # 导出子菜单
-        export_menu = QMenu("导出", self)
-        export_menu.setStyleSheet("QMenu::item { padding: 5px 20px; }")
-        export_menu.addAction(self.yolo_action)
-        export_menu.addAction(self.coco_action)
-        file_menu.addMenu(export_menu)
+        
+        # 训练子菜单
+        train_menu = QMenu("训练", self)
+        train_menu.setStyleSheet("QMenu::item { padding: 5px 20px; }")
+        train_menu.addAction(self.train_yolo_action)
+        file_menu.addMenu(train_menu)
 
         file_menu.addSeparator()
         file_menu.addAction(self.close_action)
@@ -72,10 +70,10 @@ class MainMenuBar(QMenuBar):
         """连接动作的信号到槽函数"""
         self.new_action.triggered.connect(self.handle_new_project)
         self.import_action.triggered.connect(self.import_images)  # 连接导入图片动作
-
-        self.yolo_action.triggered.connect(self.exportToYoloRequested.emit)  # type: ignore
-        self.coco_action.triggered.connect(self.exportToCocoRequested.emit)  # type: ignore
         self.close_action.triggered.connect(self.closeRequested.emit)  # type: ignore
+        
+        # 连接训练相关的信号
+        self.train_yolo_action.triggered.connect(self.trainYoloRequested.emit)  # type: ignore
 
     def handle_new_project(self):
         """处理新建项目的目录选择"""

@@ -9,7 +9,7 @@ from PyQt5.QtGui import QPen, QPainter, QBrush, QColor
 from PyQt5.QtWidgets import QGraphicsRectItem, QGraphicsItem, QStyle
 
 from src.core.utils.string_util import StringUtil
-from src.models.dto.annotation_category import AnnotationCategory
+from src.ui.widget.annotation_list.annotation_item import AnnotationItem
 
 
 class AnnotationView(QGraphicsRectItem):
@@ -34,12 +34,13 @@ class AnnotationView(QGraphicsRectItem):
     BOTTOM_LEFT = 7
     LEFT_MIDDLE = 8
 
-    def __init__(self, x: Decimal, y: Decimal, width: Decimal, height: Decimal, category: AnnotationCategory, parent: any):
+    def __init__(self, x: Decimal, y: Decimal, width: Decimal, height: Decimal, annotation_item: AnnotationItem, parent: any):
         super().__init__(float(x), float(y), float(width), float(height))
-        self.opposite_color = None
-        self.current_color = None
-        self.category = None
-        self.set_category(category)
+        self.opposite_color: Optional[QColor] = None
+        self.current_color: Optional[QColor] = None
+        self.class_name: Optional[str] = None
+        self.class_id: Optional[int] = None
+        self.set_annotation_item(annotation_item)
         self.setAcceptDrops(True)  # 启用拖放接受
 
         # 初始状态下不设置ItemIsMovable标志，只在选中时设置
@@ -83,10 +84,11 @@ class AnnotationView(QGraphicsRectItem):
             color.alpha()  # 保持透明度不变
         )
 
-    def set_category(self, category: AnnotationCategory):
-        self.category = category
+    def set_annotation_item(self, annotation_item: AnnotationItem):
+        self.class_name = annotation_item.class_name
+        self.class_id = annotation_item.class_id
         # 保存当前颜色和相反颜色供绘制使用
-        self.current_color = self.category.color
+        self.current_color = annotation_item.class_color
         self.opposite_color = self.get_opposite_color(self.current_color)
         self.update()  # 颜色变化时强制重绘
 
@@ -256,7 +258,6 @@ class AnnotationView(QGraphicsRectItem):
         self.mouse_operation_in_progress = True
         # 只更新当前项，其他项会在set_selected中更新
         self.update()
-        print(f'set_selected: {self.category} - {self.get_outer_rect()}')
         super().mousePressEvent(event)  # 继续默认事件处理
 
         # 添加10ms睡眠
@@ -545,12 +546,12 @@ class AnnotationView(QGraphicsRectItem):
     def to_yolo_format(self, img_width: int, img_height: int) -> Tuple[int, Decimal, Decimal, Decimal, Decimal]:
         """转换为YOLO格式"""
         x_center, y_center, width, height = self._calculate_normalized_coordinates(img_width, img_height)
-        return self.category.class_id, x_center, y_center, width, height
+        return self.class_id, x_center, y_center, width, height
 
     def to_kolo_format(self, img_width: int, img_height: int) -> Tuple[str, Decimal, Decimal, Decimal, Decimal]:
         """转换为KOLO格式"""
         x_center, y_center, width, height = self._calculate_normalized_coordinates(img_width, img_height)
-        return StringUtil.string_to_base64(self.category.class_name), x_center, y_center, width, height
+        return StringUtil.string_to_base64(self.class_name), x_center, y_center, width, height
 
     # 添加拖放事件处理
     def dragEnterEvent(self, event):
@@ -569,22 +570,19 @@ class AnnotationView(QGraphicsRectItem):
             category_data = json.loads(json_data)
 
             # 创建AnnotationCategory对象
-            from src.models.dto.annotation_category import AnnotationCategory
-            dropped_category = AnnotationCategory(
-                class_id=category_data['class_id'],
-                class_name=category_data['class_name']
-            )
+            class_id :int = int(category_data['class_id']),
+            class_name :str = category_data['class_name']
 
             # 调用处理方法
-            self.handle_dropped_annotation(dropped_category)
+            self.handle_dropped_annotation(AnnotationItem(class_name, class_id))
             event.acceptProposedAction()
         else:
             event.ignore()
 
-    def handle_dropped_annotation(self, category):
+    def handle_dropped_annotation(self, annotation_item: AnnotationItem):
         """处理拖拽的标注类别"""
-        self.set_category(category)
-        print(f"拖拽成功! 接收到标注: ID={category.class_id}, 名称='{category.class_name}'")
+        self.set_annotation_item(annotation_item)
+        print(f"拖拽成功! 接收到标注: ID={annotation_item.class_id}, 名称='{annotation_item.class_name}'")
         self.set_needs_save_annotation()
         if self.image_canvas is not None:
             self.image_canvas.save_annotations()
@@ -610,17 +608,21 @@ class AnnotationView(QGraphicsRectItem):
             scene = self.scene()
             if scene:
                 for item in scene.items():
-                    if isinstance(item, AnnotationView) and item != self:
+                    if isinstance(item, AnnotationView) and item != self and hasattr(item, 'set_selected_flag_internal'):
                         item.set_selected_flag_internal(False)
-            self.setZValue(1000)  # 将选中的项置于顶层
         self.set_selected_flag_internal(selected)
+        self.bring_to_top()
         self.update()
+        
+        # 同步更新annotation_list中的选中状态
+        if self.image_canvas and self.image_canvas.annotation_list:
+            self.image_canvas.annotation_list.select_category_by_name(self.class_name)
 
     def clicked_with_shift(self):
         # 修改这里，确保同步更新annotation_list
         self.set_selected_flag_internal(not self.isSelected())
         if self.isSelected() and self.image_canvas and self.image_canvas.annotation_list:
-            self.image_canvas.annotation_list.select_category_by_name(self.category.class_name)
+            self.image_canvas.annotation_list.select_category_by_name(self.class_name)
         self.update()
 
     def set_needs_save_annotation(self):

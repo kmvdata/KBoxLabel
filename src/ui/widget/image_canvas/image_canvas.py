@@ -9,11 +9,11 @@ from PyQt5.QtGui import QPixmap, QPen, QColor, QPainter, QBrush, QKeySequence, Q
 from PyQt5.QtWidgets import (QGraphicsView, QGraphicsScene, QGraphicsPixmapItem, QAction,
                              QToolBar, QSizePolicy, QMenu, QFileDialog, QMessageBox, QToolButton, QGraphicsItem)
 
+from src.common.domain.models.kolo_item import KoloItem
 from src.common.god.korm_base import KOrmBase
-from src.models.dto.annotation_category import AnnotationCategory
-from src.models.dto.ref_project_info import RefProjectInfo
-from src.models.sql import KoloItem
-from src.ui.widget.image_canvas.annotation_list import AnnotationList
+from src.core.project_info import ProjectInfo
+from src.ui.widget.annotation_list.annotation_item import AnnotationItem
+from src.ui.widget.annotation_list.annotation_list import AnnotationList
 from src.ui.widget.image_canvas.annotation_view import AnnotationView
 
 
@@ -23,7 +23,7 @@ class ImageCanvas(QGraphicsView):
     MAX_SCALE = 2.0  # 最大缩放比例（200%）
     ZOOM_STEP = 0.1  # 每次缩放步长（原始大小的10%）
 
-    def __init__(self, project_info: RefProjectInfo):
+    def __init__(self, project_info: ProjectInfo):
         super().__init__()
         self.run_action = None
         self.set_needs_save_annotations = False
@@ -35,7 +35,6 @@ class ImageCanvas(QGraphicsView):
         # 初始化annotation list
         self.annotation_list = AnnotationList(self.project_info)
         self.annotation_list.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
-        self.annotation_list.load_categories()
 
         # 按钮引用
         self.delete_toolbar_action = None
@@ -89,9 +88,6 @@ class ImageCanvas(QGraphicsView):
         self.setScene(self.scene)
         self.image_item: Optional[QGraphicsPixmapItem] = None
         self.current_image_path: Optional[Path] = None
-
-        # 存储标注类别
-        self.category_map = {}  # 用于快速查找class_name对应的类别
 
         # 绘图状态
         self.drawing = False
@@ -173,12 +169,12 @@ class ImageCanvas(QGraphicsView):
             if isinstance(item, AnnotationView):
                 item.set_selected_flag_internal(False)
 
-    def load_image(self, image_path: Path):
+    def load_image(self, image_path: Path, reload = False):
         """加载指定路径的图片，并显示到画布上"""
         # 加载图片
         if not image_path.exists():
             raise FileNotFoundError(f"图片文件不存在: {image_path}")
-        if image_path == self.current_image_path:
+        if not reload and image_path == self.current_image_path:
             print("图片已加载，无需重复加载")
             return
         pixmap = QPixmap(str(image_path))
@@ -189,9 +185,6 @@ class ImageCanvas(QGraphicsView):
         self.scene.clear()
         self.resetTransform()
         self.current_scale = 1.0
-
-        # 保存标注类别信息
-        self.category_map = {category.class_name: category for category in self.categories}
 
         # 添加图片到场景
         self.image_item = self.scene.addPixmap(pixmap)
@@ -205,52 +198,21 @@ class ImageCanvas(QGraphicsView):
         # 加载对应的txt标注文件
         self.load_annotations_on_image(image_path, pixmap.width(), pixmap.height())
 
-
-    @property
-    def categories(self) -> list[AnnotationCategory]:
-        return self.project_info.categories
-
     def load_annotations_on_image(self, image_path: Path, img_width: int, img_height: int):
         """从SQLite数据库加载与图片同名的kolo_item记录"""
-        # 获取图片文件名作为查询key
-        image_name = image_path.name
-
-        # 创建类名到类别的映射字典
-        class_name_map = {category.class_name: category for category in self.category_map.values()}
-
         # 从数据库中查询所有匹配image_name的KoloItem对象
         try:
-
-            self.project_info.load_categories()
-
             # 执行查询
-            kolo_items = self.project_info.load_kolo_item_from_db(image_path)
+            kolo_items = self.project_info.domain.load_kolo_items_for_image(image_path.name)
 
             # 处理查询结果
             for kolo_item in kolo_items:
                 class_name = kolo_item.class_name
 
                 # 获取类别对象（如果不存在则创建并添加到映射中）
-                category = class_name_map.get(class_name)
-                if not category:
-                    # 动态创建新类别
-                    new_category = AnnotationCategory(
-                        class_id=len(self.category_map) + 1,
-                        class_name=class_name,
-                    )
-                    # 添加到类别映射
-                    self.category_map[new_category.class_name] = new_category
-                    class_name_map[class_name] = new_category
-                    category = new_category
-                    print(f"信息: 数据库中类别 '{class_name}' 未定义，已创建新类别（ID={new_category.class_id}）")
-                    
-                    # 将新创建的类别保存到数据库并刷新annotation_list
-                    # 添加到project_info.categories中
-                    self.project_info.categories.append(new_category)
-                    # 保存到数据库
-                    self.project_info.save_categories()
-                    # 刷新annotation_list显示
-                    self.annotation_list.load_categories()
+                annotation_item = self.annotation_list.source_model.get_item_by_class_name(class_name)
+                if not annotation_item:
+                    annotation_item = self.annotation_list.source_model.append_new_category(class_name)
 
                 # 从KoloItem获取归一化坐标
                 x_center = Decimal(kolo_item.x_center)
@@ -265,9 +227,8 @@ class ImageCanvas(QGraphicsView):
                 rect_height = height * img_height
 
                 # 创建AnnotationView并添加到场景
-                item = AnnotationView(x1, y1, rect_width, rect_height, category, self)
+                item = AnnotationView(x1, y1, rect_width, rect_height, annotation_item, self)
                 self.scene.addItem(item)
-
         except Exception as e:
             print(f"从数据库加载标注信息错误: {e}")
 
@@ -295,29 +256,12 @@ class ImageCanvas(QGraphicsView):
             rect_width = width * img_width
             rect_height = height * img_height
 
-            # 获取或创建类别
-            category = self.category_map.get(class_name)
-            if not category:
-                # 创建新类别
-                new_category = AnnotationCategory(
-                    class_id=len(self.category_map) + 1,
-                    class_name=class_name,
-                )
-                self.category_map[new_category.class_name] = new_category
-                category = new_category
-                # 添加到annotation_list
-                self.annotation_list.handle_add_annotation(
-                    position=len(self.project_info.categories),
-                    reference_id=max((cat.class_id for cat in self.project_info.categories), default=0),
-                    default_name=category.class_name
-                )
-                
-                # 将新创建的类别保存到数据库
-                self.project_info.categories.append(new_category)
-                self.project_info.save_categories()
+            # 添加到annotation_list
+            annotation_item = self.annotation_list.source_model.append_new_category(class_name)
+
 
             # 创建并添加AnnotationView
-            item = AnnotationView(x1, y1, rect_width, rect_height, category, self)
+            item = AnnotationView(x1, y1, rect_width, rect_height, annotation_item, self)
             self.scene.addItem(item)
             item.setFlags(item.flags() & ~QGraphicsItem.GraphicsItemFlag.ItemIsMovable)
             item.selected = False
@@ -329,10 +273,10 @@ class ImageCanvas(QGraphicsView):
             return False
 
     @property
-    def current_category(self) -> Optional[AnnotationCategory]:
+    def current_annotation_item(self) -> Optional[AnnotationItem]:
         """获取当前要绘制的标注类别，从annotation list中获取当前选中item对应的category，如果没有选中任何item，则返回none"""
         if self.annotation_list:
-            return self.annotation_list.get_selected_category()
+            return self.annotation_list.get_selected_annotation_item()
         return None
 
     def wheelEvent(self, event):
@@ -411,8 +355,8 @@ class ImageCanvas(QGraphicsView):
             if not is_annotation and not shift_pressed and not self._is_rubber_band_selection:
                 self.unselect_all_annotations()
 
-            # 当设置了当前类别时开始绘制新标注
-            if not is_annotation and self.current_category is not None:
+            # 当设置了当前类别时开始绘制新标注，但按住Shift键时不创建新标注
+            if not is_annotation and self.current_annotation_item is not None and not shift_pressed:
                 self.start_point = self.mapToScene(event.pos())
                 self.drawing = True
 
@@ -421,7 +365,7 @@ class ImageCanvas(QGraphicsView):
                     QRectF(self.start_point, self.start_point),
                     QPen(Qt.red, 2, Qt.DashLine)
                 )
-                self.temp_rect_item.setZValue(10)  # 确保在最上层显示
+                self.temp_rect_item.setZValue(10000)  # 确保在最上层显示
                 return  # 拦截事件，避免默认处理
 
             # 如果点击在标注上且按住Shift键，切换该标注的选中状态
@@ -439,6 +383,9 @@ class ImageCanvas(QGraphicsView):
     def mouseReleaseEvent(self, event):
         """处理鼠标释放事件，无论操作是什么都保存标注"""
         created_new_annotation = False
+        # 检查是否按住Shift键
+        shift_pressed = event.modifiers() & Qt.ShiftModifier
+        
         if self.drawing and event.button() == Qt.LeftButton:
             self.drawing = False
             current_point = self.mapToScene(event.pos())
@@ -456,11 +403,12 @@ class ImageCanvas(QGraphicsView):
                 self.temp_rect_item = None
 
             # 检查矩形尺寸：宽度和高度都必须至少为10px
-            if rect.width() >= 10 and rect.height() >= 10:
+            # 但按住Shift键时不创建新标注
+            if rect.width() >= 10 and rect.height() >= 10 and not shift_pressed:
                 # 创建新AnnotationView并设置当前类别
                 item = AnnotationView(
                     Decimal(rect.x()), Decimal(rect.y()), Decimal(rect.width()), Decimal(rect.height()),
-                    self.current_category,
+                    self.current_annotation_item,
                     self
                 )
                 self.scene.addItem(item)
@@ -480,12 +428,18 @@ class ImageCanvas(QGraphicsView):
             )
             
             # 只有点击空白区域且未按住Shift键时才清除选择
-            if not is_annotation and not (event.modifiers() & Qt.ShiftModifier):
+            if not is_annotation and not shift_pressed:
                 # 取消annotation_list中的选中状态
                 if self.annotation_list and self.annotation_list.selectionModel():
                     self.annotation_list.selectionModel().clearSelection()
                 # 取消画布上所有标注的选中状态
                 self.unselect_all_annotations()
+            elif is_annotation and not shift_pressed:
+                # 如果点击的是标注且没有按住Shift键，选中标注并同步更新annotation_list
+                if isinstance(clicked_item, AnnotationView):
+                    clicked_item.select_annotation_view()
+                elif clicked_item.parentItem() and isinstance(clicked_item.parentItem(), AnnotationView):
+                    clicked_item.parentItem().select_annotation_view()
 
         # 处理框选完成后的标注选择
         if self.rubberBandRect().isValid() and not self.drawing:
@@ -509,9 +463,13 @@ class ImageCanvas(QGraphicsView):
                     self.unselect_all_annotations()
                 
                 # 选择框选区域内的所有AnnotationView
+                selected_count = 0
                 for item in items_in_rect:
                     if isinstance(item, AnnotationView):
-                        item.select_annotation_view(True)
+                        # 直接设置选中状态，而不是调用select_annotation_view方法
+                        # 因为select_annotation_view会取消其他项的选中状态，不适合多选场景
+                        item.set_selected_flag_internal(True)
+                        selected_count += 1
                         
                 # 更新annotation_list的选中状态
                 self._update_annotation_list_selection()
@@ -623,8 +581,8 @@ class ImageCanvas(QGraphicsView):
                 if isinstance(item, AnnotationView):
                     annotations.append(item)
 
-            # 按class_id排序
-            annotations.sort(key=lambda _item: _item.category.class_name)
+            # 按class_name排序
+            annotations.sort(key=lambda _item: _item.class_name)
 
             # 创建kolo_item_list用于存储KoloItem对象
             kolo_item_list = []
@@ -648,7 +606,7 @@ class ImageCanvas(QGraphicsView):
                 kolo_item_list.append(KoloItem(
                     kid=KOrmBase.snowflake.gen_kid(),
                     image_name=image_name,
-                    class_name=item.category.class_name,
+                    class_name=item.class_name,
                     x_center=x_center,
                     y_center=y_center,
                     width=norm_width,
@@ -665,7 +623,7 @@ class ImageCanvas(QGraphicsView):
                     session.add(kolo_item)
 
             # 执行事务
-            self.project_info.sqlite_db.execute_in_transaction(transaction_func)
+            self.project_info.domain.execute_in_transaction(transaction_func)
             
             return True
         except Exception as e:
@@ -678,7 +636,7 @@ class ImageCanvas(QGraphicsView):
 
         # 运行子菜单
         self.run_action = QAction("Run", self)
-        self.run_action.triggered.connect(self.exec_yolo)  # type: ignore
+        self.run_action.triggered.connect(self.on_run_clicked)  # type: ignore
         # 运行选项状态通过project_info判断
         self.run_action.setEnabled(self.project_info.is_model_loaded)
         self.config_menu.addAction(self.run_action)
@@ -741,16 +699,23 @@ class ImageCanvas(QGraphicsView):
 
     def _load_yolo_model_async(self, model_path: Optional[Path] =None):
         # 开始加载模型
-        self.project_info.load_yolo_model(model_path)
-        self.run_action.setEnabled(self.project_info.is_model_loaded)
-        self.run_tool_button.setEnabled(self.project_info.is_model_loaded)
+        is_loaded = self.project_info.load_yolo_model(model_path)
+        self.run_action.setEnabled(is_loaded)
+        self.run_tool_button.setEnabled(is_loaded)
+        
+        # 如果加载失败，给用户提示
+        if not is_loaded and model_path is not None:
+            QMessageBox.warning(
+                self, "Load Failed",
+                f"Failed to load model. Model file may not exist or is invalid."
+            )
 
     def delete_yolo_model(self):
         """删除已选择的YOLO模型配置"""
         self.project_info.delete_yolo_model()
 
     # 然后是调用YOLOExecutor的代码（例如UI类中的方法）
-    def exec_yolo(self):
+    def on_run_clicked(self):
         """执行YOLO模型的方法，识别当前图片目标并按指定格式输出日志"""
         import logging
         # 检查模型是否加载
@@ -766,7 +731,7 @@ class ImageCanvas(QGraphicsView):
         try:
             self.clear_annotation_views(save_annotations=False)
             # 调用YOLOExecutor的exec_yolo方法（复用已有实现）
-            detection_results = self.project_info.exec_yolo(img_path=self.current_image_path)
+            detection_results = self.project_info.exec_yolo(img_path=self.current_image_path, save_to_db=True)
 
             # 输出检测结果并复用load_kolo_line方法
             model_name = self.project_info.model_name
@@ -930,7 +895,7 @@ class ImageCanvas(QGraphicsView):
                 icon-size: 24px;
             }
         """)
-        self.run_tool_button.clicked.connect(self.exec_yolo)  # type: ignore
+        self.run_tool_button.clicked.connect(self.on_run_clicked)  # type: ignore
         # 根据是否有模型设置初始状态（通过project_info判断）
         self.run_tool_button.setEnabled(bool(getattr(self.project_info, 'yolo_model_path', None)))
         toolbar.addWidget(self.run_tool_button)
@@ -1071,25 +1036,20 @@ class ImageCanvas(QGraphicsView):
 
         # 获取第一个选中的标注的类别
         first_item = selected_items[0]
-        category = first_item.category
 
         # 检查该类别是否已存在于annotation_list中
-        exists = any(c.class_name == category.class_name for c in self.project_info.categories)
+        exists = self.annotation_list.source_model.get_item_by_class_name(first_item.class_name)
 
         if not exists:
             # 如果不存在，添加到列表末尾
-            self.annotation_list.handle_add_annotation(
-                position=len(self.project_info.categories),
-                reference_id=max((cat.class_id for cat in self.project_info.categories), default=0),
-                default_name=category.class_name
-            )
+            self.annotation_list.source_model.append_new_category(first_item.class_name)
 
         # 发射信号通知选中的标注类别
         # self.annotation_selected.emit(category)
 
         # 选中列表中对应的项
         if self.annotation_list:
-            self.annotation_list.select_category_by_name(category.class_name)
+            self.annotation_list.select_category_by_name(first_item.class_name)
 
     def show_context_menu(self, position):
         """显示上下文菜单"""
@@ -1135,7 +1095,7 @@ class ImageCanvas(QGraphicsView):
             
             # 为每个AnnotationView添加菜单项到一级菜单
             for annotation in sorted_annotations:
-                action = QAction(annotation.category.class_name, self)
+                action = QAction(annotation.class_name, self)
                 # 确保在选择时取消其他项的选中状态，并同步更新annotation_list
                 action.triggered.connect(  # type: ignore
                     lambda checked, ann=annotation: self.select_single_annotation(ann)
@@ -1192,10 +1152,7 @@ class ImageCanvas(QGraphicsView):
 
     def reload_image(self):
         """重新加载当前显示的图片（如果存在）"""
-        # 检查当前是否有图片路径，即是否有图片正在显示
-        if self.current_image_path is not None:
-            # 调用已有的load_image方法重新加载当前图片
-            self.load_image(self.current_image_path)
+        self.load_image(self.current_image_path, reload=True)
 
     def _connect_model_signals(self):
         """连接模型加载相关的信号"""
@@ -1225,7 +1182,7 @@ class ImageCanvas(QGraphicsView):
         else:
             # 如果只选中一个项，更新annotation_list中的选中状态
             selected_item = selected_items[0]
-            self.annotation_list.select_category_by_name(selected_item.category.class_name)
+            self.annotation_list.select_category_by_name(selected_item.class_name)
 
     def select_single_annotation(self, annotation_view):
         """选中单个标注视图，取消其他所有标注视图的选中状态，并同步更新annotation_list"""
@@ -1239,4 +1196,7 @@ class ImageCanvas(QGraphicsView):
         
         # 同步更新annotation_list
         if self.annotation_list:
-            self.annotation_list.select_category_by_name(annotation_view.category.class_name)
+            self.annotation_list.select_category_by_name(annotation_view.class_name)
+
+        # 刷新画布
+        self.viewport().update()
