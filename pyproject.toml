@@ -4,9 +4,9 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "kboxlabel"
-version = "1.0.0"
+version = "0.0.1-alpha"
 authors = [
-    {name = "Your Name", email = "your.email@example.com"},
+    {name = "Kermit", email = "kermit.mei@gmail.com"},
 ]
 description = "A image annotation tool for object detection tasks"
 readme = "README.md"
@@ -78,7 +78,7 @@ dependencies = [
 ]
 
 [project.scripts]
-kboxlabel = "main:main"
+kboxlabel = "src.main:main"
 
 [project.urls]
 Homepage = "https://github.com/kmvdata/KBoxLabel"

@@ -8,9 +8,9 @@ with open("app/requirements.txt", "r", encoding="utf-8") as fh:
 
 setup(
     name="kboxlabel",
-    version="1.0.0",
-    author="Your Name",
-    author_email="your.email@example.com",
+    version="0.0.1-alpha",
+    author="Kermit",
+    author_email="kermit.mei@gmail.com",
     description="A image annotation tool for object detection tasks",
     long_description=long_description,
     long_description_content_type="text/markdown",
@@ -35,7 +35,7 @@ setup(
     install_requires=requirements,
     entry_points={
         "console_scripts": [
-            "kboxlabel=main:main",
+            "kboxlabel=src.main:main",
         ],
     },
     include_package_data=True,
