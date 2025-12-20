@@ -282,52 +282,60 @@ class AnnotationView(QGraphicsRectItem):
                     # Ctrl+Shift+左箭头：保持左边固定，右边向左移动，使标注框宽度减小
                     if rect.width() > float(resize_distance):
                         new_rect = QRectF(rect.x(), rect.y(), rect.width() - float(resize_distance), rect.height())
-                        self.setRect(new_rect)
-                        self.update_handles()
-                        self.set_needs_save_annotation()
-                        # 标记为键盘操作
-                        self.mouse_operation_in_progress = False
-                        # 隐藏锚点
-                        self._hide_handles_temporarily()
+                        # 检查调整后的矩形是否在图像边界内
+                        if self._is_rect_within_image_bounds_for_resize(new_rect):
+                            self.setRect(new_rect)
+                            self.update_handles()
+                            self.set_needs_save_annotation()
+                            # 标记为键盘操作
+                            self.mouse_operation_in_progress = False
+                            # 隐藏锚点
+                            self._hide_handles_temporarily()
                     event.accept()
                     return
                 elif event.key() == Qt.Key_Right:
                     # Ctrl+Shift+右箭头：保持右边固定，左边向右移动，使标注框宽度减小
                     if rect.width() > float(resize_distance):
                         new_rect = QRectF(rect.x() + float(resize_distance), rect.y(), rect.width() - float(resize_distance), rect.height())
-                        self.setRect(new_rect)
-                        self.update_handles()
-                        self.set_needs_save_annotation()
-                        # 标记为键盘操作
-                        self.mouse_operation_in_progress = False
-                        # 隐藏锚点
-                        self._hide_handles_temporarily()
+                        # 检查调整后的矩形是否在图像边界内
+                        if self._is_rect_within_image_bounds_for_resize(new_rect):
+                            self.setRect(new_rect)
+                            self.update_handles()
+                            self.set_needs_save_annotation()
+                            # 标记为键盘操作
+                            self.mouse_operation_in_progress = False
+                            # 隐藏锚点
+                            self._hide_handles_temporarily()
                     event.accept()
                     return
                 elif event.key() == Qt.Key_Up:
                     # Ctrl+Shift+上箭头：保持上边固定，下边向上移动，使标注框高度减小
                     if rect.height() > float(resize_distance):
                         new_rect = QRectF(rect.x(), rect.y(), rect.width(), rect.height() - float(resize_distance))
-                        self.setRect(new_rect)
-                        self.update_handles()
-                        self.set_needs_save_annotation()
-                        # 标记为键盘操作
-                        self.mouse_operation_in_progress = False
-                        # 隐藏锚点
-                        self._hide_handles_temporarily()
+                        # 检查调整后的矩形是否在图像边界内
+                        if self._is_rect_within_image_bounds_for_resize(new_rect):
+                            self.setRect(new_rect)
+                            self.update_handles()
+                            self.set_needs_save_annotation()
+                            # 标记为键盘操作
+                            self.mouse_operation_in_progress = False
+                            # 隐藏锚点
+                            self._hide_handles_temporarily()
                     event.accept()
                     return
                 elif event.key() == Qt.Key_Down:
                     # Ctrl+Shift+下箭头：保持下边固定，上边向下移动，使标注框高度减小
                     if rect.height() > float(resize_distance):
                         new_rect = QRectF(rect.x(), rect.y() + float(resize_distance), rect.width(), rect.height() - float(resize_distance))
-                        self.setRect(new_rect)
-                        self.update_handles()
-                        self.set_needs_save_annotation()
-                        # 标记为键盘操作
-                        self.mouse_operation_in_progress = False
-                        # 隐藏锚点
-                        self._hide_handles_temporarily()
+                        # 检查调整后的矩形是否在图像边界内
+                        if self._is_rect_within_image_bounds_for_resize(new_rect):
+                            self.setRect(new_rect)
+                            self.update_handles()
+                            self.set_needs_save_annotation()
+                            # 标记为键盘操作
+                            self.mouse_operation_in_progress = False
+                            # 隐藏锚点
+                            self._hide_handles_temporarily()
                     event.accept()
                     return
             # 检查是否按住Shift键
@@ -336,96 +344,156 @@ class AnnotationView(QGraphicsRectItem):
                 if event.key() == Qt.Key_Left:
                     # 向左扩展：右边保持不动，向左扩展（x减小，宽度增加）
                     new_rect = QRectF(rect.x() - float(resize_distance), rect.y(), rect.width() + float(resize_distance), rect.height())
-                    self.setRect(new_rect)
-                    self.update_handles()
-                    self.set_needs_save_annotation()
-                    # 标记为键盘操作
-                    self.mouse_operation_in_progress = False
-                    # 隐藏锚点
-                    self._hide_handles_temporarily()
+                    # 检查调整后的矩形是否在图像边界内
+                    if self._is_rect_within_image_bounds_for_resize(new_rect):
+                        self.setRect(new_rect)
+                        self.update_handles()
+                        self.set_needs_save_annotation()
+                        # 标记为键盘操作
+                        self.mouse_operation_in_progress = False
+                        # 隐藏锚点
+                        self._hide_handles_temporarily()
                     event.accept()
                     return
                 elif event.key() == Qt.Key_Right:
                     # 向右扩展：左边保持不动，向右扩展（宽度增加）
                     new_rect = QRectF(rect.x(), rect.y(), rect.width() + float(resize_distance), rect.height())
-                    self.setRect(new_rect)
-                    self.update_handles()
-                    self.set_needs_save_annotation()
-                    # 标记为键盘操作
-                    self.mouse_operation_in_progress = False
-                    # 隐藏锚点
-                    self._hide_handles_temporarily()
+                    # 检查调整后的矩形是否在图像边界内
+                    if self._is_rect_within_image_bounds_for_resize(new_rect):
+                        self.setRect(new_rect)
+                        self.update_handles()
+                        self.set_needs_save_annotation()
+                        # 标记为键盘操作
+                        self.mouse_operation_in_progress = False
+                        # 隐藏锚点
+                        self._hide_handles_temporarily()
                     event.accept()
                     return
                 elif event.key() == Qt.Key_Up:
                     # 向上扩展：下边保持不动，向上扩展（y减小，高度增加）
                     new_rect = QRectF(rect.x(), rect.y() - float(resize_distance), rect.width(), rect.height() + float(resize_distance))
-                    self.setRect(new_rect)
-                    self.update_handles()
-                    self.set_needs_save_annotation()
-                    # 标记为键盘操作
-                    self.mouse_operation_in_progress = False
-                    # 隐藏锚点
-                    self._hide_handles_temporarily()
+                    # 检查调整后的矩形是否在图像边界内
+                    if self._is_rect_within_image_bounds_for_resize(new_rect):
+                        self.setRect(new_rect)
+                        self.update_handles()
+                        self.set_needs_save_annotation()
+                        # 标记为键盘操作
+                        self.mouse_operation_in_progress = False
+                        # 隐藏锚点
+                        self._hide_handles_temporarily()
                     event.accept()
                     return
                 elif event.key() == Qt.Key_Down:
                     # 向下扩展：上边保持不动，向下扩展（高度增加）
                     new_rect = QRectF(rect.x(), rect.y(), rect.width(), rect.height() + float(resize_distance))
-                    self.setRect(new_rect)
-                    self.update_handles()
-                    self.set_needs_save_annotation()
-                    # 标记为键盘操作
-                    self.mouse_operation_in_progress = False
-                    # 隐藏锚点
-                    self._hide_handles_temporarily()
+                    # 检查调整后的矩形是否在图像边界内
+                    if self._is_rect_within_image_bounds_for_resize(new_rect):
+                        self.setRect(new_rect)
+                        self.update_handles()
+                        self.set_needs_save_annotation()
+                        # 标记为键盘操作
+                        self.mouse_operation_in_progress = False
+                        # 隐藏锚点
+                        self._hide_handles_temporarily()
                     event.accept()
                     return
             else:
                 # 根据按键方向移动标注框
                 if event.key() == Qt.Key_Left:
-                    self.setRect(rect.translated(-float(move_distance), 0))
-                    self.update_handles()
-                    self.set_needs_save_annotation()
-                    # 标记为键盘操作
-                    self.mouse_operation_in_progress = False
-                    # 隐藏锚点
-                    self._hide_handles_temporarily()
+                    moved_rect = rect.translated(-float(move_distance), 0)
+                    if self._is_rect_within_image_bounds(moved_rect):
+                        self.setRect(moved_rect)
+                        self.update_handles()
+                        self.set_needs_save_annotation()
+                        # 标记为键盘操作
+                        self.mouse_operation_in_progress = False
+                        # 隐藏锚点
+                        self._hide_handles_temporarily()
                     event.accept()
                     return
                 elif event.key() == Qt.Key_Right:
-                    self.setRect(rect.translated(float(move_distance), 0))
-                    self.update_handles()
-                    self.set_needs_save_annotation()
-                    # 标记为键盘操作
-                    self.mouse_operation_in_progress = False
-                    # 隐藏锚点
-                    self._hide_handles_temporarily()
+                    moved_rect = rect.translated(float(move_distance), 0)
+                    if self._is_rect_within_image_bounds(moved_rect):
+                        self.setRect(moved_rect)
+                        self.update_handles()
+                        self.set_needs_save_annotation()
+                        # 标记为键盘操作
+                        self.mouse_operation_in_progress = False
+                        # 隐藏锚点
+                        self._hide_handles_temporarily()
                     event.accept()
                     return
                 elif event.key() == Qt.Key_Up:
-                    self.setRect(rect.translated(0, -float(move_distance)))
-                    self.update_handles()
-                    self.set_needs_save_annotation()
-                    # 标记为键盘操作
-                    self.mouse_operation_in_progress = False
-                    # 隐藏锚点
-                    self._hide_handles_temporarily()
+                    moved_rect = rect.translated(0, -float(move_distance))
+                    if self._is_rect_within_image_bounds(moved_rect):
+                        self.setRect(moved_rect)
+                        self.update_handles()
+                        self.set_needs_save_annotation()
+                        # 标记为键盘操作
+                        self.mouse_operation_in_progress = False
+                        # 隐藏锚点
+                        self._hide_handles_temporarily()
                     event.accept()
                     return
                 elif event.key() == Qt.Key_Down:
-                    self.setRect(rect.translated(0, float(move_distance)))
-                    self.update_handles()
-                    self.set_needs_save_annotation()
-                    # 标记为键盘操作
-                    self.mouse_operation_in_progress = False
-                    # 隐藏锚点
-                    self._hide_handles_temporarily()
+                    moved_rect = rect.translated(0, float(move_distance))
+                    if self._is_rect_within_image_bounds(moved_rect):
+                        self.setRect(moved_rect)
+                        self.update_handles()
+                        self.set_needs_save_annotation()
+                        # 标记为键盘操作
+                        self.mouse_operation_in_progress = False
+                        # 隐藏锚点
+                        self._hide_handles_temporarily()
                     event.accept()
                     return
         
         # 如果不是方向键或者未选中，调用父类方法处理
         super().keyPressEvent(event)
+
+    def _is_rect_within_image_bounds(self, rect: QRectF) -> bool:
+        """检查矩形是否在图像边界内"""
+        # 获取图像画布
+        if not self.image_canvas or not self.image_canvas.image_item:
+            return True  # 如果无法获取图像信息，默认允许移动
+            
+        # 获取图像边界
+        image_rect = self.image_canvas.image_item.boundingRect()
+        
+        # 获取当前矩形在场景中的位置
+        scene_pos = self.pos()
+        scene_left = scene_pos.x() + rect.x()
+        scene_top = scene_pos.y() + rect.y()
+        scene_right = scene_left + rect.width()
+        scene_bottom = scene_top + rect.height()
+        
+        # 检查是否在图像边界内
+        return (scene_left >= 0 and 
+                scene_top >= 0 and 
+                scene_right <= image_rect.width() and 
+                scene_bottom <= image_rect.height())
+                
+    def _is_rect_within_image_bounds_for_resize(self, rect: QRectF) -> bool:
+        """检查调整大小后的矩形是否在图像边界内"""
+        # 获取图像画布
+        if not self.image_canvas or not self.image_canvas.image_item:
+            return True  # 如果无法获取图像信息，默认允许调整大小
+            
+        # 获取图像边界
+        image_rect = self.image_canvas.image_item.boundingRect()
+        
+        # 获取当前矩形在场景中的位置
+        scene_pos = self.pos()
+        scene_left = scene_pos.x() + rect.x()
+        scene_top = scene_pos.y() + rect.y()
+        scene_right = scene_left + rect.width()
+        scene_bottom = scene_top + rect.height()
+        
+        # 对于调整大小操作，我们只需要确保边界不会越出图像范围
+        return (scene_left >= 0 and 
+                scene_top >= 0 and 
+                scene_right <= image_rect.width() and 
+                scene_bottom <= image_rect.height())
 
     def mouseMoveEvent(self, event):
         """鼠标移动事件处理"""
