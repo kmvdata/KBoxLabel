@@ -448,6 +448,52 @@ class AnnotationView(QGraphicsRectItem):
             self.set_needs_save_annotation()
             # 鼠标拖拽过程中持续隐藏锚点
             self._keep_handles_hidden()
+            
+            # 确保移动后的位置在图像边界内
+            self._constrain_position_to_image_bounds()
+
+    def _constrain_position_to_image_bounds(self):
+        """约束当前位置在图像边界内"""
+        # 获取图像画布
+        if not self.image_canvas or not self.image_canvas.image_item:
+            return
+            
+        # 获取图像边界
+        image_rect = self.image_canvas.image_item.boundingRect()
+        
+        # 获取当前矩形在场景中的位置
+        rect = self.rect()
+        scene_pos = self.pos()
+        scene_left = scene_pos.x() + rect.x()
+        scene_top = scene_pos.y() + rect.y()
+        scene_right = scene_left + rect.width()
+        scene_bottom = scene_top + rect.height()
+        
+        # 调整位置
+        adjusted_scene_x = scene_pos.x()
+        adjusted_scene_y = scene_pos.y()
+        
+        # 确保左边界不小于0
+        if scene_left < 0:
+            adjusted_scene_x -= scene_left
+            
+        # 确保上边界不小于0
+        if scene_top < 0:
+            adjusted_scene_y -= scene_top
+            
+        # 确保右边界不超过图像宽度
+        if scene_right > image_rect.width():
+            adjusted_scene_x -= (scene_right - image_rect.width())
+            
+        # 确保下边界不超过图像高度
+        if scene_bottom > image_rect.height():
+            adjusted_scene_y -= (scene_bottom - image_rect.height())
+            
+        # 应用调整后的位置
+        self.setPos(adjusted_scene_x, adjusted_scene_y)
+        
+        # 更新控制点位置
+        self.update_handles()
 
     def mouseReleaseEvent(self, event):
         """鼠标释放事件处理"""
@@ -532,6 +578,61 @@ class AnnotationView(QGraphicsRectItem):
         # 更新控制点位置
         self.update_handles()
         self.update()  # 调整大小后强制重绘
+        
+        # 约束调整大小后的矩形在图像边界内
+        self._constrain_rect_to_image_bounds(original_rect)
+
+    def _constrain_rect_to_image_bounds(self, original_rect):
+        """约束矩形在图像边界内"""
+        # 获取图像画布
+        if not self.image_canvas or not self.image_canvas.image_item:
+            return
+            
+        # 获取图像边界
+        image_rect = self.image_canvas.image_item.boundingRect()
+        
+        # 获取当前矩形在场景中的位置
+        rect = self.rect()
+        scene_pos = self.pos()
+        scene_left = scene_pos.x() + rect.x()
+        scene_top = scene_pos.y() + rect.y()
+        scene_right = scene_left + rect.width()
+        scene_bottom = scene_top + rect.height()
+        
+        # 调整边界
+        # 确保左边界不小于0
+        if scene_left < 0:
+            scene_left = 0
+            
+        # 确保上边界不小于0
+        if scene_top < 0:
+            scene_top = 0
+            
+        # 确保右边界不超过图像宽度
+        if scene_right > image_rect.width():
+            scene_right = image_rect.width()
+            
+        # 确保下边界不超过图像高度
+        if scene_bottom > image_rect.height():
+            scene_bottom = image_rect.height()
+            
+        # 确保宽度和高度至少为1
+        if scene_right - scene_left < 1:
+            scene_right = scene_left + 1
+            
+        if scene_bottom - scene_top < 1:
+            scene_bottom = scene_top + 1
+            
+        # 转换回本地坐标
+        local_left = scene_left - scene_pos.x()
+        local_top = scene_top - scene_pos.y()
+        local_width = scene_right - scene_left
+        local_height = scene_bottom - scene_top
+        
+        # 应用调整后的矩形
+        adjusted_rect = QRectF(local_left, local_top, local_width, local_height)
+        self.setRect(adjusted_rect)
+        self.update_handles()
 
     def _calculate_normalized_coordinates(self, img_width: int, img_height: int) -> Tuple[Decimal, Decimal, Decimal, Decimal]:
         """计算归一化坐标"""
