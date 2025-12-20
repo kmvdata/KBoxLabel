@@ -292,6 +292,7 @@ class AnnotationView(QGraphicsRectItem):
                             # 隐藏锚点
                             self._hide_handles_temporarily()
                     event.accept()
+                    self._save_if_needed()
                     return
                 elif event.key() == Qt.Key_Right:
                     # Ctrl+Shift+右箭头：保持右边固定，左边向右移动，使标注框宽度减小
@@ -307,6 +308,7 @@ class AnnotationView(QGraphicsRectItem):
                             # 隐藏锚点
                             self._hide_handles_temporarily()
                     event.accept()
+                    self._save_if_needed()
                     return
                 elif event.key() == Qt.Key_Up:
                     # Ctrl+Shift+上箭头：保持上边固定，下边向上移动，使标注框高度减小
@@ -322,6 +324,7 @@ class AnnotationView(QGraphicsRectItem):
                             # 隐藏锚点
                             self._hide_handles_temporarily()
                     event.accept()
+                    self._save_if_needed()
                     return
                 elif event.key() == Qt.Key_Down:
                     # Ctrl+Shift+下箭头：保持下边固定，上边向下移动，使标注框高度减小
@@ -337,6 +340,7 @@ class AnnotationView(QGraphicsRectItem):
                             # 隐藏锚点
                             self._hide_handles_temporarily()
                     event.accept()
+                    self._save_if_needed()
                     return
             # 检查是否按住Shift键
             elif event.modifiers() & Qt.ShiftModifier:
@@ -354,6 +358,7 @@ class AnnotationView(QGraphicsRectItem):
                         # 隐藏锚点
                         self._hide_handles_temporarily()
                     event.accept()
+                    self._save_if_needed()
                     return
                 elif event.key() == Qt.Key_Right:
                     # 向右扩展：左边保持不动，向右扩展（宽度增加）
@@ -368,6 +373,7 @@ class AnnotationView(QGraphicsRectItem):
                         # 隐藏锚点
                         self._hide_handles_temporarily()
                     event.accept()
+                    self._save_if_needed()
                     return
                 elif event.key() == Qt.Key_Up:
                     # 向上扩展：下边保持不动，向上扩展（y减小，高度增加）
@@ -382,6 +388,7 @@ class AnnotationView(QGraphicsRectItem):
                         # 隐藏锚点
                         self._hide_handles_temporarily()
                     event.accept()
+                    self._save_if_needed()
                     return
                 elif event.key() == Qt.Key_Down:
                     # 向下扩展：上边保持不动，向下扩展（高度增加）
@@ -396,6 +403,7 @@ class AnnotationView(QGraphicsRectItem):
                         # 隐藏锚点
                         self._hide_handles_temporarily()
                     event.accept()
+                    self._save_if_needed()
                     return
             else:
                 # 根据按键方向移动标注框
@@ -410,6 +418,7 @@ class AnnotationView(QGraphicsRectItem):
                         # 隐藏锚点
                         self._hide_handles_temporarily()
                     event.accept()
+                    self._save_if_needed()
                     return
                 elif event.key() == Qt.Key_Right:
                     moved_rect = rect.translated(float(move_distance), 0)
@@ -422,6 +431,7 @@ class AnnotationView(QGraphicsRectItem):
                         # 隐藏锚点
                         self._hide_handles_temporarily()
                     event.accept()
+                    self._save_if_needed()
                     return
                 elif event.key() == Qt.Key_Up:
                     moved_rect = rect.translated(0, -float(move_distance))
@@ -434,6 +444,7 @@ class AnnotationView(QGraphicsRectItem):
                         # 隐藏锚点
                         self._hide_handles_temporarily()
                     event.accept()
+                    self._save_if_needed()
                     return
                 elif event.key() == Qt.Key_Down:
                     moved_rect = rect.translated(0, float(move_distance))
@@ -446,6 +457,7 @@ class AnnotationView(QGraphicsRectItem):
                         # 隐藏锚点
                         self._hide_handles_temporarily()
                     event.accept()
+                    self._save_if_needed()
                     return
         
         # 如果不是方向键或者未选中，调用父类方法处理
@@ -901,3 +913,8 @@ class AnnotationView(QGraphicsRectItem):
 
         # 弃选当前项
         self.set_selected_flag_internal(False)
+
+    def _save_if_needed(self):
+        """如果需要保存标注，则调用image_canvas的save_annotations方法"""
+        if self.image_canvas is not None and getattr(self.image_canvas, 'set_needs_save_annotations', False):
+            self.image_canvas.save_annotations()

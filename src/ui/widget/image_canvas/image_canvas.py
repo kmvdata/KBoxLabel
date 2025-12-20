@@ -635,7 +635,7 @@ class ImageCanvas(QGraphicsView):
 
             # 执行事务
             self.project_info.domain.execute_in_transaction(transaction_func)
-            
+            print(f"保存标注文件成功")
             return True
         except Exception as e:
             print(f"保存标注文件时出错: {e}")
