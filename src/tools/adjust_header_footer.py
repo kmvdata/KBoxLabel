@@ -129,7 +129,7 @@ def adjust_footer(project_path: str):
         def transaction_func(session):
             # 获取所有class_name为'Page-footer'的项目
             page_footers = session.query(KoloItem).filter(
-                KoloItem.class_name == 'Page-number'
+                KoloItem.class_name == 'Page-footer'
             ).all()
             
             updated_count = 0
@@ -196,6 +196,51 @@ def adjust_footer(project_path: str):
         return False
 
 
+def change_page_number_to_footer(project_path: str):
+    """
+    将项目中所有class_name为'Page-number'的kolo_item项的class_name改为'Page-footer'
+    
+    :param project_path: 项目路径
+    """
+    # 构造数据库路径
+    db_path = Path(project_path) / ".kboxlabel" / "data.db"
+    
+    # 检查数据库文件是否存在
+    if not db_path.exists():
+        print(f"错误: 在路径 {db_path} 找不到数据库文件")
+        return False
+    
+    try:
+        # 创建ProjectDomain实例
+        project_domain = ProjectDomain(db_path)
+        
+        # 定义事务函数来更新数据
+        def transaction_func(session):
+            # 获取所有class_name为'Page-number'的项目
+            page_numbers = session.query(KoloItem).filter(
+                KoloItem.class_name == 'Page-number'
+            ).all()
+            
+            updated_count = 0
+            for item in page_numbers:
+                # 将class_name从'Page-number'改为'Page-footer'
+                item.class_name = 'Page-footer'
+                updated_count += 1
+                    
+            print(f"已更新 {updated_count} 个 'Page-number' 项目的类别为 'Page-footer'")
+            return updated_count
+        
+        # 在事务中执行更新
+        updated_count = project_domain.execute_in_transaction(transaction_func)
+        
+        print(f"成功将 {updated_count} 个Page-number项目更改为Page-footer")
+        return True
+        
+    except Exception as e:
+        print(f"更改Page-number项目时出错: {str(e)}")
+        return False
+
+
 if __name__ == "__main__":
     _project_path = '/Users/kermit/DataGripProjects/contracts/'
     success = adjust_header(_project_path)
@@ -205,9 +250,17 @@ if __name__ == "__main__":
         print("Page-header项目调整失败")
         sys.exit(1)
 
+    success = change_page_number_to_footer(_project_path)
+    if success:
+        print("Page-number项目转换完成")
+    else:
+        print("Page-number项目转换失败")
+        sys.exit(1)
+
     success = adjust_footer(_project_path)
     if success:
         print("Page-footer项目调整完成")
     else:
         print("Page-footer项目调整失败")
         sys.exit(1)
+        
