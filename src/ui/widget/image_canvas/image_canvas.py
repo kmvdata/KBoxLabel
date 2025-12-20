@@ -412,6 +412,10 @@ class ImageCanvas(QGraphicsView):
                     self
                 )
                 self.scene.addItem(item)
+                
+                # 检查并调整新创建的标注框，确保它完全在图像边界内
+                self._adjust_annotation_to_image_bounds(item)
+                
                 self.save_annotations()
 
                 # 自动选中新创建的标注
@@ -1200,3 +1204,54 @@ class ImageCanvas(QGraphicsView):
 
         # 刷新画布
         self.viewport().update()
+
+    def _adjust_annotation_to_image_bounds(self, annotation_view):
+        """
+        调整标注框使其完全在图像边界内
+        :param annotation_view: AnnotationView实例
+        """
+        if not self.image_item:
+            return
+            
+        # 获取图像边界
+        image_rect = self.image_item.boundingRect()
+        
+        # 获取标注框当前矩形
+        rect = annotation_view.rect()
+        
+        # 调整位置和大小以确保在边界内
+        x = rect.x()
+        y = rect.y()
+        width = rect.width()
+        height = rect.height()
+        
+        # 确保左边界不小于0
+        if x < 0:
+            x = 0
+            
+        # 确保上边界不小于0
+        if y < 0:
+            y = 0
+            
+        # 确保右边界不超过图像宽度
+        if x + width > image_rect.width():
+            # 如果整体宽度超过图像宽度，则调整宽度
+            if width > image_rect.width():
+                width = image_rect.width()
+                x = 0
+            else:
+                x = image_rect.width() - width
+                
+        # 确保下边界不超过图像高度
+        if y + height > image_rect.height():
+            # 如果整体高度超过图像高度，则调整高度
+            if height > image_rect.height():
+                height = image_rect.height()
+                y = 0
+            else:
+                y = image_rect.height() - height
+        
+        # 应用调整后的矩形
+        adjusted_rect = QRectF(x, y, width, height)
+        annotation_view.setRect(adjusted_rect)
+        annotation_view.update_handles()
