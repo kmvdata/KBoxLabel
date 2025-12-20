@@ -283,7 +283,7 @@ class AnnotationView(QGraphicsRectItem):
                     if rect.width() > float(resize_distance):
                         new_rect = QRectF(rect.x(), rect.y(), rect.width() - float(resize_distance), rect.height())
                         # 检查调整后的矩形是否在图像边界内
-                        if self._is_rect_within_image_bounds_for_resize(new_rect):
+                        if self._is_rect_move_or_resize_valid(rect, 'right_shrink'):
                             self.setRect(new_rect)
                             self.update_handles()
                             self.set_needs_save_annotation()
@@ -298,7 +298,7 @@ class AnnotationView(QGraphicsRectItem):
                     if rect.width() > float(resize_distance):
                         new_rect = QRectF(rect.x() + float(resize_distance), rect.y(), rect.width() - float(resize_distance), rect.height())
                         # 检查调整后的矩形是否在图像边界内
-                        if self._is_rect_within_image_bounds_for_resize(new_rect):
+                        if self._is_rect_move_or_resize_valid(rect, 'left_shrink'):
                             self.setRect(new_rect)
                             self.update_handles()
                             self.set_needs_save_annotation()
@@ -313,7 +313,7 @@ class AnnotationView(QGraphicsRectItem):
                     if rect.height() > float(resize_distance):
                         new_rect = QRectF(rect.x(), rect.y(), rect.width(), rect.height() - float(resize_distance))
                         # 检查调整后的矩形是否在图像边界内
-                        if self._is_rect_within_image_bounds_for_resize(new_rect):
+                        if self._is_rect_move_or_resize_valid(rect, 'bottom_shrink'):
                             self.setRect(new_rect)
                             self.update_handles()
                             self.set_needs_save_annotation()
@@ -328,7 +328,7 @@ class AnnotationView(QGraphicsRectItem):
                     if rect.height() > float(resize_distance):
                         new_rect = QRectF(rect.x(), rect.y() + float(resize_distance), rect.width(), rect.height() - float(resize_distance))
                         # 检查调整后的矩形是否在图像边界内
-                        if self._is_rect_within_image_bounds_for_resize(new_rect):
+                        if self._is_rect_move_or_resize_valid(rect, 'top_shrink'):
                             self.setRect(new_rect)
                             self.update_handles()
                             self.set_needs_save_annotation()
@@ -345,7 +345,7 @@ class AnnotationView(QGraphicsRectItem):
                     # 向左扩展：右边保持不动，向左扩展（x减小，宽度增加）
                     new_rect = QRectF(rect.x() - float(resize_distance), rect.y(), rect.width() + float(resize_distance), rect.height())
                     # 检查调整后的矩形是否在图像边界内
-                    if self._is_rect_within_image_bounds_for_resize(new_rect):
+                    if self._is_rect_move_or_resize_valid(new_rect, 'left_expand'):
                         self.setRect(new_rect)
                         self.update_handles()
                         self.set_needs_save_annotation()
@@ -359,7 +359,7 @@ class AnnotationView(QGraphicsRectItem):
                     # 向右扩展：左边保持不动，向右扩展（宽度增加）
                     new_rect = QRectF(rect.x(), rect.y(), rect.width() + float(resize_distance), rect.height())
                     # 检查调整后的矩形是否在图像边界内
-                    if self._is_rect_within_image_bounds_for_resize(new_rect):
+                    if self._is_rect_move_or_resize_valid(new_rect, 'right_expand'):
                         self.setRect(new_rect)
                         self.update_handles()
                         self.set_needs_save_annotation()
@@ -373,7 +373,7 @@ class AnnotationView(QGraphicsRectItem):
                     # 向上扩展：下边保持不动，向上扩展（y减小，高度增加）
                     new_rect = QRectF(rect.x(), rect.y() - float(resize_distance), rect.width(), rect.height() + float(resize_distance))
                     # 检查调整后的矩形是否在图像边界内
-                    if self._is_rect_within_image_bounds_for_resize(new_rect):
+                    if self._is_rect_move_or_resize_valid(new_rect, 'up_expand'):
                         self.setRect(new_rect)
                         self.update_handles()
                         self.set_needs_save_annotation()
@@ -387,7 +387,7 @@ class AnnotationView(QGraphicsRectItem):
                     # 向下扩展：上边保持不动，向下扩展（高度增加）
                     new_rect = QRectF(rect.x(), rect.y(), rect.width(), rect.height() + float(resize_distance))
                     # 检查调整后的矩形是否在图像边界内
-                    if self._is_rect_within_image_bounds_for_resize(new_rect):
+                    if self._is_rect_move_or_resize_valid(new_rect, 'down_expand'):
                         self.setRect(new_rect)
                         self.update_handles()
                         self.set_needs_save_annotation()
@@ -401,7 +401,7 @@ class AnnotationView(QGraphicsRectItem):
                 # 根据按键方向移动标注框
                 if event.key() == Qt.Key_Left:
                     moved_rect = rect.translated(-float(move_distance), 0)
-                    if self._is_rect_within_image_bounds(moved_rect):
+                    if self._is_rect_move_or_resize_valid(moved_rect, 'move_left'):
                         self.setRect(moved_rect)
                         self.update_handles()
                         self.set_needs_save_annotation()
@@ -413,7 +413,7 @@ class AnnotationView(QGraphicsRectItem):
                     return
                 elif event.key() == Qt.Key_Right:
                     moved_rect = rect.translated(float(move_distance), 0)
-                    if self._is_rect_within_image_bounds(moved_rect):
+                    if self._is_rect_move_or_resize_valid(moved_rect, 'move_right'):
                         self.setRect(moved_rect)
                         self.update_handles()
                         self.set_needs_save_annotation()
@@ -425,7 +425,7 @@ class AnnotationView(QGraphicsRectItem):
                     return
                 elif event.key() == Qt.Key_Up:
                     moved_rect = rect.translated(0, -float(move_distance))
-                    if self._is_rect_within_image_bounds(moved_rect):
+                    if self._is_rect_move_or_resize_valid(moved_rect, 'move_up'):
                         self.setRect(moved_rect)
                         self.update_handles()
                         self.set_needs_save_annotation()
@@ -437,7 +437,7 @@ class AnnotationView(QGraphicsRectItem):
                     return
                 elif event.key() == Qt.Key_Down:
                     moved_rect = rect.translated(0, float(move_distance))
-                    if self._is_rect_within_image_bounds(moved_rect):
+                    if self._is_rect_move_or_resize_valid(moved_rect, 'move_down'):
                         self.setRect(moved_rect)
                         self.update_handles()
                         self.set_needs_save_annotation()
@@ -451,49 +451,65 @@ class AnnotationView(QGraphicsRectItem):
         # 如果不是方向键或者未选中，调用父类方法处理
         super().keyPressEvent(event)
 
-    def _is_rect_within_image_bounds(self, rect: QRectF) -> bool:
-        """检查矩形是否在图像边界内"""
+    def _is_rect_move_or_resize_valid(self, new_rect: QRectF, operation_type: str) -> bool:
+        """检查移动或调整大小操作是否有效"""
         # 获取图像画布
         if not self.image_canvas or not self.image_canvas.image_item:
-            return True  # 如果无法获取图像信息，默认允许移动
+            return True  # 如果无法获取图像信息，默认允许操作
             
         # 获取图像边界
         image_rect = self.image_canvas.image_item.boundingRect()
         
         # 获取当前矩形在场景中的位置
         scene_pos = self.pos()
-        scene_left = scene_pos.x() + rect.x()
-        scene_top = scene_pos.y() + rect.y()
-        scene_right = scene_left + rect.width()
-        scene_bottom = scene_top + rect.height()
+        scene_left = scene_pos.x() + new_rect.x()
+        scene_top = scene_pos.y() + new_rect.y()
+        scene_right = scene_left + new_rect.width()
+        scene_bottom = scene_top + new_rect.height()
         
-        # 检查是否在图像边界内
-        return (scene_left >= 0 and 
-                scene_top >= 0 and 
-                scene_right <= image_rect.width() and 
-                scene_bottom <= image_rect.height())
-                
-    def _is_rect_within_image_bounds_for_resize(self, rect: QRectF) -> bool:
-        """检查调整大小后的矩形是否在图像边界内"""
-        # 获取图像画布
-        if not self.image_canvas or not self.image_canvas.image_item:
-            return True  # 如果无法获取图像信息，默认允许调整大小
-            
-        # 获取图像边界
-        image_rect = self.image_canvas.image_item.boundingRect()
-        
-        # 获取当前矩形在场景中的位置
-        scene_pos = self.pos()
-        scene_left = scene_pos.x() + rect.x()
-        scene_top = scene_pos.y() + rect.y()
-        scene_right = scene_left + rect.width()
-        scene_bottom = scene_top + rect.height()
-        
-        # 对于调整大小操作，我们只需要确保边界不会越出图像范围
-        return (scene_left >= 0 and 
-                scene_top >= 0 and 
-                scene_right <= image_rect.width() and 
-                scene_bottom <= image_rect.height())
+        # 根据不同的操作类型进行检查
+        if operation_type == 'move_left':
+            # 移动向左，只需检查左边界是否超出
+            return scene_left >= 0
+        elif operation_type == 'move_right':
+            # 移动向右，只需检查右边界是否超出
+            return scene_right <= image_rect.width()
+        elif operation_type == 'move_up':
+            # 移动向上，只需检查上边界是否超出
+            return scene_top >= 0
+        elif operation_type == 'move_down':
+            # 移动向下，只需检查下边界是否超出
+            return scene_bottom <= image_rect.height()
+        elif operation_type == 'left_expand':
+            # 向左扩展，检查左边界是否超出
+            return scene_left >= 0
+        elif operation_type == 'right_expand':
+            # 向右扩展，检查右边界是否超出
+            return scene_right <= image_rect.width()
+        elif operation_type == 'up_expand':
+            # 向上扩展，检查上边界是否超出
+            return scene_top >= 0
+        elif operation_type == 'down_expand':
+            # 向下扩展，检查下边界是否超出
+            return scene_bottom <= image_rect.height()
+        elif operation_type == 'left_shrink':
+            # 向左收缩（右边向左移动），总是允许
+            return True
+        elif operation_type == 'right_shrink':
+            # 向右收缩（左边向右移动），总是允许
+            return True
+        elif operation_type == 'top_shrink':
+            # 向上收缩（下边向上移动），总是允许
+            return True
+        elif operation_type == 'bottom_shrink':
+            # 向下收缩（上边向下移动），总是允许
+            return True
+        else:
+            # 默认检查：完全在边界内
+            return (scene_left >= 0 and 
+                    scene_top >= 0 and 
+                    scene_right <= image_rect.width() and 
+                    scene_bottom <= image_rect.height())
 
     def mouseMoveEvent(self, event):
         """鼠标移动事件处理"""
