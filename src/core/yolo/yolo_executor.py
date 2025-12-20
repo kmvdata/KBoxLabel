@@ -107,6 +107,13 @@ class YOLOExecutor:
                 kolo_item.kid = KoloItem.gen_kid()
                 kolo_item.image_name = image_name if image_name else ''
                 kolo_item.class_name = class_name
+                
+                # 确保坐标值在[0, 1]范围内
+                x_center = max(0.0, min(1.0, x_center))
+                y_center = max(0.0, min(1.0, y_center))
+                width = max(0.0, min(1.0, width))
+                height = max(0.0, min(1.0, height))
+                
                 kolo_item.x_center = f"{x_center:.9f}"
                 kolo_item.y_center = f"{y_center:.9f}"
                 kolo_item.width = f"{width:.9f}"

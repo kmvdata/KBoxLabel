@@ -208,10 +208,13 @@ class ProjectDomain(AbsSqliteDomain):
                 new_item.kid = KSnowflake().gen_kid()
                 new_item.image_name = item.image_name
                 new_item.class_name = item.class_name
-                new_item.x_center = item.x_center
-                new_item.y_center = item.y_center
-                new_item.width = item.width
-                new_item.height = item.height
+                
+                # 确保坐标值在[0, 1]范围内
+                new_item.x_center = self._clamp_coordinate_value(item.x_center)
+                new_item.y_center = self._clamp_coordinate_value(item.y_center)
+                new_item.width = self._clamp_coordinate_value(item.width)
+                new_item.height = self._clamp_coordinate_value(item.height)
+                
                 new_kolo_items.append(new_item)
 
             # 批量插入新对象
@@ -224,6 +227,25 @@ class ProjectDomain(AbsSqliteDomain):
             print(f"保存了 {len(kolo_items)} 个Kolo项目到数据库")
         except Exception as e:
             print(f"保存Kolo项目到数据库时出错: {str(e)}")
+
+    def _clamp_coordinate_value(self, value: str) -> str:
+        """
+        将坐标值限制在[0, 1]范围内
+        :param value: 坐标值字符串
+        :return: 限制后的坐标值字符串
+        """
+        try:
+            # 转换为浮点数
+            float_val = float(value)
+            
+            # 限制在[0, 1]范围内
+            clamped_val = max(0.0, min(1.0, float_val))
+            
+            # 返回格式化的字符串，保持原有的精度
+            return f"{clamped_val:.9f}"
+        except ValueError:
+            # 如果转换失败，返回默认值0
+            return "0.000000000"
 
     def load_image_names_from_kilo_item(self, page: int = 1, page_size: int = 1000) -> list[str]:
         """
@@ -376,3 +398,5 @@ class ProjectDomain(AbsSqliteDomain):
                     category_map[category.class_name] = parent_category
         print(f'category_map -> {category_map}')
         return category_map
+
+

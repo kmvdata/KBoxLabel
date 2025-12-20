@@ -607,6 +607,13 @@ class ImageCanvas(QGraphicsView):
 
                 # 从当前图片路径获取图片名称
                 image_name = self.current_image_path.name
+                
+                # 确保坐标值在[0, 1]范围内
+                x_center = max(0.0, min(1.0, x_center))
+                y_center = max(0.0, min(1.0, y_center))
+                norm_width = max(0.0, min(1.0, norm_width))
+                norm_height = max(0.0, min(1.0, norm_height))
+
                 kolo_item_list.append(KoloItem(
                     kid=KOrmBase.snowflake.gen_kid(),
                     image_name=image_name,
