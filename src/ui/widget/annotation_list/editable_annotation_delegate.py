@@ -1,8 +1,7 @@
 # annotation_list.py
 
 from PyQt5.QtCore import Qt, QRect
-from PyQt5.QtWidgets import QLineEdit, QWidget, QMessageBox, QProgressDialog
-from ultralytics import YOLO
+from PyQt5.QtWidgets import QLineEdit, QMessageBox, QProgressDialog
 
 from src.core.project_info import ProjectInfo
 from src.ui.widget.annotation_list.annotation_delegate import AnnotationDelegate

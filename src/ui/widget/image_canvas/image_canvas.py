@@ -1,5 +1,6 @@
 # image_canvas.py
 import sys
+import time
 from decimal import Decimal
 from pathlib import Path
 from typing import Optional
@@ -443,7 +444,8 @@ class ImageCanvas(QGraphicsView):
                 if isinstance(clicked_item, AnnotationView):
                     clicked_item.select_annotation_view()
                 elif clicked_item.parentItem() and isinstance(clicked_item.parentItem(), AnnotationView):
-                    clicked_item.parentItem().select_annotation_view()
+                    # clicked_item.parentItem().select_annotation_view()
+                    print("??????todo: 这里代码需要修复 image_canvas - mouseReleaseEvent")
 
         # 处理框选完成后的标注选择
         if self.rubberBandRect().isValid() and not self.drawing:
@@ -618,10 +620,10 @@ class ImageCanvas(QGraphicsView):
                     kid=KOrmBase.snowflake.gen_kid(),
                     image_name=image_name,
                     class_name=item.class_name,
-                    x_center=x_center,
-                    y_center=y_center,
-                    width=norm_width,
-                    height=norm_height
+                    x_center=str(x_center),
+                    y_center=str(y_center),
+                    width=str(norm_width),
+                    height=str(norm_height)
                 ))
 
             # 在事务中删除所有image_name的kolo_item, 然后插入新的kolo_item_list中的对象
@@ -635,7 +637,7 @@ class ImageCanvas(QGraphicsView):
 
             # 执行事务
             self.project_info.domain.execute_in_transaction(transaction_func)
-            print(f"保存标注文件成功")
+            print(f"保存标注文件成功 {time.time()}")
             return True
         except Exception as e:
             print(f"保存标注文件时出错: {e}")

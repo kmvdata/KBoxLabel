@@ -3,8 +3,6 @@
 from PyQt5.QtCore import Qt, QSize, QRect
 from PyQt5.QtGui import QPen, QColor, QPainter, QPixmap
 from PyQt5.QtWidgets import QStyledItemDelegate, QStyle
-from ultralytics import YOLO
-from ultralytics import YOLO
 
 from src.ui.widget.annotation_list.annotation_item import AnnotationItem
 

@@ -3,7 +3,6 @@ from enum import Enum
 from typing import Optional, List, Any
 
 from PyQt5.QtCore import Qt, QModelIndex, QAbstractListModel, QVariant
-from ultralytics import YOLO
 
 from src.common.domain import AnnotationCategory
 from src.core.project_info import ProjectInfo

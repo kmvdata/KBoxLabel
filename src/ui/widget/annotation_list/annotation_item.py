@@ -3,8 +3,6 @@ import hashlib
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QStandardItem, QColor
-from ultralytics import YOLO
-from ultralytics import YOLO
 
 from src.common.domain import AnnotationCategory
 
