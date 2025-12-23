@@ -90,7 +90,7 @@ class AnnotationListModel(QAbstractListModel):
         categories = self.domain.query_all_categories()
         # 根据categories内容创建AnnotationItem
         for category in categories:
-            item = AnnotationItem(category.class_name, category.class_id, category.parent_name)
+            item = AnnotationItem(category.class_name, category.class_id, category.parent_name, category.color_name)
             item.set_model(self)  # 设置模型引用
             self.items.append(item)
         self.endResetModel()
@@ -123,15 +123,7 @@ class AnnotationListModel(QAbstractListModel):
         return self.domain.count_kilo_items_for_category(category_name)
 
     def append_new_category(self, class_name: Optional[str] = None, class_id: Optional[int] = None) -> AnnotationItem:
-        """创建新的类别"""
-        # 调用create_new_category_at_index实现，需要获取列表最后的index作为参数传入
-        return self.create_new_category_at_index(self.index(len(self.items) - 1, 0), class_name, class_id)
-
-    def create_new_category_at_index(self,
-                                     index: QModelIndex,
-                                     class_name: Optional[str] = None,
-                                     class_id: Optional[int] = None) -> AnnotationItem:
-        """在指定索引位置创建新的类别"""
+        """在末尾添加新的类别"""
         # 如果已存在，则直接返回
         if class_name:
             exist_item = self.get_item_by_class_name(class_name)
@@ -157,12 +149,11 @@ class AnnotationListModel(QAbstractListModel):
         )
         new_item.set_model(self)  # 设置模型引用
 
-        # 插入AnnotationItem到模型指定位置
-        insert_row = index.row() + 1 if index.isValid() else 0
+        # 将新项目添加到列表的最后
+        insert_row = len(self.items)
         self.beginInsertRows(QModelIndex(), insert_row, insert_row)
-        self.items.insert(insert_row, new_item)
+        self.items.append(new_item)
         self.endInsertRows()
-
         self.save_categories()
         return new_item
 
@@ -340,7 +331,6 @@ class AnnotationListModel(QAbstractListModel):
             
         self.endInsertRows()
         self.save_categories()
-
 
     def save_categories(self):
         """保存类别列表到数据库"""

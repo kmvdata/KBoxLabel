@@ -9,17 +9,21 @@ from src.common.domain import AnnotationCategory
 
 class AnnotationItem(QStandardItem):
     """自定义项，存储带序号的标注类别数据"""
-    def __init__(self, class_name: str, class_id: int, parent_name: str = None):
+    def __init__(self, class_name: str, class_id: int, parent_name: str = None, color_name: str = None):
         super().__init__(class_name)
-        self.set_category(class_name, class_id, parent_name)
+        self.set_category(class_name, class_id, parent_name, color_name)
         # 保存指向模型的引用，以便获取准确的行号
         self._model = None
 
         # 默认没有order赋值，仅作为排序辅助值使用
         self.order = 0
 
-    def set_category(self, class_name: str, class_id: int, parent_name: str = None):
-        self.setData(self._generate_color_from_class_name(class_name), Qt.UserRole)
+    def set_category(self, class_name: str, class_id: int, parent_name: str = None, color_name: str = None):
+        if color_name is not None:
+            self.setData(QColor(color_name), Qt.UserRole)
+        else:
+            self.setData(self._generate_color_from_class_id(class_id), Qt.UserRole)
+
         self.setData(class_id, Qt.UserRole + 1)
         self.setData(class_name, Qt.UserRole + 2)  # 存储class_name
         self.setData(parent_name, Qt.UserRole + 3)  # 存储父class_name
@@ -93,14 +97,14 @@ class AnnotationItem(QStandardItem):
         return self.gen_sql_annotation_category(self.class_name, self.class_id, self.parent_name)
 
     @staticmethod
-    def _generate_color_from_class_id(class_id: int):
+    def _generate_color_from_class_id(class_id: int) -> QColor:
         """根据类别ID生成稳定颜色"""
         # 使用类别ID生成颜色，确保同一类别总是相同颜色
         hue = (class_id * 137) % 360  # 使用黄金角确保颜色分布均匀
         return QColor.fromHsv(hue, 180, 230)  # 高饱和度，中等亮度
 
     @staticmethod
-    def _generate_color_from_class_name(class_name: str):
+    def _generate_color_from_class_name(class_name: str) -> QColor:
         """根据类别名称生成稳定颜色（使用MD5后6位），避免接近白色"""
         # 1. 计算class_name的MD5哈希
         md5_hash = hashlib.md5(class_name.encode()).hexdigest()

@@ -650,23 +650,10 @@ class AnnotationList(QListView):
 
     def _handle_add_annotation(self):
         """处理新增标注操作"""
-        position: Optional[QModelIndex] = None
-        if self.right_click_index and self.right_click_index.isValid():
-            # 在右键点击位置添加新类别
-            position = self.right_click_index
-        """处理添加新类别，position为源模型中的位置索引，None表示添加到末尾"""
-        # 调用模型的方法创建新类别
-        if position is not None and position.isValid():
-            source_index = self.proxy_model.mapToSource(position)
-            new_category = self.source_model.create_new_category_at_index(source_index)
-            # 获取新添加项的索引
-            proxy_index = self.proxy_model.mapFromSource(self.source_model.index(source_index.row(), 0))
-        else:
-            # 添加到末尾
-            row_count = self.source_model.rowCount()
-            end_index = self.source_model.index(row_count, 0)
-            new_category = self.source_model.create_new_category_at_index(end_index)
-            proxy_index = self.proxy_model.mapFromSource(self.source_model.index(row_count, 0))
+        # 添加到末尾
+        row_count = self.source_model.rowCount()
+        new_category = self.source_model.append_new_category()
+        proxy_index = self.proxy_model.mapFromSource(self.source_model.index(row_count, 0))
 
         print(f"新类别添加成功: {new_category.class_name}")
 
