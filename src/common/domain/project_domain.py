@@ -327,6 +327,47 @@ class ProjectDomain(AbsSqliteDomain):
             print(f"删除类别 '{category_name}' 时出错: {str(e)}")
             raise
 
+    def recolor_category(self, class_name: str, new_color_name: str) -> bool:
+        """
+        重新设置指定类别的颜色
+        :param class_name: 类别名称
+        :param new_color_name: 新的颜色名称
+        :return: 如果成功更新返回True，否则返回False
+        """
+        if not class_name or not new_color_name:
+            print(f"类别名称或颜色名称不能为空: class_name='{class_name}', new_color_name='{new_color_name}'")
+            return False
+            
+        try:
+            with self.db_session() as session:
+                # 检查类别是否存在
+                existing_category = session.query(AnnotationCategory).filter(
+                    AnnotationCategory.class_name == class_name
+                ).first()
+                
+                if not existing_category:
+                    print(f"类别 '{class_name}' 不存在，无法重新设置颜色")
+                    return False
+                
+                # 更新annotation_category表中class_name为class_name的数据的color_name字段
+                updated_count = session.query(AnnotationCategory).filter(
+                    AnnotationCategory.class_name == class_name
+                ).update({
+                    AnnotationCategory.color_name: new_color_name
+                })
+
+                session.commit()  # 确保提交事务
+                
+                if updated_count > 0:
+                    print(f"已重新设置类别 '{class_name}' 的颜色为 '{new_color_name}'，更新了 {updated_count} 条记录")
+                    return True
+                else:
+                    print(f"类别 '{class_name}' 未被更新，可能已存在相同颜色")
+                    return False
+        except Exception as e:
+            print(f"重新设置类别 '{class_name}' 的颜色时出错: {str(e)}")
+            raise
+
     def get_max_category_id(self):
         """
         获取annotation_category表中最大的class_id值
