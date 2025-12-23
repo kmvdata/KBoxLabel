@@ -97,19 +97,31 @@ class YOLOTrainer:
         train_image_names = all_image_names[:split_index]
         val_image_names = all_image_names[split_index:]
         
+        # 记录训练集和验证集的初始图片数量
+        initial_info = f"数据集分割完成: 训练集包含 {len(train_image_names)} 张图片, 验证集包含 {len(val_image_names)} 张图片"
+        logging.info(initial_info)
+        if progress_callback:
+            progress_callback(initial_info, 25)  # 25% 表示数据分割完成
+        
         # 处理训练集
         if progress_callback:
             progress_callback("开始处理训练集数据...", 30)
-        self._process_image_set(train_image_names, source_dir, data_dir / "train", 
+        train_processed_count = self._process_image_set(train_image_names, source_dir, data_dir / "train", 
                                image_extensions, category_map, class_name_to_id, project_domain, 
                                progress_callback=progress_callback, set_name="训练集")
         
         # 处理验证集
         if progress_callback:
             progress_callback("开始处理验证集数据...", 60)
-        self._process_image_set(val_image_names, source_dir, data_dir / "val", 
+        val_processed_count = self._process_image_set(val_image_names, source_dir, data_dir / "val", 
                                image_extensions, category_map, class_name_to_id, project_domain,
                                progress_callback=progress_callback, set_name="验证集")
+        
+        # 记录训练集和验证集的导出统计信息
+        final_info = f"数据导出完成: 训练集导出 {train_processed_count} 张图片, 验证集导出 {val_processed_count} 张图片"
+        logging.info(final_info)
+        if progress_callback:
+            progress_callback(final_info, 95)  # 95% 表示导出完成
         
         # 生成README.md文件
         self._generate_readmes(data_dir)
@@ -130,12 +142,17 @@ class YOLOTrainer:
             project_domain: 项目数据库域对象
             progress_callback: 进度回调函数，用于报告处理进度
             set_name: 数据集名称（训练集或验证集）
+        
+        Returns:
+            int: 成功处理并导出的图片数量
         """
         # 确保目标目录存在
         (target_dir / "images").mkdir(parents=True, exist_ok=True)
         (target_dir / "labels").mkdir(parents=True, exist_ok=True)
         
         total_images = len(image_names)
+        processed_count = 0  # 记录成功处理的图片数量
+        
         for idx, image_name in enumerate(image_names, 1):
             # 报告进度
             if progress_callback:
@@ -194,8 +211,18 @@ class YOLOTrainer:
                 # 复制图片文件
                 import shutil
                 shutil.copy2(image_file, target_dir / "images" / image_file.name)
+                processed_count += 1  # 增加成功处理计数
             else:
                 logging.info(f"图片 {image_name} 没有有效的标签，跳过")
+        
+        set_complete_info = f"{set_name}处理完成: 成功导出 {processed_count}/{total_images} 张图片"
+        logging.info(set_complete_info)
+        
+        # 如果有进度回调函数，也发送此信息
+        if progress_callback:
+            progress_callback(set_complete_info, 0)  # 使用当前进度值，不改变进度条数值
+        
+        return processed_count
 
     @staticmethod
     def _build_class_hierarchy_mapping(categories) -> Dict[str, str]:

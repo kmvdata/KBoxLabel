@@ -300,7 +300,10 @@ class TrainYoloDialog(QDialog):
             def progress_callback(message, percentage):
                 self.progress_bar.setValue(percentage)
                 self.progress_bar.setFormat(message)
-                self.log_text_edit.append(message)
+                # 只有当消息不是进度更新（如'正在处理训练集图片 1/10: image.jpg'）时才添加到日志
+                # 避免过多的进度信息刷屏，只显示关键信息
+                if not message.startswith("正在处理") or "数据集分割完成" in message or "数据导出完成" in message or "处理完成:" in message:
+                    self.log_text_edit.append(message)
                 # 处理事件队列，确保UI更新
                 from PyQt5.QtWidgets import QApplication
                 QApplication.processEvents()
