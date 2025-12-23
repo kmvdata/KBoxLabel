@@ -21,6 +21,7 @@ class AnnotationItem(QStandardItem):
     def set_category(self, class_name: str, class_id: int, parent_name: str = None, color_name: str = None):
         if color_name is not None:
             self.setData(QColor(color_name), Qt.UserRole)
+            self.setData(color_name, Qt.UserRole + 5)  # 存储color_name
         else:
             self.setData(self._generate_color_from_class_id(class_id), Qt.UserRole)
 
@@ -28,7 +29,6 @@ class AnnotationItem(QStandardItem):
         self.setData(class_name, Qt.UserRole + 2)  # 存储class_name
         self.setData(parent_name, Qt.UserRole + 3)  # 存储父class_name
         self.setEditable(True)
-
 
     @property
     def class_id(self) -> int:
@@ -65,6 +65,10 @@ class AnnotationItem(QStandardItem):
     @property
     def class_color(self) -> QColor:
         return self.data(Qt.UserRole)
+
+    @property
+    def color_name(self) -> str:
+        return self.data(Qt.UserRole + 5)
 
     def set_model(self, model):
         """设置模型引用"""

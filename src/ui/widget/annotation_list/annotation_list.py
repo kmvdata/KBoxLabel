@@ -9,7 +9,7 @@ from PyQt5.QtCore import Qt, QSize, QItemSelectionModel, QMimeData, \
     QSortFilterProxyModel, QPoint, QModelIndex
 from PyQt5.QtGui import QPen, QDrag, QColor, QPainter
 from PyQt5.QtWidgets import QLineEdit, QListView, QAbstractItemView, \
-    QToolBar, QWidget, QHBoxLayout, QMenu, QAction, QMessageBox
+    QToolBar, QWidget, QHBoxLayout, QMenu, QAction, QMessageBox, QColorDialog
 from ultralytics import YOLO
 
 from src.core.project_info import ProjectInfo
@@ -38,6 +38,9 @@ class AnnotationList(QListView):
         self.drop_indicator_pos = QPoint()  # 拖拽指示器位置
         self.is_dragging_child_to_gap = False  # 是否是子项拖拽到间隙
         self.drag_hover_index = None  # 拖拽悬停索引
+        
+        # 添加对image_canvas的引用
+        self.image_canvas = None
 
         # 设置最小宽度，确保能显示所有区域
         self.setMinimumWidth(self.calculate_min_width())
@@ -635,6 +638,13 @@ class AnnotationList(QListView):
         menu.addAction(add_action)
         menu.addSeparator()
         menu.addAction(rename_action)
+        
+        # 添加修改颜色菜单项
+        color_action = QAction("修改颜色", self)
+        color_action.triggered.connect(self._handle_set_color)  # type:ignore
+        color_action.setEnabled(index.isValid())  # 只有选中项时可用
+        menu.addAction(color_action)
+        
         menu.addAction(delete_action)
         
         # 添加分隔线
@@ -674,6 +684,52 @@ class AnnotationList(QListView):
         # 创建并显示统计对话框
         dialog = StatisticsDialog(self.project_info, self)
         dialog.exec_()
+
+    def _handle_set_color(self):
+        """处理修改颜色操作"""
+        if not (self.right_click_index and self.right_click_index.isValid()):
+            return
+
+        # 获取当前选中的类别信息
+        source_index = self.proxy_model.mapToSource(self.right_click_index)
+        annotation_item = self.source_model.item_from_index(source_index)
+        
+        if not annotation_item:
+            return
+            
+        # 获取当前颜色作为初始颜色
+        current_color = annotation_item.class_color
+        
+        # 显示颜色选择对话框
+        color = QColorDialog.getColor(current_color, self, "选择类别颜色")
+        
+        if color.isValid():  # 如果用户选择了颜色并确认
+            try:
+                # 获取类别名称
+                class_name = annotation_item.class_name
+                color_name = color.name()  # 获取颜色的十六进制表示
+                
+                # 调用domain的recolor_category方法更新数据库
+                success = self.project_info.domain.recolor_category(class_name, color_name)
+                
+                if success:
+                    # 更新模型中的颜色
+                    annotation_item.setData(color, Qt.UserRole)
+                    # 同时更新color_name字段
+                    annotation_item.setData(color_name, Qt.UserRole + 5)
+
+                    # 刷新视图
+                    self.source_model.dataChanged.emit(source_index, source_index, [Qt.UserRole])
+
+                    # 通知image canvas更新所有对应类别的annotation view颜色
+                    if self.image_canvas:
+                        self.image_canvas.update_annotation_colors(class_name, color)
+
+                    print(f"类别 '{class_name}' 的颜色已更新为 {color_name}")
+                else:
+                    QMessageBox.warning(self, "修改颜色失败", f"无法更新类别 '{class_name}' 的颜色")
+            except Exception as e:
+                QMessageBox.critical(self, "错误", f"修修改颜色时出错: {str(e)}")
 
     def load_categories_from_yolo_model(self, model_path):
         """

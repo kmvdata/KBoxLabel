@@ -769,9 +769,10 @@ class AnnotationView(QGraphicsRectItem):
             # 创建AnnotationCategory对象
             class_name :str = category_data['class_name']
             class_id: int = int(category_data['class_id'])
+            color_name: str = category_data.get('color', None)  # 从拖拽数据中获取颜色信息
 
             # 调用处理方法
-            self.handle_dropped_annotation(AnnotationItem(class_name, class_id))
+            self.handle_dropped_annotation(AnnotationItem(class_name, class_id, color_name=color_name))
             event.acceptProposedAction()
         else:
             event.ignore()

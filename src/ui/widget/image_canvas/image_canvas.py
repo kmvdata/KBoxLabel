@@ -36,6 +36,8 @@ class ImageCanvas(QGraphicsView):
         # 初始化annotation list
         self.annotation_list = AnnotationList(self.project_info)
         self.annotation_list.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
+        # 设置annotation_list对image_canvas的引用
+        self.annotation_list.image_canvas = self
 
         # 按钮引用
         self.delete_toolbar_action = None
@@ -1264,3 +1266,14 @@ class ImageCanvas(QGraphicsView):
         adjusted_rect = QRectF(x, y, width, height)
         annotation_view.setRect(adjusted_rect)
         annotation_view.update_handles()
+
+    def update_annotation_colors(self, class_name: str, new_color: QColor):
+        """更新指定类名的所有annotation view的颜色"""
+        # 遍历场景中的所有项
+        for item in self.scene.items():
+            if isinstance(item, AnnotationView) and item.class_name == class_name:
+                # 更新annotation item的颜色
+                item.current_color = new_color
+                item.opposite_color = item.get_opposite_color(new_color)
+                # 强制重绘
+                item.update()
