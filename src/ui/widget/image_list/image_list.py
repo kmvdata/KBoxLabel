@@ -8,7 +8,7 @@ from PyQt5.QtCore import (Qt, QSize, QThreadPool, pyqtSignal,
 from PyQt5.QtGui import (QPixmap, QIcon, QPainter, QTextCursor)
 from PyQt5.QtWidgets import (QListView, QStyledItemDelegate, QStyle,
                              QMenu, QInputDialog, QMessageBox, QDialog, QVBoxLayout,
-                             QLabel, QPushButton, QProgressBar, QApplication, QTextEdit, QSpinBox)
+                             QLabel, QPushButton, QProgressBar, QApplication, QTextEdit, QSpinBox, QHBoxLayout)
 
 from src.core.project_info import ProjectInfo
 from src.ui.widget.image_list.thumbnail_loader import ThumbnailLoader
@@ -838,22 +838,27 @@ class BatchRecognitionDialog(QDialog):
         layout = QVBoxLayout()
         
         # 范围选择控件
-        self.start_label = QLabel("起始图片:")
+        range_layout = QHBoxLayout()  # 使用水平布局
+        
+        self.start_label = QLabel("从")
         self.start_spinbox = QSpinBox()
         self.start_spinbox.setRange(1, total_count)
         self.start_spinbox.setValue(default_start)
+        # 设置提示后缀，显示最大值
+        self.start_spinbox.setSuffix(f"/{total_count}")
         
-        self.end_label = QLabel("结束图片:")
+        self.end_label = QLabel("到")
         self.end_spinbox = QSpinBox()
         self.end_spinbox.setRange(1, total_count)
         self.end_spinbox.setValue(default_end)
+        # 设置提示后缀，显示最大值
+        self.end_spinbox.setSuffix(f"/{total_count}")
         
-        # 连接信号以验证范围
-        self.start_spinbox.valueChanged.connect(self.validate_range)
-        self.end_spinbox.valueChanged.connect(self.validate_range)
+        # 连接信号以验证范围和范围修正
+        self.start_spinbox.valueChanged.connect(self.validate_and_fix_range)
+        self.end_spinbox.valueChanged.connect(self.validate_and_fix_range)
         
-        # 添加范围选择控件到布局
-        range_layout = QVBoxLayout()
+        # 添加范围选择控件到水平布局
         range_layout.addWidget(self.start_label)
         range_layout.addWidget(self.start_spinbox)
         range_layout.addWidget(self.end_label)
@@ -900,14 +905,36 @@ class BatchRecognitionDialog(QDialog):
         self.error_count = 0
         self.errors = []
         
-    def validate_range(self):
-        """验证范围，确保起始值不大于结束值"""
+    def validate_and_fix_range(self):
+        """验证范围并自动修正超出范围的值，确保起始值不大于结束值"""
         start_val = self.start_spinbox.value()
         end_val = self.end_spinbox.value()
+        min_val = 1
+        max_val = self.total_count
         
+        # 检查并修正起始值
+        if start_val < min_val:
+            self.start_spinbox.setValue(min_val)
+            start_val = min_val
+        elif start_val > max_val:
+            self.start_spinbox.setValue(max_val)
+            start_val = max_val
+            
+        # 检查并修正结束值
+        if end_val < min_val:
+            self.end_spinbox.setValue(min_val)
+            end_val = min_val
+        elif end_val > max_val:
+            self.end_spinbox.setValue(max_val)
+            end_val = max_val
+            
+        # 确保起始值不大于结束值
         if start_val > end_val:
             # 如果起始值大于结束值，将结束值设为起始值
             self.end_spinbox.setValue(start_val)
+        elif end_val < start_val:
+            # 如果结束值小于起始值，将起始值设为结束值
+            self.start_spinbox.setValue(end_val)
     
     def on_start_clicked(self):
         """开始识别按钮点击事件"""

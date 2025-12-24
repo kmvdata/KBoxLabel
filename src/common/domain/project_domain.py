@@ -67,18 +67,22 @@ class ProjectDomain(AbsSqliteDomain):
         finally:
             session.close()
             
-    def rename_image_for_kolo_item(self, old_img_name: str, new_img_name: str):
+    def rename_image_for_kolo_item(self, old_img_name: Path, new_img_name: Path):
         """
         在数据库中，把kolo_item表中image_name=old_img_name的项目，全部改成image_name=new_img_name
-        :param old_img_name: 旧图片名称
-        :param new_img_name: 新图片名称
+        :param old_img_name: 旧图片路径
+        :param new_img_name: 新图片路径
         """
+        # 获取文件名部分（不包含路径）
+        old_filename = old_img_name.name
+        new_filename = new_img_name.name
+        
         # 获取数据库会话
         session = self.db_session()
         try:
             # 更新kolo_item表中所有image_name等于old_img_name的记录为new_img_name
-            session.query(KoloItem).filter(KoloItem.image_name == old_img_name).update(
-                {KoloItem.image_name: new_img_name}
+            session.query(KoloItem).filter(KoloItem.image_name == old_filename).update(
+                {KoloItem.image_name: new_filename}
             )
             # 提交事务
             session.commit()
@@ -439,5 +443,7 @@ class ProjectDomain(AbsSqliteDomain):
                     category_map[category.class_name] = parent_category
         print(f'category_map -> {category_map}')
         return category_map
+
+
 
 
