@@ -5,10 +5,10 @@ from pathlib import Path
 
 from PyQt5.QtCore import (Qt, QSize, QThreadPool, pyqtSignal,
                           QAbstractListModel, QModelIndex, QItemSelection, QItemSelectionModel)
-from PyQt5.QtGui import (QPixmap, QIcon, QPainter)
+from PyQt5.QtGui import (QPixmap, QIcon, QPainter, QTextCursor)
 from PyQt5.QtWidgets import (QListView, QStyledItemDelegate, QStyle,
                              QMenu, QInputDialog, QMessageBox, QDialog, QVBoxLayout,
-                             QLabel, QPushButton, QProgressBar, QApplication)
+                             QLabel, QPushButton, QProgressBar, QApplication, QTextEdit, QSpinBox)
 
 from src.core.project_info import ProjectInfo
 from src.ui.widget.image_list.thumbnail_loader import ThumbnailLoader
@@ -296,9 +296,9 @@ class ImageListView(QListView):
         else:  # Windows, Linux
             open_action = menu.addAction("在文件夹中打开")
 
-        # 添加新增的Run和Run All菜单项
+        # 添加新增的Run和识别多图菜单项
         run_action = menu.addAction("Run")
-        run_all_action = menu.addAction("Run All")
+        batch_recognition_action = menu.addAction("识别多图")
         
         # 添加新的菜单项
         jump_to_action = menu.addAction("跳转至...")
@@ -307,7 +307,7 @@ class ImageListView(QListView):
         # 检查模型是否已加载，控制Run相关菜单项的可用性
         model_loaded = self.project_info.is_model_loaded
         run_action.setEnabled(is_item_clicked and model_loaded)
-        run_all_action.setEnabled(model_loaded)
+        batch_recognition_action.setEnabled(model_loaded)
 
         # 根据点击位置设置其他菜单项可用性
         rename_action.setEnabled(is_item_clicked)
@@ -323,7 +323,7 @@ class ImageListView(QListView):
         delete_action.triggered.connect(lambda: self.delete_selected())  # type: ignore
         open_action.triggered.connect(lambda: self.open_in_explorer(index))  # type: ignore
         run_action.triggered.connect(lambda: self.on_run_clicked(index))  # type: ignore
-        run_all_action.triggered.connect(self.on_run_all_clicked)  # type: ignore
+        batch_recognition_action.triggered.connect(lambda: self.on_batch_recognition_clicked(index))  # type: ignore
         
         # 连接新菜单项的信号
         jump_to_action.triggered.connect(self.on_jump_to_clicked)  # type: ignore
@@ -781,8 +781,8 @@ class ImageListView(QListView):
             msg = f"处理被用户取消\n\n已处理: {processed_count}\n成功: {success_count}\n错误: {error_count}"
             QMessageBox.information(self, "处理结果", msg)
 
-    def on_run_all_clicked(self):
-        """处理项目中的所有文件，使用YOLO模型对所有文件进行批量处理"""
+    def on_batch_recognition_clicked(self, index):
+        """处理指定范围内的图片，使用YOLO模型进行批量处理"""
         # 检查模型是否已加载
         if not self.project_info.is_model_loaded:
             QMessageBox.warning(self, "警告", "模型未加载，请先加载YOLO模型。")
@@ -793,9 +793,273 @@ class ImageListView(QListView):
             QMessageBox.information(self, "提示", "没有可处理的文件。")
             return
 
-        # 清除当前选择并选中所有文件索引
-        self.selectAll()
+        # 获取当前点击的索引（如果有效）
+        current_index = 0
+        if index.isValid():
+            current_index = index.row()
         
-        # 直接调用on_run_clicked处理所有选中文件
-        # 创建一个无效的QModelIndex作为参数
-        self.on_run_clicked(QModelIndex())
+        # 创建批量识别对话框
+        dialog = BatchRecognitionDialog(self.model.rowCount(), current_index, self)
+        
+        # 显示对话框并等待结果
+        result = dialog.exec_()
+        
+        # 如果用户完成操作，发送canvas刷新信号
+        if result == QDialog.Accepted:
+            self.sig_canvas_needs_reload.emit()
+
+
+# ====================== 批量识别对话框 ======================
+class BatchRecognitionDialog(QDialog):
+    def __init__(self, total_count, current_index, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("识别多图")
+        self.setModal(True)
+        self.resize(500, 400)
+        
+        self.total_count = total_count
+        self.current_index = current_index
+        
+        # 计算默认范围
+        default_start = current_index + 1  # 当前图片索引+1（从1开始）
+        default_end = min(current_index + 101, total_count)  # 当前+100或到总数（取较小值）
+        
+        layout = QVBoxLayout()
+        
+        # 范围选择控件
+        self.start_label = QLabel("起始图片:")
+        self.start_spinbox = QSpinBox()
+        self.start_spinbox.setRange(1, total_count)
+        self.start_spinbox.setValue(default_start)
+        
+        self.end_label = QLabel("结束图片:")
+        self.end_spinbox = QSpinBox()
+        self.end_spinbox.setRange(1, total_count)
+        self.end_spinbox.setValue(default_end)
+        
+        # 连接信号以验证范围
+        self.start_spinbox.valueChanged.connect(self.validate_range)
+        self.end_spinbox.valueChanged.connect(self.validate_range)
+        
+        # 添加范围选择控件到布局
+        range_layout = QVBoxLayout()
+        range_layout.addWidget(self.start_label)
+        range_layout.addWidget(self.start_spinbox)
+        range_layout.addWidget(self.end_label)
+        range_layout.addWidget(self.end_spinbox)
+        
+        layout.addLayout(range_layout)
+        
+        # 按钮区域
+        button_layout = QVBoxLayout()
+        self.start_button = QPushButton("开始识别")
+        self.cancel_button = QPushButton("取消")
+        
+        self.start_button.clicked.connect(self.on_start_clicked)
+        self.cancel_button.clicked.connect(self.reject)
+        
+        button_layout.addWidget(self.start_button)
+        button_layout.addWidget(self.cancel_button)
+        
+        # 进度相关控件（初始隐藏）
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setVisible(False)
+        self.progress_label = QLabel("")
+        self.progress_label.setVisible(False)
+        self.progress_label.setAlignment(Qt.AlignRight)
+        
+        # 日志显示区域（使用QTextEdit提供滚动功能）
+        self.log_text = QTextEdit()
+        self.log_text.setVisible(False)
+        self.log_text.setReadOnly(True)
+        
+        # 将控件添加到布局
+        layout.addWidget(self.progress_bar)
+        layout.addWidget(self.progress_label)
+        layout.addWidget(self.log_text)
+        layout.addLayout(button_layout)
+        
+        self.setLayout(layout)
+        
+        # 处理状态变量
+        self.processing = False
+        self.canceled = False
+        self.processed_count = 0
+        self.success_count = 0
+        self.error_count = 0
+        self.errors = []
+        
+    def validate_range(self):
+        """验证范围，确保起始值不大于结束值"""
+        start_val = self.start_spinbox.value()
+        end_val = self.end_spinbox.value()
+        
+        if start_val > end_val:
+            # 如果起始值大于结束值，将结束值设为起始值
+            self.end_spinbox.setValue(start_val)
+    
+    def on_start_clicked(self):
+        """开始识别按钮点击事件"""
+        start_index = self.start_spinbox.value() - 1  # 转换为0基索引
+        end_index = self.end_spinbox.value() - 1      # 转换为0基索引
+        
+        if start_index > end_index:
+            QMessageBox.warning(self, "警告", "起始图片索引不能大于结束图片索引！")
+            return
+            
+        # 更新UI状态
+        self.processing = True
+        self.start_button.setEnabled(False)
+        self.start_button.setText("处理中...")
+        self.progress_bar.setVisible(True)
+        self.progress_label.setVisible(True)
+        self.log_text.setVisible(True)
+        self.cancel_button.setText("取消")
+        
+        # 设置进度条范围
+        self.progress_bar.setRange(0, end_index - start_index + 1)
+        self.progress_bar.setValue(0)
+        
+        # 更新进度标签
+        self.progress_label.setText("0/0")
+        
+        # 开始处理图片
+        self.process_images(start_index, end_index)
+    
+    def process_images(self, start_index, end_index):
+        """处理指定范围内的图片"""
+        total_count = end_index - start_index + 1
+        self.processed_count = 0
+        self.success_count = 0
+        self.error_count = 0
+        self.errors = []
+        
+        # 更新进度
+        self.progress_bar.setMaximum(total_count)
+        self.progress_label.setText(f"0/{total_count}")
+        
+        # 获取父窗口（ImageListView）来访问模型数据
+        parent_widget = self.parent()
+        if not parent_widget or not hasattr(parent_widget, 'model'):
+            return
+            
+        # 选中指定范围内的所有图片
+        parent_widget.clearSelection()
+        for i in range(start_index, end_index + 1):
+            index = parent_widget.model.index(i, 0)
+            parent_widget.selectionModel().select(
+                index, 
+                QItemSelectionModel.SelectionFlag.Select
+            )
+        
+        # 逐个处理图片
+        for i in range(start_index, end_index + 1):
+            if self.canceled:
+                self.log_text.append("用户取消操作")
+                break
+                
+            # 获取文件路径
+            file_path = parent_widget.model.data(parent_widget.model.index(i, 0), Qt.UserRole)
+            if not file_path:
+                continue
+                
+            # 更新日志显示当前处理的文件
+            self.log_text.append(f"正在处理: {os.path.basename(file_path)}")
+            # 滚动到底部
+            self.log_text.moveCursor(QTextCursor.End)
+            QApplication.processEvents()  # 保持UI响应
+            
+            # 更新进度
+            self.processed_count += 1
+            self.progress_bar.setValue(self.processed_count)
+            self.progress_label.setText(f"{self.processed_count}/{total_count}")
+            
+            # 使用YoloWorker处理图片
+            worker = YoloWorker(file_path, parent_widget.project_info)
+            
+            # 标记是否已完成处理
+            worker_finished = False
+            worker_error = False
+            worker_result_msg = ""
+            
+            # 连接信号
+            def on_worker_finished(success, msg, path):
+                nonlocal worker_finished, worker_error, worker_result_msg
+                worker_finished = True
+                if success:
+                    self.success_count += 1
+                    worker_result_msg = msg
+                    self.log_text.append(f"成功: {os.path.basename(path)} - {msg}")
+                else:
+                    self.error_count += 1
+                    worker_result_msg = msg
+                    error_msg = f"{os.path.basename(path)}: {msg}"
+                    self.errors.append(error_msg)
+                    self.log_text.append(f"失败: {error_msg}")
+                
+                # 滚动到底部
+                self.log_text.moveCursor(QTextCursor.End)
+            
+            def on_worker_error(error_msg, path):
+                nonlocal worker_finished, worker_error, worker_result_msg
+                worker_finished = True
+                worker_error = True
+                self.error_count += 1
+                worker_result_msg = error_msg
+                error_msg = f"{os.path.basename(path)}: {error_msg}"
+                self.errors.append(error_msg)
+                self.log_text.append(f"失败: {error_msg}")
+                
+                # 滚动到底部
+                self.log_text.moveCursor(QTextCursor.End)
+            
+            worker.finished.connect(on_worker_finished)
+            worker.error.connect(on_worker_error)
+            
+            # 启动工作线程
+            worker.start()
+            
+            # 等待当前工作线程完成
+            while not worker_finished and not self.canceled:
+                QApplication.processEvents()
+        
+        # 处理完成后的操作
+        self.on_processing_complete()
+    
+    def on_processing_complete(self):
+        """处理完成后更新UI"""
+        self.processing = False
+        
+        # 更新进度条到完成状态
+        self.progress_bar.setValue(self.progress_bar.maximum())
+        
+        # 更新按钮状态
+        self.start_button.setEnabled(True)
+        self.start_button.setText("完成")
+        self.cancel_button.setEnabled(False)
+        
+        # 更新日志显示最终结果
+        status_msg = f"\n\n处理完成"
+        if not self.canceled:
+            status_msg += f"\n总数: {self.processed_count}\n成功: {self.success_count}\n错误: {self.error_count}"
+        else:
+            status_msg += f"\n用户取消操作\n已处理: {self.processed_count}\n成功: {self.success_count}\n错误: {self.error_count}"
+        
+        if self.errors:
+            status_msg += "\n\n错误详情:\n" + "\n".join(self.errors[:5])  # 只显示前5个错误
+            if len(self.errors) > 5:
+                status_msg += f"\n... 还有 {len(self.errors) - 5} 个错误"
+        
+        self.log_text.append(status_msg)
+        # 滚动到底部
+        self.log_text.moveCursor(QTextCursor.End)
+        
+        # 重新连接开始按钮事件为关闭对话框
+        self.start_button.clicked.disconnect()
+        self.start_button.clicked.connect(self.accept)
+        
+        # 发送canvas刷新信号
+        parent_widget = self.parent()
+        if parent_widget and hasattr(parent_widget, 'sig_canvas_needs_reload'):
+            parent_widget.sig_canvas_needs_reload.emit()
+
