@@ -822,6 +822,8 @@ class ImageListView(QListView):
 
 # ====================== 批量识别对话框 ======================
 class BatchRecognitionDialog(QDialog):
+    DEFAULT_RANGE = 10  # 默认识别范围，可以方便地在代码中修改
+    
     def __init__(self, total_count, current_index, parent=None):
         super().__init__(parent)
         self.setWindowTitle("识别多图")
@@ -833,7 +835,7 @@ class BatchRecognitionDialog(QDialog):
         
         # 计算默认范围
         default_start = current_index + 1  # 当前图片索引+1（从1开始）
-        default_end = min(current_index + 101, total_count)  # 当前+100或到总数（取较小值）
+        default_end = min(current_index + self.DEFAULT_RANGE, total_count)  # 当前+DEFAULT_RANGE或到总数（取较小值）
         
         layout = QVBoxLayout()
         
@@ -880,16 +882,16 @@ class BatchRecognitionDialog(QDialog):
         button_layout.addWidget(self.start_button)
         button_layout.addWidget(self.cancel_button)
         
-        # 进度相关控件（初始隐藏）
+        # 进度相关控件（初始显示）
         self.progress_bar = QProgressBar()
-        self.progress_bar.setVisible(False)
+        self.progress_bar.setVisible(True)
         self.progress_label = QLabel("")
-        self.progress_label.setVisible(False)
+        self.progress_label.setVisible(True)
         self.progress_label.setAlignment(Qt.AlignRight)
         
         # 日志显示区域（使用QTextEdit提供滚动功能）
         self.log_text = QTextEdit()
-        self.log_text.setVisible(False)
+        self.log_text.setVisible(True)
         self.log_text.setReadOnly(True)
         
         # 将控件添加到布局
@@ -1088,6 +1090,10 @@ class BatchRecognitionDialog(QDialog):
         self.start_button.setEnabled(True)
         self.start_button.setText("完成")
         self.cancel_button.setEnabled(False)
+        
+        # 识别完成后，禁用输入框，防止用户修改
+        self.start_spinbox.setEnabled(False)
+        self.end_spinbox.setEnabled(False)
         
         # 更新日志显示最终结果
         status_msg = f"\n\n处理完成"
