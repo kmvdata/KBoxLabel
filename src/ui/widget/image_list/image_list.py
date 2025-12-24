@@ -844,15 +844,13 @@ class BatchRecognitionDialog(QDialog):
         self.start_spinbox = QSpinBox()
         self.start_spinbox.setRange(1, total_count)
         self.start_spinbox.setValue(default_start)
-        # 设置提示后缀，显示最大值
-        self.start_spinbox.setSuffix(f"/{total_count}")
+        # 移除后缀，改为在下方显示范围
         
         self.end_label = QLabel("到")
         self.end_spinbox = QSpinBox()
         self.end_spinbox.setRange(1, total_count)
         self.end_spinbox.setValue(default_end)
-        # 设置提示后缀，显示最大值
-        self.end_spinbox.setSuffix(f"/{total_count}")
+        # 移除后缀，改为在下方显示范围
         
         # 连接信号以验证范围和范围修正
         self.start_spinbox.valueChanged.connect(self.validate_and_fix_range)
@@ -865,6 +863,11 @@ class BatchRecognitionDialog(QDialog):
         range_layout.addWidget(self.end_spinbox)
         
         layout.addLayout(range_layout)
+        
+        # 添加范围提示标签
+        self.range_label = QLabel(f"取值范围: 1-{total_count}，结束值范围: {default_start}-{total_count}")
+        self.range_label.setStyleSheet("color: gray; font-size: 12px;")
+        layout.addWidget(self.range_label)
         
         # 按钮区域
         button_layout = QVBoxLayout()
@@ -920,21 +923,27 @@ class BatchRecognitionDialog(QDialog):
             self.start_spinbox.setValue(max_val)
             start_val = max_val
             
+        # 更新结束值的范围限制 - 结束值的最小值应为起始值
+        self.end_spinbox.setMinimum(start_val)
+        
         # 检查并修正结束值
-        if end_val < min_val:
-            self.end_spinbox.setValue(min_val)
-            end_val = min_val
+        if end_val < start_val:
+            self.end_spinbox.setValue(start_val)
+            end_val = start_val
         elif end_val > max_val:
             self.end_spinbox.setValue(max_val)
             end_val = max_val
             
-        # 确保起始值不大于结束值
+        # 确保起始值不大于结束值（虽然上面已处理，但再次确认）
         if start_val > end_val:
             # 如果起始值大于结束值，将结束值设为起始值
             self.end_spinbox.setValue(start_val)
         elif end_val < start_val:
             # 如果结束值小于起始值，将起始值设为结束值
             self.start_spinbox.setValue(end_val)
+        
+        # 更新范围提示标签
+        self.range_label.setText(f"取值范围: 1-{self.total_count}，结束值范围: {start_val}-{self.total_count}")
     
     def on_start_clicked(self):
         """开始识别按钮点击事件"""
@@ -953,6 +962,10 @@ class BatchRecognitionDialog(QDialog):
         self.progress_label.setVisible(True)
         self.log_text.setVisible(True)
         self.cancel_button.setText("取消")
+        
+        # 禁用数字输入框，防止用户修改
+        self.start_spinbox.setEnabled(False)
+        self.end_spinbox.setEnabled(False)
         
         # 设置进度条范围
         self.progress_bar.setRange(0, end_index - start_index + 1)
