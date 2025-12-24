@@ -286,38 +286,49 @@ class ImageListView(QListView):
 
         # 创建右键菜单
         menu = QMenu(self)
-        # 添加原有菜单项
-        rename_action = menu.addAction("重命名")
-        delete_action = menu.addAction("删除")
-
-        # 添加打开文件夹选项（根据操作系统）
+        
+        # 第一部分：文件操作
         if sys.platform == 'darwin':  # macOS
             open_action = menu.addAction("在Finder中打开")
         else:  # Windows, Linux
             open_action = menu.addAction("在文件夹中打开")
-
-        # 添加新增的Run和识别多图菜单项
-        run_action = menu.addAction("Run")
+        rename_action = menu.addAction("重命名")
+        delete_action = menu.addAction("删除")
+        
+        # 第一部分菜单项可用性设置
+        open_action.setEnabled(is_item_clicked)
+        rename_action.setEnabled(is_item_clicked)
+        delete_action.setEnabled(is_item_clicked)
+        
+        # 添加分隔线
+        menu.addSeparator()
+        
+        # 第二部分：YOLO识别相关
+        # 添加一个灰色的标签项，显示当前块的含义
+        yolo_label_action = menu.addAction("Yolo识别")
+        yolo_label_action.setEnabled(False)  # 灰色显示，不可点击
+        
+        # 识别单个图片
+        run_action = menu.addAction("识别")
+        # 识别多图
         batch_recognition_action = menu.addAction("识别多图")
         
-        # 添加新的菜单项
-        jump_to_action = menu.addAction("跳转至...")
-        smart_jump_action = menu.addAction("跳转到最后标注")
-
-        # 检查模型是否已加载，控制Run相关菜单项的可用性
+        # 第二部分菜单项可用性设置
         model_loaded = self.project_info.is_model_loaded
         run_action.setEnabled(is_item_clicked and model_loaded)
         batch_recognition_action.setEnabled(model_loaded)
-
-        # 根据点击位置设置其他菜单项可用性
-        rename_action.setEnabled(is_item_clicked)
-        delete_action.setEnabled(is_item_clicked)
-        open_action.setEnabled(is_item_clicked)
         
-        # 设置新菜单项的可用性
+        # 添加分隔线
+        menu.addSeparator()
+        
+        # 第三部分：跳转操作
+        jump_to_action = menu.addAction("跳转至...")
+        smart_jump_action = menu.addAction("跳转到最后标注")
+        
+        # 第三部分菜单项可用性设置
         jump_to_action.setEnabled(True)
         smart_jump_action.setEnabled(self.model.rowCount() > 0)
-
+        
         # 连接菜单项信号
         rename_action.triggered.connect(lambda: self.rename_image_with_index(index))  # type: ignore
         delete_action.triggered.connect(lambda: self.delete_selected())  # type: ignore
