@@ -15,6 +15,34 @@ from src.ui.widget.image_list.thumbnail_loader import ThumbnailLoader
 from src.ui.widget.image_list.yolo_workder import YoloWorker
 
 
+# 自定义SpinBox，使其步进到最近的5的倍数
+class CustomSpinBox(QSpinBox):
+    def stepBy(self, steps):
+        current_value = self.value()
+        min_val = self.minimum()
+        max_val = self.maximum()
+        
+        if steps > 0:  # 向上调整
+            # 计算下一个最近的能被5整除的数字
+            next_multiple = ((current_value // 5) + 1) * 5
+            # 如果计算的值超过最大值，则设置为最大值
+            if next_multiple > max_val:
+                next_multiple = max_val
+            self.setValue(next_multiple)
+        else:  # 向下调整
+            # 计算上一个最近的能被5整除的数字
+            if current_value % 5 == 0:  # 如果当前值本身就是5的倍数
+                prev_multiple = current_value - 5
+            else:
+                # 否则计算上一个5的倍数
+                prev_multiple = (current_value // 5) * 5
+            
+            # 如果计算的值小于最小值，则设置为最小值
+            if prev_multiple < min_val:
+                prev_multiple = min_val
+            self.setValue(prev_multiple)
+
+
 # ====================== 图片列表模型 ======================
 class ImageListModel(QAbstractListModel):
     thumbnailLoaded = pyqtSignal(str, QPixmap)
@@ -843,13 +871,13 @@ class BatchRecognitionDialog(QDialog):
         range_layout = QHBoxLayout()  # 使用水平布局
         
         self.start_label = QLabel("从")
-        self.start_spinbox = QSpinBox()
+        self.start_spinbox = CustomSpinBox()
         self.start_spinbox.setRange(1, total_count)
         self.start_spinbox.setValue(default_start)
         # 移除后缀，改为在下方显示范围
         
         self.end_label = QLabel("到")
-        self.end_spinbox = QSpinBox()
+        self.end_spinbox = CustomSpinBox()
         self.end_spinbox.setRange(1, total_count)
         self.end_spinbox.setValue(default_end)
         # 移除后缀，改为在下方显示范围
