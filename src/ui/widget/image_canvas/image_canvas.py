@@ -650,7 +650,7 @@ class ImageCanvas(QGraphicsView):
         self.config_menu = QMenu(self)
 
         # 运行子菜单
-        self.run_action = QAction("Run", self)
+        self.run_action = QAction("Yolo", self)
         self.run_action.triggered.connect(self.on_run_clicked)  # type: ignore
         # 运行选项状态通过project_info判断
         self.run_action.setEnabled(self.project_info.is_model_loaded)
@@ -674,7 +674,7 @@ class ImageCanvas(QGraphicsView):
             # 更新菜单状态（通过project_info判断模型是否存在）
             model_exists = self.project_info.is_model_loaded
             for action in self.config_menu.actions():
-                if action.text() == "Run" or action.text() == "Delete":
+                if action.text() == "Yolo" or action.text() == "Delete":
                     action.setEnabled(model_exists)
             # 在按钮下方显示菜单
             self.config_menu.exec_(self.config_button.mapToGlobal(self.config_button.rect().bottomLeft()))
@@ -884,7 +884,7 @@ class ImageCanvas(QGraphicsView):
         """创建YOLO相关的动作按钮"""
         # YOLO Run Button - 使用QToolButton
         self.run_tool_button = QToolButton()
-        self.run_tool_button.setText("Run")
+        self.run_tool_button.setText("Yolo")
         if use_icons:
             self.run_tool_button.setIcon(self._get_icon("system-run", "▶"))
         self.run_tool_button.setToolTip("Run YOLO model")

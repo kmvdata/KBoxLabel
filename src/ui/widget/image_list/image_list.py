@@ -886,6 +886,10 @@ class BatchRecognitionDialog(QDialog):
         self.start_spinbox.valueChanged.connect(self.validate_and_fix_range)
         self.end_spinbox.valueChanged.connect(self.validate_and_fix_range)
         
+        # 连接信号以更新选中数量提示
+        self.start_spinbox.valueChanged.connect(self.update_selection_hint)
+        self.end_spinbox.valueChanged.connect(self.update_selection_hint)
+        
         # 添加范围选择控件到水平布局
         range_layout.addWidget(self.start_label)
         range_layout.addWidget(self.start_spinbox)
@@ -895,7 +899,7 @@ class BatchRecognitionDialog(QDialog):
         layout.addLayout(range_layout)
         
         # 添加范围提示标签
-        self.range_label = QLabel(f"取值范围: 1-{total_count}，结束值范围: {default_start}-{total_count}")
+        self.range_label = QLabel(f"起始值范围: 1-{total_count}，结束值范围: {default_start}-{total_count}，当前选中 {default_end - default_start + 1} 张")
         self.range_label.setStyleSheet("color: gray; font-size: 12px;")
         layout.addWidget(self.range_label)
         
@@ -973,7 +977,22 @@ class BatchRecognitionDialog(QDialog):
             self.start_spinbox.setValue(end_val)
         
         # 更新范围提示标签
-        self.range_label.setText(f"取值范围: 1-{self.total_count}，结束值范围: {start_val}-{self.total_count}")
+        self.range_label.setText(f"起始范围: 1-{self.total_count}，结束值范围: {start_val}-{self.total_count}")
+        
+        # 更新选中数量提示
+        self.update_selection_hint()
+    
+    def update_selection_hint(self):
+        """更新选中数量的提示"""
+        start_val = self.start_spinbox.value()
+        end_val = self.end_spinbox.value()
+        
+        # 计算选中的图片数量
+        selected_count = max(0, end_val - start_val + 1)
+        
+        # 更新范围标签，添加选中数量提示
+        range_text = f"起始范围: 1-{self.total_count}，结束值范围: {start_val}-{self.total_count}，当前选中 {selected_count} 张"
+        self.range_label.setText(range_text)
     
     def on_start_clicked(self):
         """开始识别按钮点击事件"""
