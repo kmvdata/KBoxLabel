@@ -48,6 +48,7 @@ class MainMenuBar(QMenuBar):
         self.help_doc_action = QAction("帮助文档", self)
         self.chinese_action = QAction("中文", self)
         self.english_action = QAction("英文", self)
+        self.about_action = QAction("关于", self)
 
         self.create_menus()
         self.connect_signals()
@@ -81,6 +82,10 @@ class MainMenuBar(QMenuBar):
         language_menu.addAction(self.chinese_action)
         language_menu.addAction(self.english_action)
         help_menu.addMenu(language_menu)
+        
+        # 添加分隔线和关于菜单
+        help_menu.addSeparator()
+        help_menu.addAction(self.about_action)
 
     def connect_signals(self):
         """连接动作的信号到槽函数"""
@@ -95,6 +100,7 @@ class MainMenuBar(QMenuBar):
         self.help_doc_action.triggered.connect(self.open_help_documentation)  # type: ignore
         self.chinese_action.triggered.connect(self.switch_to_chinese)  # type: ignore
         self.english_action.triggered.connect(self.switch_to_english)  # type: ignore
+        self.about_action.triggered.connect(self.show_about_dialog)  # type: ignore
 
     def handle_new_project(self):
         """处理新建项目的目录选择"""
@@ -423,3 +429,10 @@ class MainMenuBar(QMenuBar):
         # 这里可以实现语言切换逻辑
         # 目前只是显示提示信息
         QMessageBox.information(self, "语言切换", "已切换到英文")
+
+    def show_about_dialog(self):
+        """显示关于对话框"""
+        from src.ui.dialog.about_dialog import AboutDialog
+        
+        about_dialog = AboutDialog(self)
+        about_dialog.exec_()
