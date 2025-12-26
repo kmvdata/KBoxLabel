@@ -2,6 +2,7 @@
 
 import os
 import shutil
+import sys
 from pathlib import Path
 
 from PyQt5.QtCore import pyqtSignal, Qt
@@ -42,6 +43,11 @@ class MainMenuBar(QMenuBar):
 
         # 训练子菜单动作
         self.train_yolo_action = QAction("YOLO数据集", self)
+        
+        # 帮助菜单动作
+        self.help_doc_action = QAction("帮助文档", self)
+        self.chinese_action = QAction("中文", self)
+        self.english_action = QAction("英文", self)
 
         self.create_menus()
         self.connect_signals()
@@ -65,6 +71,16 @@ class MainMenuBar(QMenuBar):
 
         file_menu.addSeparator()
         file_menu.addAction(self.close_action)
+        
+        # 帮助菜单
+        help_menu = self.addMenu("帮助")
+        help_menu.addAction(self.help_doc_action)
+        
+        # 语言子菜单
+        language_menu = QMenu("语言", self)
+        language_menu.addAction(self.chinese_action)
+        language_menu.addAction(self.english_action)
+        help_menu.addMenu(language_menu)
 
     def connect_signals(self):
         """连接动作的信号到槽函数"""
@@ -74,6 +90,11 @@ class MainMenuBar(QMenuBar):
         
         # 连接训练相关的信号
         self.train_yolo_action.triggered.connect(self.trainYoloRequested.emit)  # type: ignore
+        
+        # 连接帮助菜单相关的信号
+        self.help_doc_action.triggered.connect(self.open_help_documentation)  # type: ignore
+        self.chinese_action.triggered.connect(self.switch_to_chinese)  # type: ignore
+        self.english_action.triggered.connect(self.switch_to_english)  # type: ignore
 
     def handle_new_project(self):
         """处理新建项目的目录选择"""
@@ -381,3 +402,40 @@ class MainMenuBar(QMenuBar):
                 msg += f"\n- {os.path.basename(file)}: {error}"
 
         QMessageBox.information(self, "导入结果", msg)
+
+    def open_help_documentation(self):
+        """打开帮助文档"""
+        # 读取项目根目录下的README.md文件
+        from pathlib import Path
+        
+        # 获取项目根目录的README.md文件
+        project_root = Path(__file__).parent.parent.parent  # 获取到src目录的上两级
+        readme_path = project_root / "README.md"
+        
+        if readme_path.exists():
+            # 在系统默认应用中打开README.md
+            import subprocess
+            try:
+                if os.name == 'nt':  # Windows
+                    os.startfile(str(readme_path))
+                elif os.name == 'posix':  # macOS and Linux
+                    if sys.platform == 'darwin':  # macOS
+                        subprocess.run(['open', str(readme_path)])
+                    else:  # Linux
+                        subprocess.run(['xdg-open', str(readme_path)])
+            except Exception as e:
+                QMessageBox.information(self, "帮助文档", f"无法打开帮助文档: {str(e)}")
+        else:
+            QMessageBox.information(self, "帮助文档", "帮助文档不存在")
+
+    def switch_to_chinese(self):
+        """切换到中文语言"""
+        # 这里可以实现语言切换逻辑
+        # 目前只是显示提示信息
+        QMessageBox.information(self, "语言切换", "已切换到中文")
+
+    def switch_to_english(self):
+        """切换到英文语言"""
+        # 这里可以实现语言切换逻辑
+        # 目前只是显示提示信息
+        QMessageBox.information(self, "语言切换", "已切换到英文")
