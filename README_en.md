@@ -27,10 +27,10 @@ KBoxLabel is a professional image annotation tool developed based on PyQt5, spec
 
 ### Annotation Support
 - Rectangle annotation support suitable for object detection tasks
-- Import and export support for COCO and YOLO formats
 - Integrated YOLOv8 model for automatic annotation capabilities
 - Support for hierarchical category management (parent-child category relationships)
 - Visual editing and adjustment of annotations
+- Support for drag-and-drop sorting and renaming of annotations
 
 ### Project Management
 - Fully adopts SQLite3 database for storing project configurations and annotation data
@@ -44,10 +44,7 @@ KBoxLabel is a professional image annotation tool developed based on PyQt5, spec
 KBoxLabel integrates the advanced YOLOv8 object detection model, which can automatically identify objects in images and generate annotation boxes, greatly improving annotation efficiency. Users can enjoy one-click automatic annotation by simply loading a pre-trained model.
 
 ### Hierarchical Category Management
-Supports parent-child category structures, allowing users to create complex category systems. For example, "Vehicle" can be created as a parent category with "Car", "Truck", and "Motorcycle" as child categories. When exporting data, child categories will be automatically mapped to their parent categories, simplifying the data processing workflow.
-
-### Multi-format Data Export
-Supports exporting to industry-standard COCO and YOLO formats, seamlessly connecting with mainstream deep learning frameworks such as TensorFlow and PyTorch, facilitating model training.
+Supports parent-child category structures, allowing users to create complex category systems. For example, "Vehicle" can be created as a parent category with "Car", "Truck", and "Motorcycle" as child categories. This hierarchical structure facilitates organization and management of complex annotation categories.
 
 ### Efficient Operation Experience
 Provides rich keyboard shortcuts and mouse operation support:
@@ -56,6 +53,8 @@ Provides rich keyboard shortcuts and mouse operation support:
 - Shift+Arrow keys: Adjust annotation box edges
 - Ctrl+Shift+Arrow keys: Adjust annotation box size
 - Box selection supports simultaneous operation of multiple annotation boxes
+- Supports drag-and-drop sorting of annotation lists
+- Right-click menu for quick operations
 
 ## Installation Guide
 
@@ -99,7 +98,7 @@ python src/main.py
 2. Import image files
 3. Create required annotation categories
 4. Perform image annotation
-5. Save and export annotation data
+5. Save annotation data
 
 ## Usage Guide
 
@@ -119,12 +118,14 @@ python src/main.py
 - Support adding, deleting, and renaming categories
 - Adjust category order through drag and drop
 - Support setting parent-child category relationships
+- Support modifying category colors
 
 ### Image Annotation Operations
 1. Select the category to annotate in the category list
 2. Hold down the left mouse button in the image area to drag and create an annotation box
 3. Adjust the position and size of the annotation box via mouse or keyboard
 4. Right-click on the annotation box for operations such as deletion and sending to back
+5. Support batch operations on multiple annotation boxes
 
 ### Keyboard Shortcuts
 - `Delete` / `Backspace`: Delete selected annotations
@@ -157,16 +158,14 @@ KBoxLabel integrates powerful automatic annotation functionality, utilizing the 
 
 ## Data Export
 
-KBoxLabel supports exporting to multiple standard formats to meet the needs of different deep learning frameworks:
+KBoxLabel supports exporting annotation data as YOLO format training datasets:
 
-### COCO Format Export
-1. Click menu bar "File" -> "Export" -> "Export as COCO"
-2. Select export directory
-3. The system will automatically generate an annotations.json file
-
-### YOLO Format Export
-1. Click menu bar "File" -> "Export" -> "Export as YOLO"
-2. The system will generate corresponding .txt annotation files in the same directory as each image
+### YOLO Dataset Export
+1. Click menu bar "File" -> "Train" -> "YOLO Dataset"
+2. Select the training data save directory
+3. The system will automatically organize data according to training/validation set ratio (default 8:2)
+4. Generate standard YOLO dataset structure with images and labels subdirectories
+5. Automatically generate dataset.yaml configuration file
 
 ### Data Storage Structure
 All project data (including annotation information, category configurations, etc.) is stored in the SQLite database in the `.kboxlabel` folder under the project directory, containing:
