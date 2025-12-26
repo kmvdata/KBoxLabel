@@ -8,12 +8,13 @@ from PyQt5.QtGui import QFont, QDesktopServices
 from PyQt5.QtCore import QUrl
 
 from src.core.ksettings import KSettings
+from src.core.i18n.language_manager import tr
 
 
 class HelpDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("帮助文档")
+        self.setWindowTitle(tr("help_title"))
         self.setGeometry(200, 100, 800, 600)
         
         # 获取语言设置
@@ -46,11 +47,11 @@ class HelpDialog(QDialog):
         button_layout = QHBoxLayout()
         
         # 确定按钮
-        ok_button = QPushButton("确定")
+        ok_button = QPushButton(tr("button_ok"))
         ok_button.clicked.connect(self.accept)
         
         # 在浏览器中打开按钮
-        open_external_button = QPushButton("在浏览器中打开")
+        open_external_button = QPushButton(tr("message_open_in_browser"))
         open_external_button.clicked.connect(self.open_in_external_browser)
         
         button_layout.addStretch()
@@ -81,7 +82,7 @@ class HelpDialog(QDialog):
                 html_content = self.markdown_to_html(content)
                 self.text_browser.setHtml(html_content)
             else:
-                self.text_browser.setHtml("<h1>帮助文档未找到</h1><p>无法找到帮助文档文件。</p>")
+                self.text_browser.setHtml(f"<h1>{tr('message_dataset_not_found')}</h1><p>{tr('message_no_help_file')}</p>")
     
     def markdown_to_html(self, markdown_text):
         """简单的markdown到HTML转换"""

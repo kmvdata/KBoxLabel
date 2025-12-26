@@ -68,7 +68,7 @@ class ClassManagerDialog(QDialog):
         self.classes = dataset_manager.classes.copy()  # 复制类别列表
         self.colors = self.load_class_colors()  # 加载类别颜色
 
-        self.setWindowTitle("类别管理器")
+        self.setWindowTitle(tr("class_manager_title"))
         self.setMinimumSize(600, 400)
         self.setWindowFlags(self.windowFlags() & ~Qt.WindowContextHelpButtonHint)
 
@@ -82,7 +82,7 @@ class ClassManagerDialog(QDialog):
         main_layout.setContentsMargins(15, 15, 15, 15)
 
         # 标题标签
-        title_label = QLabel("管理标注类别")
+        title_label = QLabel(tr("class_manager_label"))
         title_label.setStyleSheet("font-size: 16px; font-weight: bold; color: #E1E1E1;")
         main_layout.addWidget(title_label)
 
@@ -118,7 +118,7 @@ class ClassManagerDialog(QDialog):
         button_layout.setSpacing(10)
 
         # 添加按钮
-        self.add_button = QPushButton("添加类别")
+        self.add_button = QPushButton(tr("class_manager_add"))
         self.add_button.setIcon(self.create_color_icon(QColor("#0078D7")))
         self.add_button.setStyleSheet("""
             QPushButton {
@@ -138,7 +138,7 @@ class ClassManagerDialog(QDialog):
         self.add_button.clicked.connect(self.add_class)
 
         # 编辑颜色按钮
-        self.edit_color_button = QPushButton("编辑颜色")
+        self.edit_color_button = QPushButton(tr("class_manager_edit_color"))
         self.edit_color_button.setIcon(self.create_color_icon(QColor("#BA68C8")))
         self.edit_color_button.setStyleSheet("""
             QPushButton {
@@ -159,7 +159,7 @@ class ClassManagerDialog(QDialog):
         self.edit_color_button.clicked.connect(self.edit_class_color)
 
         # 删除按钮
-        self.delete_button = QPushButton("删除")
+        self.delete_button = QPushButton(tr("class_manager_delete"))
         self.delete_button.setIcon(QIcon(":/icons/delete.png"))
         self.delete_button.setStyleSheet("""
             QPushButton {
@@ -180,7 +180,7 @@ class ClassManagerDialog(QDialog):
         self.delete_button.clicked.connect(self.delete_class)
 
         # 确定/取消按钮
-        self.ok_button = QPushButton("确定")
+        self.ok_button = QPushButton(tr("class_manager_confirm"))
         self.ok_button.setStyleSheet("""
             QPushButton {
                 background-color: #0078D7;
@@ -196,7 +196,7 @@ class ClassManagerDialog(QDialog):
         """)
         self.ok_button.clicked.connect(self.save_classes)
 
-        self.cancel_button = QPushButton("取消")
+        self.cancel_button = QPushButton(tr("class_manager_cancel"))
         self.cancel_button.setStyleSheet("""
             QPushButton {
                 background-color: #5C5C5C;
@@ -285,14 +285,14 @@ class ClassManagerDialog(QDialog):
     def add_class(self):
         """添加新类别"""
         new_name, ok = QInputDialog.getText(
-            self, "添加新类别", "请输入类别名称:"
+            self, tr("class_manager_add_prompt"), tr("class_manager_input_name")
         )
 
         if ok and new_name:
             if new_name in self.classes:
                 QMessageBox.warning(
-                    self, "重复类别",
-                    f"类别 '{new_name}' 已存在，请使用不同的名称！"
+                    self, tr("class_manager_duplicate"),
+                    tr("class_manager_exists", name=new_name)
                 )
                 return
 
@@ -315,7 +315,7 @@ class ClassManagerDialog(QDialog):
         widget = self.class_list.itemWidget(item)
 
         color = QColorDialog.getColor(
-            widget.color, self, "选择类别颜色"
+            widget.color, self, tr("class_manager_edit_color")
         )
 
         if color.isValid():
@@ -334,8 +334,8 @@ class ClassManagerDialog(QDialog):
 
         # 确认对话框
         reply = QMessageBox.question(
-            self, "确认删除",
-            f"确定要删除类别 '{class_name}' 吗?",
+            self, tr("class_manager_delete_confirm", name=class_name),
+            tr("class_manager_delete_confirm", name=class_name),
             QMessageBox.Yes | QMessageBox.No
         )
 
@@ -364,14 +364,14 @@ class ClassManagerDialog(QDialog):
             new_name = widget.name_edit.text().strip()
             if not new_name:
                 QMessageBox.warning(
-                    self, "无效名称", "类别名称不能为空！"
+                    self, tr("class_manager_invalid_name"), tr("class_manager_empty_name")
                 )
                 return
 
             if new_name in updated_classes:
                 QMessageBox.warning(
-                    self, "重复类别",
-                    f"类别 '{new_name}' 已存在，请使用不同的名称！"
+                    self, tr("class_manager_duplicate"),
+                    tr("class_manager_exists", name=new_name)
                 )
                 return
 

@@ -12,6 +12,7 @@ from src.core.yolo.yolo_trainer import YOLOTrainer
 # 添加PIL库用于获取图片尺寸
 from PIL import Image
 
+from src.core.i18n.language_manager import tr
 
 class TrainYoloDialog(QDialog):
     """YOLO数据集对话框"""
@@ -19,7 +20,7 @@ class TrainYoloDialog(QDialog):
     def __init__(self, project_window, parent=None):
         super().__init__(parent)
         self.project_window = project_window
-        self.setWindowTitle("YOLO数据集")
+        self.setWindowTitle(tr("train_yolo_title"))
         self.setMinimumSize(600, 500)
         self.init_ui()
         self.populate_data_stats()  # 初始化时就加载统计数据
@@ -29,21 +30,21 @@ class TrainYoloDialog(QDialog):
         layout = QVBoxLayout()
         
         # 说明标签
-        info_label = QLabel("请选择训练数据保存目录:")
+        info_label = QLabel(tr("train_select_directory"))
         layout.addWidget(info_label)
         
         # 目录选择
         dir_layout = QHBoxLayout()
         self.dir_line_edit = QLineEdit()
         self.dir_line_edit.setReadOnly(True)
-        select_dir_btn = QPushButton("选择目录")
+        select_dir_btn = QPushButton(tr("dialog_button_open_project"))
         select_dir_btn.clicked.connect(self.select_directory)
         dir_layout.addWidget(self.dir_line_edit)
         dir_layout.addWidget(select_dir_btn)
         layout.addLayout(dir_layout)
         
         # 标题
-        title_label = QLabel("标注类别统计")
+        title_label = QLabel(tr("train_statistics_title"))
         title_label.setAlignment(Qt.AlignCenter)
         title_label.setStyleSheet("font-size: 16px; font-weight: bold; margin-bottom: 10px; margin-top: 10px;")
         layout.addWidget(title_label)
@@ -71,7 +72,7 @@ class TrainYoloDialog(QDialog):
         layout.addWidget(self.tree)
         
         # 训练参数区域
-        params_group = QGroupBox("训练参数")
+        params_group = QGroupBox(tr("train_params"))
         params_layout = QFormLayout()
         params_layout.setSpacing(10)
         
@@ -120,9 +121,9 @@ class TrainYoloDialog(QDialog):
         # 按钮
         button_layout = QHBoxLayout()
         button_layout.addStretch()
-        self.cancel_button = QPushButton("取消")
-        self.open_folder_button = QPushButton("打开数据集")
-        self.start_button = QPushButton("开始生成")
+        self.cancel_button = QPushButton(tr("button_cancel"))
+        self.open_folder_button = QPushButton(tr("button_open_dataset"))
+        self.start_button = QPushButton(tr("button_start"))
         button_layout.addWidget(self.cancel_button)
         button_layout.addWidget(self.open_folder_button)
         button_layout.addWidget(self.start_button)
@@ -172,7 +173,7 @@ class TrainYoloDialog(QDialog):
     def select_directory(self):
         """选择训练数据目录"""
         directory = QFileDialog.getExistingDirectory(
-            self, "选择训练数据目录", str(self.project_window.project_info.path)
+            self, tr("train_select_directory"), str(self.project_window.project_info.path)
         )
         if directory:
             self.dir_line_edit.setText(directory)
@@ -242,7 +243,7 @@ class TrainYoloDialog(QDialog):
     def prepare_training_data(self):
         """准备训练数据"""
         if not hasattr(self, 'train_data_dir'):
-            QMessageBox.warning(self, "错误", "请先选择训练数据目录")
+            QMessageBox.warning(self, tr("error_get_project_path"), tr("error_training_data_dir"))
             return
             
         try:
@@ -250,8 +251,8 @@ class TrainYoloDialog(QDialog):
             if self.train_data_dir.exists():
                 reply = QMessageBox.question(
                     self, 
-                    '目录已存在', 
-                    f'目录 "{self.train_data_dir}" 已存在，是否覆盖？\n注意：这将覆盖该目录下的所有内容。',
+                    tr("train_data_exists"), 
+                    tr("train_overwrite_confirm", dir=str(self.train_data_dir)),
                     QMessageBox.Yes | QMessageBox.No, 
                     QMessageBox.No
                 )
@@ -265,8 +266,8 @@ class TrainYoloDialog(QDialog):
             
             # 准备训练数据
             self.progress_bar.setVisible(True)
-            self.progress_bar.setFormat("正在统计数据...")
-            self.log_text_edit.append("正在统计训练数据...")
+            self.progress_bar.setFormat(tr("train_preparing"))
+            self.log_text_edit.append(tr("train_preparing"))
             
             # 获取类别列表和类别名称
             categories = self.project_window.project_info.domain.query_all_categories()
@@ -277,7 +278,7 @@ class TrainYoloDialog(QDialog):
             # 用户确认开始生成，现在开始实际生成过程
             self.generate_training_data(trainer, categories)
         except Exception as e:
-            QMessageBox.critical(self, "错误", f"准备训练数据时出错: {str(e)}")
+            QMessageBox.critical(self, tr("error_get_project_path"), tr("error_prepare_training", error=str(e)))
             self.progress_bar.setVisible(False)
             self.start_button.setEnabled(True)
             self.cancel_button.setEnabled(True)
@@ -287,8 +288,8 @@ class TrainYoloDialog(QDialog):
         try:
             # 更新进度条
             self.progress_bar.setValue(20)
-            self.progress_bar.setFormat("正在组织训练数据...")
-            self.log_text_edit.append("正在组织训练数据...")
+            self.progress_bar.setFormat(tr("train_organizing"))
+            self.log_text_edit.append(tr("train_organizing"))
             
             # 确保训练数据目录存在
             self.train_data_dir.mkdir(parents=True, exist_ok=True)
@@ -314,8 +315,8 @@ class TrainYoloDialog(QDialog):
             
             # 更新进度
             self.progress_bar.setValue(90)
-            self.progress_bar.setFormat("正在生成配置文件...")
-            self.log_text_edit.append("正在生成数据集配置文件...")
+            self.progress_bar.setFormat(tr("train_generating_config"))
+            self.log_text_edit.append(tr("train_generating_config"))
             
             # 生成数据集YAML配置文件
             # 如果提供了categories，只使用顶层类别生成yaml
@@ -326,8 +327,8 @@ class TrainYoloDialog(QDialog):
             
             # 完成
             self.progress_bar.setValue(100)
-            self.progress_bar.setFormat("数据准备完成")
-            self.log_text_edit.append("数据准备已完成！")
+            self.progress_bar.setFormat(tr("train_completed"))
+            self.log_text_edit.append(tr("train_completed"))
             
             # 显示训练命令而不是直接训练
             self.show_training_command(
@@ -335,7 +336,7 @@ class TrainYoloDialog(QDialog):
                 class_names
             )
         except Exception as e:
-            QMessageBox.critical(self, "错误", f"生成训练数据时出错: {str(e)}")
+            QMessageBox.critical(self, tr("error_get_project_path"), tr("error_generate_training", error=str(e)))
             self.progress_bar.setVisible(False)
             self.start_button.setEnabled(True)
             self.cancel_button.setEnabled(True)
@@ -361,7 +362,7 @@ class TrainYoloDialog(QDialog):
                 import subprocess
                 subprocess.Popen(["xdg-open", str(folder_path)])
         except Exception as e:
-            QMessageBox.critical(self, "错误", f"无法打开文件夹: {str(e)}")
+            QMessageBox.critical(self, tr("error_get_project_path"), tr("error_open_folder", error=str(e)))
 
     def show_training_command(self, data_dir, class_names):
         """显示训练命令"""
@@ -370,8 +371,8 @@ class TrainYoloDialog(QDialog):
         
         # 在日志中显示命令
         self.log_text_edit.append("=" * 50)
-        self.log_text_edit.append("数据准备已完成！")
-        self.log_text_edit.append("请在终端中运行以下命令来开始训练：")
+        self.log_text_edit.append(tr("train_completed"))
+        self.log_text_edit.append(tr("train_command_info"))
         self.log_text_edit.append("=" * 50)
         self.log_text_edit.append(command)
         self.log_text_edit.append("=" * 50)
@@ -381,7 +382,7 @@ class TrainYoloDialog(QDialog):
         # 更改按钮状态：隐藏取消按钮，显示打开数据集按钮，启用完成按钮
         self.cancel_button.setVisible(False)
         self.open_folder_button.setVisible(True)
-        self.start_button.setText("完成")
+        self.start_button.setText(tr("button_finish"))
         self.start_button.setEnabled(True)
         self.start_button.clicked.disconnect()
         self.start_button.clicked.connect(self.accept)

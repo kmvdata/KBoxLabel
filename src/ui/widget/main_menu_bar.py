@@ -5,8 +5,10 @@ import shutil
 import sys
 from pathlib import Path
 
-from PyQt5.QtCore import pyqtSignal, Qt
+from PyQt5.QtCore import pyqtSignal, Qt, pyqtSlot
 from PyQt5.QtWidgets import QMenuBar, QAction, QMenu, QFileDialog, QMessageBox, QProgressDialog
+
+from src.core.i18n.language_manager import tr, LanguageManager
 
 # 解决循环导入问题：延迟导入 ApplicationManager
 # from src.ui.application_manager import ApplicationManager
@@ -36,36 +38,71 @@ class MainMenuBar(QMenuBar):
 
         """创建所有菜单动作"""
         # 文件菜单动作
-        self.new_action = QAction("新建", self)
-        self.recent_projects_menu = QMenu("最近打开的", self)
-        self.import_action = QAction("导入图片", self)
-        self.close_action = QAction("关闭", self)
+        self.new_action = QAction("", self)  # 初始文本为空，稍后设置
+        self.recent_projects_menu = QMenu("", self)  # 初始文本为空，稍后设置
+        self.import_action = QAction("", self)  # 初始文本为空，稍后设置
+        self.close_action = QAction("", self)  # 初始文本为空，稍后设置
 
         # 训练子菜单动作
-        self.train_yolo_action = QAction("YOLO数据集", self)
+        self.train_yolo_action = QAction("", self)  # 初始文本为空，稍后设置
         
         # 帮助菜单动作
-        self.help_doc_action = QAction("帮助文档", self)
-        self.chinese_action = QAction("中文", self)
-        self.english_action = QAction("英文", self)
-        self.about_action = QAction("关于", self)
+        self.help_doc_action = QAction("", self)  # 初始文本为空，稍后设置
+        self.chinese_action = QAction("", self)  # 初始文本为空，稍后设置
+        self.english_action = QAction("", self)  # 初始文本为空，稍后设置
+        self.about_action = QAction("", self)  # 初始文本为空，稍后设置
 
+        # 设置菜单文本
+        self.update_menu_texts()
+        
         self.create_menus()
         self.connect_signals()
 
         # 初始更新最近项目菜单
         self.update_recent_projects_menu()
+        
+        # 连接语言变更信号
+        LanguageManager.instance().language_changed.connect(self.on_language_changed)
+
+    def update_menu_texts(self):
+        """更新菜单文本"""
+        self.new_action.setText(tr("menu_new"))
+        self.recent_projects_menu.setTitle(tr("menu_recent"))
+        self.import_action.setText(tr("menu_import_images"))
+        self.close_action.setText(tr("menu_close"))
+        self.train_yolo_action.setText(tr("menu_train_yolo"))
+        self.help_doc_action.setText(tr("menu_help_documentation"))
+        self.chinese_action.setText(tr("menu_chinese"))
+        self.english_action.setText(tr("menu_english"))
+        self.about_action.setText(tr("menu_about"))
+        
+        # 更新菜单标题
+        # 注意：QMenuBar的菜单标题需要重新创建菜单项来更新
+        self.recreate_menus()
+    
+    def recreate_menus(self):
+        """重新创建菜单以更新语言"""
+        # 清除现有菜单
+        self.clear()
+        
+        # 重新创建菜单
+        self.create_menus()
+    
+    @pyqtSlot(str)
+    def on_language_changed(self, language: str):
+        """处理语言变更事件"""
+        self.update_menu_texts()
 
     def create_menus(self):
         """创建菜单结构"""
         # 文件菜单
-        file_menu = self.addMenu("文件")
+        file_menu = self.addMenu(tr("menu_file"))
         file_menu.addAction(self.new_action)
         file_menu.addMenu(self.recent_projects_menu)  # 添加最近项目子菜单
         file_menu.addAction(self.import_action)
         
         # 训练子菜单
-        train_menu = QMenu("训练", self)
+        train_menu = QMenu(tr("menu_train"), self)
         train_menu.setStyleSheet("QMenu::item { padding: 5px 20px; }")
         train_menu.addAction(self.train_yolo_action)
         file_menu.addMenu(train_menu)
@@ -74,11 +111,11 @@ class MainMenuBar(QMenuBar):
         file_menu.addAction(self.close_action)
         
         # 帮助菜单
-        help_menu = self.addMenu("帮助")
+        help_menu = self.addMenu(tr("menu_help"))
         help_menu.addAction(self.help_doc_action)
         
         # 语言子菜单
-        language_menu = QMenu("语言", self)
+        language_menu = QMenu(tr("menu_language"), self)
         language_menu.addAction(self.chinese_action)
         language_menu.addAction(self.english_action)
         help_menu.addMenu(language_menu)
@@ -111,7 +148,7 @@ class MainMenuBar(QMenuBar):
         
         selected_dir = QFileDialog.getExistingDirectory(
             self,
-            "选择或创建项目目录",
+            tr("select_or_create_project_dir"),
             last_directory,  # 使用上次打开的目录作为默认路径
             options=QFileDialog.ShowDirsOnly | QFileDialog.DontUseNativeDialog
         )
@@ -141,8 +178,8 @@ class MainMenuBar(QMenuBar):
         except Exception as e:
             QMessageBox.critical(
                 self,
-                "项目创建失败",
-                f"无法访问目录: {str(e)}"
+                tr("error_create_project"),
+                tr("error_invalid_path", error=str(e))
             )
 
     def load_recent_projects(self):
@@ -195,7 +232,7 @@ class MainMenuBar(QMenuBar):
 
         if not self.recent_projects:
             # 如果没有最近项目，显示禁用菜单项
-            no_project = QAction("无最近项目", self)
+            no_project = QAction(tr("no_recent_project"), self)
             no_project.setEnabled(False)
             self.recent_projects_menu.addAction(no_project)
             return
@@ -210,7 +247,7 @@ class MainMenuBar(QMenuBar):
 
         # 添加清除历史选项
         self.recent_projects_menu.addSeparator()
-        clear_action = QAction("清除历史记录", self)
+        clear_action = QAction(tr("message_clear_history"), self)
         clear_action.triggered.connect(self.clear_recent_projects)  # type: ignore
         self.recent_projects_menu.addAction(clear_action)
 
@@ -252,12 +289,12 @@ class MainMenuBar(QMenuBar):
         project_path = project_info.path
         # 检查project_path是否存在且是Path类型
         if project_path is None or not isinstance(project_path, Path):
-            QMessageBox.warning(self, "错误", "获取工程路径异常")
+            QMessageBox.warning(self, tr("error_get_project_path"), tr("error_get_project_path"))
             return
 
         # 2. 验证项目路径
         if not project_path or not project_path.exists():
-            QMessageBox.warning(self, "项目未打开", "请先创建或打开有效的项目目录")
+            QMessageBox.warning(self, tr("error_project_not_opened"), tr("error_project_not_opened"))
             return
 
         # 3. 选择导入方式
@@ -283,11 +320,11 @@ class MainMenuBar(QMenuBar):
     def select_import_type(self):
         """选择导入方式（文件或文件夹）"""
         msg_box = QMessageBox(self)
-        msg_box.setWindowTitle("选择导入方式")
-        msg_box.setText("请选择导入方式：")
-        file_btn = msg_box.addButton("导入文件", QMessageBox.ActionRole)
-        folder_btn = msg_box.addButton("导入文件夹", QMessageBox.ActionRole)
-        cancel_btn = msg_box.addButton("取消", QMessageBox.RejectRole)
+        msg_box.setWindowTitle(tr("dialog_title_import"))
+        msg_box.setText(tr("import_type_selection"))
+        file_btn = msg_box.addButton(tr("import_files"), QMessageBox.ActionRole)
+        folder_btn = msg_box.addButton(tr("import_folder"), QMessageBox.ActionRole)
+        cancel_btn = msg_box.addButton(tr("button_cancel"), QMessageBox.RejectRole)
         msg_box.exec_()
 
         if msg_box.clickedButton() == file_btn:
@@ -307,7 +344,7 @@ class MainMenuBar(QMenuBar):
             # 选择多个图片文件 [3](@ref)
             file_paths, _ = QFileDialog.getOpenFileNames(
                 self,
-                "选择图片文件",
+                tr("dialog_title_import"),
                 last_directory,
                 "图片文件 (*.jpg *.jpeg *.png *.bmp *.gif *.tif *.tiff);;所有文件 (*.*)"
             )
@@ -319,7 +356,7 @@ class MainMenuBar(QMenuBar):
             return file_paths
         else:
             # 选择文件夹并获取所有图片文件
-            folder_path = QFileDialog.getExistingDirectory(self, "选择图片文件夹", last_directory)
+            folder_path = QFileDialog.getExistingDirectory(self, tr("dialog_title_import"), last_directory)
             
             # 保存当前选择的目录
             if folder_path:
@@ -343,8 +380,8 @@ class MainMenuBar(QMenuBar):
     def copy_images_to_project(self, image_files, project_path):
         """复制图片到项目目录，处理重名文件"""
         # 创建进度对话框 [7](@ref)
-        progress = QProgressDialog("导入图片...", "取消", 0, len(image_files), self)
-        progress.setWindowTitle("导入进度")
+        progress = QProgressDialog(tr("import_progress"), tr("button_cancel"), 0, len(image_files), self)
+        progress.setWindowTitle(tr("import_progress"))
         progress.setWindowModality(Qt.WindowModal)
         progress.setValue(0)
 
@@ -400,14 +437,12 @@ class MainMenuBar(QMenuBar):
 
     def show_import_result(self, success_count, failed_files):
         """显示导入结果"""
-        msg = f"成功导入 {success_count} 张图片"
+        msg = tr("import_success", count=success_count)
 
         if failed_files:
-            msg += f"\n\n失败 {len(failed_files)} 张图片："
-            for file, error in failed_files:
-                msg += f"\n- {os.path.basename(file)}: {error}"
+            msg += tr("import_result", success_count=success_count, failed_count=len(failed_files), failed_details='\n'.join([f'- {os.path.basename(file)}: {error}' for file, error in failed_files]))
 
-        QMessageBox.information(self, "导入结果", msg)
+        QMessageBox.information(self, tr("dialog_title_import"), msg)
 
     def open_help_documentation(self):
         """打开帮助文档"""
@@ -420,15 +455,15 @@ class MainMenuBar(QMenuBar):
 
     def switch_to_chinese(self):
         """切换到中文语言"""
-        # 这里可以实现语言切换逻辑
-        # 目前只是显示提示信息
-        QMessageBox.information(self, "语言切换", "已切换到中文")
+        from src.core.i18n.language_manager import set_language
+        set_language("zh")
+        QMessageBox.information(self, tr("menu_language"), tr("message_language_switched_to_chinese"))
 
     def switch_to_english(self):
         """切换到英文语言"""
-        # 这里可以实现语言切换逻辑
-        # 目前只是显示提示信息
-        QMessageBox.information(self, "语言切换", "已切换到英文")
+        from src.core.i18n.language_manager import set_language
+        set_language("en")
+        QMessageBox.information(self, tr("menu_language"), tr("message_language_switched_to_english"))
 
     def show_about_dialog(self):
         """显示关于对话框"""

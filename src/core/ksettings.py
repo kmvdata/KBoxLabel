@@ -29,3 +29,8 @@ class KSettings(QSettings):
         """设置当前语言"""
         self.setValue("language", language)
         self.sync()
+
+    def set_language(self, language: str) -> None:
+        """设置当前语言"""
+        self.setValue("language", language)
+        self.sync()

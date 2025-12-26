@@ -6,11 +6,12 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QTextEdit, QApplication
 from PyQt5.QtGui import QPixmap
 
+from src.core.i18n.language_manager import tr
 
 class AboutDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("关于 KBoxLabel")
+        self.setWindowTitle(tr("about_title"))
         self.setGeometry(200, 100, 500, 400)
         self.setModal(True)
         
@@ -48,7 +49,7 @@ class AboutDialog(QDialog):
         top_layout.addWidget(title_label)
         
         # 版本信息
-        version_label = QLabel("版本 1.0.0")
+        version_label = QLabel(tr("about_version"))
         version_label.setStyleSheet("font-size: 14px; color: #7f8c8d;")
         version_label.setAlignment(Qt.AlignCenter)
         top_layout.addWidget(version_label)
@@ -62,20 +63,20 @@ class AboutDialog(QDialog):
         layout.addWidget(separator)
         
         # 功能介绍
-        description_label = QLabel("KBoxLabel 是一个基于 PyQt5 开发的专业图像标注工具，专为计算机视觉中的目标检测任务设计。")
+        description_label = QLabel(tr("about_description"))
         description_label.setAlignment(Qt.AlignCenter)
         description_label.setWordWrap(True)
         description_label.setStyleSheet("font-size: 14px; margin: 10px 0px;")
         layout.addWidget(description_label)
         
         # 作者信息
-        author_label = QLabel("作者: Kermit Mei")
+        author_label = QLabel(tr("about_author"))
         author_label.setAlignment(Qt.AlignCenter)
         author_label.setStyleSheet("font-size: 14px; margin: 5px 0px;")
         layout.addWidget(author_label)
         
         # 邮箱信息
-        email_label = QLabel("邮箱: kermit.mei@gmail.com")
+        email_label = QLabel(tr("about_email"))
         email_label.setAlignment(Qt.AlignCenter)
         email_label.setStyleSheet("font-size: 14px; margin: 5px 0px;")
         layout.addWidget(email_label)

@@ -4,11 +4,12 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt
 
+from src.core.i18n.language_manager import tr
 
 class SplitDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("划分数据集")
+        self.setWindowTitle(tr("split_title"))
         self.setMinimumWidth(400)
         self.setWindowFlags(self.windowFlags() & ~Qt.WindowContextHelpButtonHint)
 
@@ -30,19 +31,19 @@ class SplitDialog(QDialog):
         self.train_spin.setRange(0, 100)
         self.train_spin.setValue(70)
         self.train_spin.setSuffix("%")
-        form_layout.addRow("训练集比例:", self.train_spin)
+        form_layout.addRow(tr("split_train_ratio"), self.train_spin)
 
         # 验证集比例
         self.val_spin = QSpinBox()
         self.val_spin.setRange(0, 100)
         self.val_spin.setValue(20)
         self.val_spin.setSuffix("%")
-        form_layout.addRow("验证集比例:", self.val_spin)
+        form_layout.addRow(tr("split_val_ratio"), self.val_spin)
 
         # 测试集比例（自动计算）
         self.test_label = QLabel("10%")
         self.test_label.setStyleSheet("color: #888; font-style: italic;")
-        form_layout.addRow("测试集比例:", self.test_label)
+        form_layout.addRow(tr("split_test_ratio"), self.test_label)
 
         # 更新比例显示
         self.update_test_percentage()
@@ -52,14 +53,14 @@ class SplitDialog(QDialog):
         button_layout = QHBoxLayout()
         button_layout.addStretch()
 
-        self.cancel_button = QPushButton("取消")
+        self.cancel_button = QPushButton(tr("button_cancel"))
         self.cancel_button.setMinimumWidth(100)
         self.cancel_button.setStyleSheet(
             "QPushButton { background-color: #5C5C5C; color: white; padding: 8px; border-radius: 4px; }"
             "QPushButton:hover { background-color: #4A4A4A; }"
         )
 
-        self.confirm_button = QPushButton("确定")
+        self.confirm_button = QPushButton(tr("button_ok"))
         self.confirm_button.setMinimumWidth(100)
         self.confirm_button.setStyleSheet(
             "QPushButton { background-color: #0078D7; color: white; padding: 8px; border-radius: 4px; font-weight: bold; }"
@@ -89,7 +90,7 @@ class SplitDialog(QDialog):
 
         # 设置文本颜色（根据是否有效）
         if test_percent < 0:
-            self.test_label.setText(f"<font color='red'>无效比例: {test_percent}%</font>")
+            self.test_label.setText(f"<font color='red'>{tr('split_invalid_ratio', ratio=test_percent)}</font>")
             self.confirm_button.setEnabled(False)
         else:
             self.test_label.setText(f"{test_percent}%")

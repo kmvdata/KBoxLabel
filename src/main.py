@@ -4,6 +4,8 @@ from pathlib import Path
 from PyQt5.QtWidgets import QApplication
 
 from src.ui.application_manager import ApplicationManager
+from src.core.i18n.language_manager import LanguageManager
+from src.core.ksettings import KSettings
 
 
 def main():
@@ -22,6 +24,11 @@ def main():
     # 可选：设置域名称（用于设置存储）
     app.setOrganizationDomain("kmvdata.com")
 
+    # 初始化语言设置
+    settings = KSettings()
+    language = settings.language
+    LanguageManager.instance().set_language(language)
+    
     # 创建应用管理器（会自动创建并显示欢迎界面）
     app_manager = ApplicationManager.get_instance()
 

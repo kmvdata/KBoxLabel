@@ -20,6 +20,8 @@ from src.ui.dialog.train_yolo_dialog import TrainYoloDialog
 from src.ui.widget.image_canvas.image_canvas import ImageCanvas
 from src.ui.widget.image_list.image_list import ImageListView
 from src.ui.widget.main_menu_bar import MainMenuBar
+from src.core.i18n.language_manager import tr, LanguageManager
+from PyQt5.QtCore import pyqtSlot
 
 
 class ProjectWindow(QMainWindow):
@@ -118,8 +120,25 @@ class ProjectWindow(QMainWindow):
 
         # 初始设置窗口标题
         self.setWindowTitle(self.window_title)
+        
+        # 连接语言变更信号
+        LanguageManager.instance().language_changed.connect(self.on_language_changed)
+    
+    @pyqtSlot(str)
+    def on_language_changed(self, language: str):
+        """处理语言变更事件"""
+        # 更新窗口标题
+        self.setWindowTitle(self.window_title)
+        
+        # 更新状态栏文本
+        if hasattr(self, 'left_status') and self.left_status:
+            self.left_status.setText(tr("status_ready"))
+        
+        # 更新菜单栏语言
+        if hasattr(self, 'menu_bar'):
+            self.menu_bar.update_menu_texts()
 
-        self.set_project_path(project_path)
+        self.set_project_path(self.project_info.path)
         # 确保项目路径有效（强制用户设置）
         self.ensure_project_path()
         self.image_list.sig_canvas_needs_reload.connect(
@@ -160,17 +179,17 @@ class ProjectWindow(QMainWindow):
         def __init__(self, main_window: 'ProjectWindow'):
             super().__init__(main_window)
             self.main_window = main_window
-            self.setWindowTitle("Project Required")
+            self.setWindowTitle(tr("dialog_title_project_required"))
             self.setModal(True)
 
             # 创建布局和控件
             layout = QVBoxLayout()
-            label = QLabel("Please open or create a project:")
+            label = QLabel(tr("dialog_project_required_label"))
             layout.addWidget(label)
 
             # 操作按钮
-            btn_open = QPushButton("Open Project")
-            btn_new = QPushButton("New Project")
+            btn_open = QPushButton(tr("dialog_button_open_project"))
+            btn_new = QPushButton(tr("menu_new"))
             layout.addWidget(btn_open)
             layout.addWidget(btn_new)
 
@@ -204,8 +223,8 @@ class ProjectWindow(QMainWindow):
                 self.accept()  # 关闭对话框
             except (OSError, FileNotFoundError) as e:
                 QMessageBox.critical(
-                    self, "Error",
-                    "Invalid path: Directory does not exist."
+                    self, tr("error_invalid_path"),
+                    tr("error_invalid_directory")
                 )
 
         def new_project(self):
@@ -230,13 +249,13 @@ class ProjectWindow(QMainWindow):
                 self.accept()  # 关闭对话框
             except OSError as e:
                 QMessageBox.critical(
-                    self, "Error",
-                    "Invalid path: Check directory name or permissions."
+                    self, tr("error_invalid_path"),
+                    tr("error_invalid_path")
                 )
             except (ValueError, TypeError) as e:
                 QMessageBox.critical(
-                    self, "Error",
-                    "Invalid path: Check directory name or permissions."
+                    self, tr("error_invalid_path"),
+                    tr("error_invalid_path")
                 )
 
     def ensure_project_path(self):
@@ -279,11 +298,11 @@ class ProjectWindow(QMainWindow):
 
             # 验证路径是否存在
             if not self.project_info.path.exists():
-                raise FileNotFoundError(f"项目目录不存在: {project_path}")
+                raise FileNotFoundError(tr("project_invalid"))
 
             # 更新UI
             self.setWindowTitle(self.window_title)
-            self.set_left_status(f"已打开项目: {project_path}")
+            self.set_left_status(tr("status_ready"))
 
             # 加载项目图片
             self.handle_import_images()
@@ -291,8 +310,8 @@ class ProjectWindow(QMainWindow):
         except (OSError, FileNotFoundError) as e:
             QMessageBox.warning(
                 self,
-                "打开项目失败",
-                f"无法打开项目: {str(e)}"
+                tr("error_load_project"),
+                tr("error_project_path", error=str(e))
             )
             # 确保项目路径为无效状态
             self.project_info = None
@@ -302,19 +321,19 @@ class ProjectWindow(QMainWindow):
     def window_title(self) -> str:
         """获取窗口标题"""
         if not (self.project_info and self.project_info.path.exists()):
-            return "请先打开或新建工程"
+            return tr("project_required_message")
 
         try:
             if self.project_info.path == self.project_info.path.parent:
                 if os.name == 'nt' and len(self.project_info.path.drive) > 0:
-                    return f"{self.project_info.path.drive} 根目录"
-                return "/ 根目录"
+                    return f"{self.project_info.path.drive} " + tr("project_root_directory")
+                return "/ " + tr("project_root_directory")
 
             return self.project_info.project_name
 
         except OSError as e:
             print(f"路径访问错误: {str(e)}")
-            return "工程加载失败"
+            return tr("project_loading_failed")
 
     def on_image_selection_changed(self, selected, deselected):
         """处理图片列表选中项变化"""
@@ -343,7 +362,7 @@ class ProjectWindow(QMainWindow):
         status.setStyleSheet("background-color: #f0f0f0; padding: 5px;")
 
         # 左侧状态
-        self.left_status = QLabel("状态1: 准备就绪")
+        self.left_status = QLabel(tr("status_ready"))
         self.left_status.setStyleSheet("font-size: 12px;")
 
         status.addWidget(self.left_status, 1)
@@ -360,13 +379,13 @@ class ProjectWindow(QMainWindow):
         if selected_count == 1:
             # 只选中一张图片时，显示具体是第几张
             current_row = current_index.row() + 1  # 行号从0开始，所以加1
-            status_text = f"共加载 {total_count} 张图片，当前选中第 {current_row} 张"
+            status_text = tr("status_selected_image", total=total_count, current=current_row)
         elif selected_count > 1:
             # 选中多张图片时，显示选中数量
-            status_text = f"共加载 {total_count} 张图片，当前选中 {selected_count} 张"
+            status_text = tr("status_selected_multiple", total=total_count, selected=selected_count)
         else:
             # 未选中任何图片
-            status_text = f"共加载 {total_count} 张图片，未选中任何图片"
+            status_text = tr("status_no_selection", total=total_count)
         self.set_left_status(status_text)
 
     def handle_import_images(self):
@@ -377,7 +396,7 @@ class ProjectWindow(QMainWindow):
 
             # 更新状态栏
             count = self.image_list.model.rowCount()
-            self.set_left_status(f"已加载 {count} 张图片")
+            self.set_left_status(tr("status_loading_images", count=count))
             
             # 自动跳转到最后一个有标注的图片
             QTimer.singleShot(100, self.image_list.jump_to_last_annotated_image)
@@ -399,24 +418,24 @@ class ProjectWindow(QMainWindow):
             finish_callback: 导出完成后的回调函数（可选）
         """
         if not self.project_info.path.exists():
-            QMessageBox.warning(self, "导出失败", "项目路径不存在")
+            QMessageBox.warning(self, tr("error_export_failed"), tr("error_get_project_path"))
             return
 
         try:
             if total_images == 0:
-                QMessageBox.information(self, "导出完成", "未找到任何图片")
+                QMessageBox.information(self, tr("dialog_title_export_progress"), tr("message_no_images_found"))
                 return
 
             # 创建自定义进度对话框
             progress_dialog = QDialog(self)
-            progress_dialog.setWindowTitle("导出进度")
+            progress_dialog.setWindowTitle(tr("dialog_title_export_progress"))
             progress_dialog.setModal(True)
             progress_dialog.resize(400, 150)
 
             layout = QVBoxLayout()
 
             # 标签显示正在处理的文件
-            file_label = QLabel("正在导出标注数据...")
+            file_label = QLabel(tr("dialog_export_label"))
             file_label.setWordWrap(True)
             layout.addWidget(file_label)
 
@@ -432,7 +451,7 @@ class ProjectWindow(QMainWindow):
             layout.addWidget(progress_label)
 
             # 取消按钮
-            cancel_button = QPushButton("取消")
+            cancel_button = QPushButton(tr("button_cancel"))
             layout.addWidget(cancel_button)
 
             progress_dialog.setLayout(layout)
@@ -457,7 +476,7 @@ class ProjectWindow(QMainWindow):
 
                 # 检查是否取消
                 if canceled:
-                    QMessageBox.information(self, "导出中止", "用户取消了导出操作")
+                    QMessageBox.information(self, tr("message_import_cancelled"), tr("message_export_cancelled"))
                     return
 
                 # 更新进度对话框
@@ -501,7 +520,7 @@ class ProjectWindow(QMainWindow):
                 finish_callback(progress_dialog)
 
         except Exception as e:
-            QMessageBox.warning(self, "导出失败", f"导出过程中发生错误: {str(e)}")
+            QMessageBox.warning(self, tr("error_export_failed"), tr("error_export_process", error=str(e)))
 
     def handle_train_yolo(self):
         """处理训练YOLO模型请求"""
@@ -509,4 +528,4 @@ class ProjectWindow(QMainWindow):
             dialog = TrainYoloDialog(self)
             dialog.exec_()
         except Exception as e:
-            QMessageBox.critical(self, "错误", f"打开训练对话框时出错: {str(e)}")
+            QMessageBox.critical(self, tr("error_open_train_dialog"), tr("error_open_train_dialog", error=str(e)))

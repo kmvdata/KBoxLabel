@@ -5,12 +5,13 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt
 from src.core.project_info import ProjectInfo
 
+from src.core.i18n.language_manager import tr
 
 class StatisticsDialog(QDialog):
     def __init__(self, project_info: ProjectInfo, parent=None):
         super().__init__(parent)
         self.project_info = project_info
-        self.setWindowTitle("类别统计信息")
+        self.setWindowTitle(tr("statistics_title"))
         self.setMinimumWidth(600)
         self.setMinimumHeight(400)
         self.setWindowFlags(self.windowFlags() & ~Qt.WindowContextHelpButtonHint)
@@ -25,7 +26,7 @@ class StatisticsDialog(QDialog):
         layout.setContentsMargins(20, 20, 20, 20)
         
         # 标题
-        title_label = QLabel("标注类别统计")
+        title_label = QLabel(tr("train_statistics_title"))
         title_label.setAlignment(Qt.AlignCenter)
         title_label.setStyleSheet("font-size: 16px; font-weight: bold; margin-bottom: 10px;")
         layout.addWidget(title_label)
@@ -38,7 +39,7 @@ class StatisticsDialog(QDialog):
         
         # 统计表格
         self.tree = QTreeWidget()
-        self.tree.setHeaderLabels(["类别名称", "类别ID", "标注数量"])
+        self.tree.setHeaderLabels([tr("statistics_header_name"), tr("statistics_header_id"), tr("statistics_header_count")])
         self.tree.header().setSectionResizeMode(QHeaderView.Stretch)
         self.tree.setAlternatingRowColors(True)
         self.tree.setStyleSheet("""
@@ -56,7 +57,7 @@ class StatisticsDialog(QDialog):
         button_layout = QHBoxLayout()
         button_layout.addStretch()
         
-        close_button = QPushButton("关闭")
+        close_button = QPushButton(tr("menu_close"))
         close_button.clicked.connect(self.accept)
         close_button.setStyleSheet("""
             QPushButton {

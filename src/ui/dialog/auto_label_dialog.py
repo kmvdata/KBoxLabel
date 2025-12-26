@@ -5,6 +5,7 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt, pyqtSignal
 
+from src.core.i18n.language_manager import tr
 
 class AutoLabelDialog(QDialog):
     # 自定义信号
@@ -12,7 +13,7 @@ class AutoLabelDialog(QDialog):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("自动标注设置")
+        self.setWindowTitle(tr("auto_label_title"))
         self.setMinimumWidth(500)
         self.init_ui()
         self.connect_signals()
@@ -24,25 +25,25 @@ class AutoLabelDialog(QDialog):
         main_layout.setContentsMargins(20, 20, 20, 20)
 
         # ==================== 模型选择区域 ====================
-        model_group = QGroupBox("模型选择")
+        model_group = QGroupBox(tr("auto_label_model_selection"))
         model_layout = QFormLayout()
         model_layout.setSpacing(10)
 
         # 模型类型选择
         self.model_combo = QComboBox()
-        self.model_combo.addItems(["YOLOv8 (推荐)", "Mask R-CNN", "DETR", "EfficientDet"])
+        self.model_combo.addItems([tr("menu_train_yolo") + " (推荐)", "Mask R-CNN", "DETR", "EfficientDet"])
         model_layout.addRow("模型类型:", self.model_combo)
 
         # 模型精度选择
         self.precision_combo = QComboBox()
-        self.precision_combo.addItems(["高精度 (速度慢)", "均衡", "快速 (精度较低)"])
+        self.precision_combo.addItems([tr("auto_label_precision_mode") + " (" + tr("auto_label_precision_mode") + ")", tr("auto_label_params"), tr("auto_label_start") + " (" + tr("auto_label_precision_mode") + ")"])
         model_layout.addRow("精度模式:", self.precision_combo)
 
         model_group.setLayout(model_layout)
         main_layout.addWidget(model_group)
 
         # ==================== 参数设置区域 ====================
-        params_group = QGroupBox("参数设置")
+        params_group = QGroupBox(tr("auto_label_params"))
         params_layout = QFormLayout()
         params_layout.setSpacing(10)
 
@@ -63,12 +64,12 @@ class AutoLabelDialog(QDialog):
         params_layout.addRow("IOU阈值:", self.iou_spin)
 
         # 高级选项
-        self.advanced_check = QCheckBox("显示高级选项")
+        self.advanced_check = QCheckBox(tr("auto_label_advanced"))
         self.advanced_check.stateChanged.connect(self.toggle_advanced_options)
         params_layout.addRow(self.advanced_check)
 
         # 高级选项容器（默认隐藏）
-        self.advanced_group = QGroupBox("高级选项")
+        self.advanced_group = QGroupBox(tr("auto_label_advanced_options"))
         advanced_layout = QFormLayout()
 
         # 批次大小
@@ -99,7 +100,7 @@ class AutoLabelDialog(QDialog):
         self.progress_bar = QProgressBar()
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setTextVisible(True)
-        self.progress_bar.setFormat("就绪")
+        self.progress_bar.setFormat(tr("auto_label_ready"))
         self.progress_bar.setAlignment(Qt.AlignCenter)
         main_layout.addWidget(self.progress_bar)
 
@@ -107,14 +108,14 @@ class AutoLabelDialog(QDialog):
         button_layout = QHBoxLayout()
         button_layout.addStretch()
 
-        self.cancel_button = QPushButton("取消")
+        self.cancel_button = QPushButton(tr("button_cancel"))
         self.cancel_button.setMinimumWidth(100)
         self.cancel_button.setStyleSheet(
             "QPushButton { background-color: #5C5C5C; color: white; padding: 8px; }"
             "QPushButton:hover { background-color: #4A4A4A; }"
         )
 
-        self.start_button = QPushButton("开始自动标注")
+        self.start_button = QPushButton(tr("auto_label_start"))
         self.start_button.setMinimumWidth(150)
         self.start_button.setStyleSheet(
             "QPushButton { background-color: #0078D7; color: white; padding: 8px; font-weight: bold; }"
@@ -155,7 +156,7 @@ class AutoLabelDialog(QDialog):
         self.start_auto_labeling.emit(config)
 
         # 更新进度条状态
-        self.progress_bar.setFormat("正在初始化模型...")
+        self.progress_bar.setFormat(tr("auto_label_initializing"))
         self.start_button.setEnabled(False)
 
     def update_progress(self, value, message=None):
@@ -167,8 +168,8 @@ class AutoLabelDialog(QDialog):
     def on_completed(self, success, message):
         """自动标注完成处理"""
         if success:
-            self.progress_bar.setFormat(f"完成! {message}")
+            self.progress_bar.setFormat(tr("auto_label_completed", message=message))
             self.accept()  # 自动关闭对话框
         else:
-            self.progress_bar.setFormat(f"错误: {message}")
+            self.progress_bar.setFormat(tr("auto_label_error", message=message))
             self.start_button.setEnabled(True)

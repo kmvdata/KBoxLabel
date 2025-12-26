@@ -11,6 +11,8 @@ from PyQt5.QtWidgets import (
 )
 
 from src.core.ksettings import KSettings
+from src.core.i18n.language_manager import tr, LanguageManager
+from PyQt5.QtCore import pyqtSlot
 
 
 class WelcomeScreen(QMainWindow):
@@ -31,7 +33,7 @@ class WelcomeScreen(QMainWindow):
         self.lbl_recent = None
         self.btn_new = None
         self.btn_open_selected = None  # 添加打开选中项目的按钮
-        self.setWindowTitle("Project Manager - Welcome")
+        self.setWindowTitle(tr("welcome_window_title"))
         self.setFixedSize(800, 600)  # 固定窗口尺寸
 
         # 存储最近项目路径列表
@@ -48,6 +50,29 @@ class WelcomeScreen(QMainWindow):
 
         # 应用样式表
         self.apply_stylesheet()
+        
+        # 连接语言变更信号
+        LanguageManager.instance().language_changed.connect(self.on_language_changed)
+    
+    @pyqtSlot(str)
+    def on_language_changed(self, language: str):
+        """处理语言变更事件"""
+        # 更新窗口标题
+        self.setWindowTitle(tr("welcome_window_title"))
+        
+        # 更新按钮文本
+        self.btn_new.setText(tr("new_project"))
+        self.btn_open.setText(tr("open_project"))
+        
+        # 更新标签文本
+        self.lbl_recent.setText(tr("recent_projects"))
+        self.btn_open_selected.setText(tr("open"))
+        
+        # 更新状态栏文本
+        self.status_bar.showMessage(tr("status_ready"), 5000)
+        
+        # 重新填充最近项目列表（以更新任何依赖于语言的文本）
+        self.populate_recent_projects()
 
     def setup_ui(self) -> None:
         """设置用户界面布局和组件"""
@@ -65,14 +90,14 @@ class WelcomeScreen(QMainWindow):
         top_layout.setSpacing(20)
 
         # 新建项目按钮
-        self.btn_new = QPushButton("新建项目")
+        self.btn_new = QPushButton(tr("new_project"))
         self.btn_new.setIcon(self.style().standardIcon(getattr(QStyle, 'SP_FileDialogNewFolder', 41)))
         self.btn_new.setIconSize(QSize(20, 20))
         self.btn_new.setFixedWidth(120)
         self.btn_new.setFixedHeight(40)
 
         # 打开项目按钮
-        self.btn_open = QPushButton("打开项目")
+        self.btn_open = QPushButton(tr("open_project"))
         self.btn_open.setIcon(self.style().standardIcon(getattr(QStyle, 'SP_DirOpenIcon', 4)))
         self.btn_open.setIconSize(QSize(20, 20))
         self.btn_open.setFixedWidth(120)
@@ -84,7 +109,7 @@ class WelcomeScreen(QMainWindow):
 
         # ===== 中间内容区域 =====
         # 标题
-        self.lbl_recent = QLabel("最近打开的项目")
+        self.lbl_recent = QLabel(tr("recent_projects"))
         self.lbl_recent.setFont(QFont("Arial", 16, QFont.Bold))
 
         # 最近项目列表
@@ -104,7 +129,7 @@ class WelcomeScreen(QMainWindow):
         bottom_layout.addStretch()
         
         # 添加打开选中项目的按钮
-        self.btn_open_selected = QPushButton("打开")
+        self.btn_open_selected = QPushButton(tr("open"))
         self.btn_open_selected.setEnabled(False)  # 默认禁用
         self.btn_open_selected.setFixedWidth(100)
         self.btn_open_selected.setFixedHeight(35)
@@ -113,7 +138,7 @@ class WelcomeScreen(QMainWindow):
         
         # 状态栏
         self.status_bar = QStatusBar()
-        self.status_bar.showMessage("Version 1.0.0", 5000)
+        self.status_bar.showMessage(tr("status_ready"), 5000)
         self.status_bar.setStyleSheet("QStatusBar {background-color: #f5f5f5;}")
         self.setStatusBar(self.status_bar)
 
@@ -248,7 +273,7 @@ class WelcomeScreen(QMainWindow):
         self.list_recent.clear()
 
         if not self.recent_projects:
-            self.list_recent.addItem("暂无最近打开的项目")
+            self.list_recent.addItem(tr("no_recent_projects"))
             self.list_recent.item(0).setFlags(Qt.NoItemFlags)  # 禁用选择
             return
 
@@ -271,7 +296,7 @@ class WelcomeScreen(QMainWindow):
         # 打开目录选择对话框
         directory = QFileDialog.getExistingDirectory(
             self,
-            "选择新项目位置",
+            tr("select_new_project_location"),
             "",
             QFileDialog.ShowDirsOnly | QFileDialog.DontResolveSymlinks
         )
@@ -292,8 +317,8 @@ class WelcomeScreen(QMainWindow):
         except (OSError, PermissionError) as e:
             QMessageBox.critical(
                 self,
-                "目录不可用",
-                f"所选目录不可用: {str(e)}\n请选择其他目录。"
+                tr("error_invalid_path"),
+                tr("directory_unavailable", error=str(e))
             )
 
     def open_existing_project(self) -> None:
@@ -301,7 +326,7 @@ class WelcomeScreen(QMainWindow):
         # 打开目录选择对话框
         directory = QFileDialog.getExistingDirectory(
             self,
-            "选择项目目录",
+            tr("select_project_directory"),
             "",
             QFileDialog.ShowDirsOnly | QFileDialog.DontResolveSymlinks
         )
@@ -334,7 +359,7 @@ class WelcomeScreen(QMainWindow):
         """处理列表项选择变化事件"""
         # 检查是否有选中的项目
         selected_items = self.list_recent.selectedItems()
-        if selected_items and selected_items[0].text() != "暂无最近打开的项目":
+        if selected_items and selected_items[0].text() != tr("no_recent_projects"): 
             self.btn_open_selected.setEnabled(True)
         else:
             self.btn_open_selected.setEnabled(False)
@@ -368,8 +393,8 @@ class WelcomeScreen(QMainWindow):
         if not project_dir.exists() or not project_dir.is_dir():
             QMessageBox.critical(
                 self,
-                "项目无效",
-                "所选项目路径无效或不存在。\n请选择其他项目。"
+                tr("error_invalid_directory"),
+                tr("project_invalid")
             )
             # 从最近项目列表中移除无效项目
             if project_path in self.recent_projects:
