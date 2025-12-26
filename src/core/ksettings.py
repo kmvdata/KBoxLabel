@@ -18,3 +18,14 @@ class KSettings(QSettings):
         """设置最近一次打开的目录路径"""
         self.setValue("lastOpenedDirectory", directory)
         self.sync()
+
+    @property
+    def language(self) -> str:
+        """获取当前语言"""
+        return self.value("language", "zh", type=str)
+
+    @language.setter
+    def language(self, language: str) -> None:
+        """设置当前语言"""
+        self.setValue("language", language)
+        self.sync()

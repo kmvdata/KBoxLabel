@@ -405,28 +405,12 @@ class MainMenuBar(QMenuBar):
 
     def open_help_documentation(self):
         """打开帮助文档"""
-        # 读取项目根目录下的README.md文件
-        from pathlib import Path
+        # 导入帮助对话框
+        from src.ui.dialog.help_dialog import HelpDialog
         
-        # 获取项目根目录的README.md文件
-        project_root = Path(__file__).parent.parent.parent  # 获取到src目录的上两级
-        readme_path = project_root / "README.md"
-        
-        if readme_path.exists():
-            # 在系统默认应用中打开README.md
-            import subprocess
-            try:
-                if os.name == 'nt':  # Windows
-                    os.startfile(str(readme_path))
-                elif os.name == 'posix':  # macOS and Linux
-                    if sys.platform == 'darwin':  # macOS
-                        subprocess.run(['open', str(readme_path)])
-                    else:  # Linux
-                        subprocess.run(['xdg-open', str(readme_path)])
-            except Exception as e:
-                QMessageBox.information(self, "帮助文档", f"无法打开帮助文档: {str(e)}")
-        else:
-            QMessageBox.information(self, "帮助文档", "帮助文档不存在")
+        # 创建并显示帮助对话框
+        help_dialog = HelpDialog(self)
+        help_dialog.exec_()
 
     def switch_to_chinese(self):
         """切换到中文语言"""
