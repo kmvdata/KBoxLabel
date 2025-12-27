@@ -17,6 +17,7 @@ from src.ui.widget.annotation_list.annotation_delegate import AnnotationDelegate
 from src.ui.widget.annotation_list.annotation_item import AnnotationItem
 from src.ui.widget.annotation_list.annotation_list_model import AnnotationListModel, AnnotationDropArea
 from src.ui.widget.annotation_list.editable_annotation_delegate import EditableAnnotationDelegate
+from src.core.i18n.language_manager import tr  # 添加国际化翻译导入
 
 
 class AnnotationList(QListView):
@@ -164,7 +165,7 @@ class AnnotationList(QListView):
 
         # 创建搜索框
         self.search_edit = QLineEdit()
-        self.search_edit.setPlaceholderText("搜索类别...")
+        self.search_edit.setPlaceholderText(tr("class_manager_label") + "...")
         self.search_edit.setFixedWidth(150)
         self.search_edit.setMinimumWidth(120)
         self.search_edit.setMaximumWidth(200)
@@ -589,8 +590,8 @@ class AnnotationList(QListView):
         if count > 0:
             reply = QMessageBox.question(
                 self,
-                "确认删除",
-                f"有{count}个标记数据使用了类别'{category_name}'，是否确认删除？",
+                tr("context_menu_confirm_delete"),
+                tr("context_menu_delete_confirm_message", count=count, category_name=category_name),
                 QMessageBox.Yes | QMessageBox.No,
                 QMessageBox.No
             )
@@ -602,7 +603,7 @@ class AnnotationList(QListView):
         try:
             self.source_model.delete_category_by_index(source_index)
         except Exception as e:
-            QMessageBox.critical(self, "删除失败", f"删除类别时出错: {str(e)}")
+            QMessageBox.critical(self, tr("context_menu_delete_error"), tr("context_menu_delete_error_message", error=str(e)))
             return
 
     def contextMenuEvent(self, event):
@@ -622,15 +623,15 @@ class AnnotationList(QListView):
         menu = QMenu(self)
 
         # 添加菜单项
-        add_action = QAction("新增", self)
+        add_action = QAction(tr("context_menu_add"), self)
         add_action.triggered.connect(self._handle_add_annotation)  # type:ignore
 
-        rename_action = QAction("重命名", self)
+        rename_action = QAction(tr("context_menu_rename"), self)
         rename_action.triggered.connect(self._handle_rename) # type: ignore
         rename_action.setEnabled(index.isValid())  # 只有选中项时可用
 
 
-        delete_action = QAction("删除", self)
+        delete_action = QAction(tr("context_menu_delete"), self)
         delete_action.triggered.connect(self._handle_delete)  # type:ignore
         delete_action.setEnabled(index.isValid())  # 只有选中项时可用
 
@@ -640,7 +641,7 @@ class AnnotationList(QListView):
         menu.addAction(rename_action)
         
         # 添加修改颜色菜单项
-        color_action = QAction("修改颜色", self)
+        color_action = QAction(tr("context_menu_edit_color"), self)
         color_action.triggered.connect(self._handle_set_color)  # type:ignore
         color_action.setEnabled(index.isValid())  # 只有选中项时可用
         menu.addAction(color_action)
@@ -651,7 +652,7 @@ class AnnotationList(QListView):
         menu.addSeparator()
         
         # 添加统计菜单项
-        statistics_action = QAction("统计", self)
+        statistics_action = QAction(tr("context_menu_statistics"), self)
         statistics_action.triggered.connect(self._handle_statistics)  # type:ignore
         menu.addAction(statistics_action)
 
@@ -701,7 +702,7 @@ class AnnotationList(QListView):
         current_color = annotation_item.class_color
         
         # 显示颜色选择对话框
-        color = QColorDialog.getColor(current_color, self, "选择类别颜色")
+        color = QColorDialog.getColor(current_color, self, tr("context_menu_edit_color"))
         
         if color.isValid():  # 如果用户选择了颜色并确认
             try:
@@ -727,9 +728,9 @@ class AnnotationList(QListView):
 
                     print(f"类别 '{class_name}' 的颜色已更新为 {color_name}")
                 else:
-                    QMessageBox.warning(self, "修改颜色失败", f"无法更新类别 '{class_name}' 的颜色")
+                    QMessageBox.warning(self, tr("dialog_title_error"), f"无法更新类别 '{class_name}' 的颜色")
             except Exception as e:
-                QMessageBox.critical(self, "错误", f"修修改颜色时出错: {str(e)}")
+                QMessageBox.critical(self, tr("dialog_title_error"), f"修改颜色时出错: {str(e)}")
 
     def load_categories_from_yolo_model(self, model_path):
         """

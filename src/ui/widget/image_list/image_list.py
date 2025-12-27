@@ -13,6 +13,7 @@ from PyQt5.QtWidgets import (QListView, QStyledItemDelegate, QStyle,
 from src.core.project_info import ProjectInfo
 from src.ui.widget.image_list.thumbnail_loader import ThumbnailLoader
 from src.ui.widget.image_list.yolo_workder import YoloWorker
+from src.core.i18n.language_manager import tr  # 添加国际化翻译导入
 
 
 # 自定义SpinBox，使其步进到最近的5的倍数
@@ -317,11 +318,11 @@ class ImageListView(QListView):
         
         # 第一部分：文件操作
         if sys.platform == 'darwin':  # macOS
-            open_action = menu.addAction("在Finder中打开")
+            open_action = menu.addAction(tr("context_menu_open_in_finder"))
         else:  # Windows, Linux
-            open_action = menu.addAction("在文件夹中打开")
-        rename_action = menu.addAction("重命名")
-        delete_action = menu.addAction("删除")
+            open_action = menu.addAction(tr("context_menu_open_in_folder"))
+        rename_action = menu.addAction(tr("context_menu_rename"))
+        delete_action = menu.addAction(tr("context_menu_delete"))
         
         # 第一部分菜单项可用性设置
         open_action.setEnabled(is_item_clicked)
@@ -333,13 +334,13 @@ class ImageListView(QListView):
         
         # 第二部分：YOLO识别相关
         # 添加一个灰色的标签项，显示当前块的含义
-        yolo_label_action = menu.addAction("Yolo识别")
+        yolo_label_action = menu.addAction(tr("context_menu_yolo_recognition"))
         yolo_label_action.setEnabled(False)  # 灰色显示，不可点击
         
         # 识别单个图片
-        run_action = menu.addAction("识别")
+        run_action = menu.addAction(tr("context_menu_recognize"))
         # 识别多图
-        batch_recognition_action = menu.addAction("识别多图")
+        batch_recognition_action = menu.addAction(tr("context_menu_batch_recognize"))
         
         # 第二部分菜单项可用性设置
         model_loaded = self.project_info.is_model_loaded
@@ -350,8 +351,8 @@ class ImageListView(QListView):
         menu.addSeparator()
         
         # 第三部分：跳转操作
-        jump_to_action = menu.addAction("跳转至...")
-        smart_jump_action = menu.addAction("跳转到最后标注")
+        jump_to_action = menu.addAction(tr("context_menu_jump_to"))
+        smart_jump_action = menu.addAction(tr("context_menu_jump_to_last_annotated"))
         
         # 第三部分菜单项可用性设置
         jump_to_action.setEnabled(True)
@@ -384,7 +385,7 @@ class ImageListView(QListView):
         # 弹出输入对话框
         new_name, ok = QInputDialog.getText(
             self,
-            "重命名文件",
+            tr("dialog_title_rename"),
             "请输入新文件名:",
             text=name
         )
@@ -397,7 +398,7 @@ class ImageListView(QListView):
             # 检查文件名是否包含非法字符
             invalid_chars = set(r'<>:"/\|?*')
             if any(c in invalid_chars for c in new_name):
-                QMessageBox.warning(self, "错误", "文件名包含非法字符！")
+                QMessageBox.warning(self, tr("dialog_title_error"), "文件名包含非法字符！")
                 return
 
             # 构建新路径
@@ -405,7 +406,7 @@ class ImageListView(QListView):
 
             # 检查新文件是否已存在
             if new_path.exists():
-                QMessageBox.warning(self, "错误", "文件已存在！")
+                QMessageBox.warning(self, tr("dialog_title_error"), "文件已存在！")
                 return
 
             try:
@@ -438,7 +439,7 @@ class ImageListView(QListView):
                 self.project_info.domain.rename_image_for_kolo_item(old_path, new_path)
 
             except Exception as e:
-                QMessageBox.critical(self, "错误", f"重命名失败: {str(e)}")
+                QMessageBox.critical(self, tr("dialog_title_error"), f"重命名失败: {str(e)}")
 
     def delete_selected(self):
         """删除文件（支持多选删除）"""
@@ -467,7 +468,7 @@ class ImageListView(QListView):
             file_name = files_to_delete[0][2]
             reply = QMessageBox.question(
                 self,
-                "确认删除",
+                tr("context_menu_confirm_delete"),
                 f"确定要删除 '{file_name}' 吗？\n此操作不可恢复！",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
             )
@@ -475,7 +476,7 @@ class ImageListView(QListView):
             # 多个文件删除确认
             reply = QMessageBox.question(
                 self,
-                "确认删除",
+                tr("context_menu_confirm_delete"),
                 f"确定要删除选中的 {len(files_to_delete)} 个文件吗？\n此操作不可恢复！",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
             )
@@ -549,12 +550,12 @@ class ImageListView(QListView):
                         error_msg += f"{file_name}: {error}\n"
                     if len(failed_files) > 5:
                         error_msg += f"... 还有 {len(failed_files) - 5} 个文件删除失败\n"
-                    QMessageBox.warning(self, "删除完成", error_msg)
+                    QMessageBox.warning(self, tr("context_menu_delete"), error_msg)
                 elif len(files_to_delete) > 1:
-                    QMessageBox.information(self, "删除完成", f"成功删除 {success_count} 个文件。")
+                    QMessageBox.information(self, tr("context_menu_delete"), f"成功删除 {success_count} 个文件。")
 
             except Exception as e:
-                QMessageBox.critical(self, "错误", f"删除过程中发生错误: {str(e)}")
+                QMessageBox.critical(self, tr("dialog_title_error"), f"删除过程中发生错误: {str(e)}")
 
     def open_in_explorer(self, index):
         """在系统文件管理器中打开文件所在目录并选中文件"""
@@ -599,7 +600,7 @@ class ImageListView(QListView):
                 # 默认情况下，只打开目录
                 subprocess.Popen(['xdg-open', os.path.dirname(file_path)])
         except Exception as e:
-            QMessageBox.critical(self, "错误", f"打开文件夹失败: {str(e)}")
+            QMessageBox.critical(self, tr("dialog_title_error"), f"打开文件夹失败: {str(e)}")
 
     def jump_to_last_annotated_image(self):
         """跳转到最后一个有标注的图片的通用方法
@@ -618,7 +619,7 @@ class ImageListView(QListView):
 
             # 如果没有找到任何KoloItem，根据参数决定是否显示提示信息
             if not last_kolo_item:
-                QMessageBox.information(self, "智能跳转", "数据库中没有找到任何标注记录。")
+                QMessageBox.information(self, tr("context_menu_jump_to_last_annotated"), "数据库中没有找到任何标注记录。")
                 return
 
             # 获取最后一个KoloItem对应的图片名称
@@ -640,12 +641,12 @@ class ImageListView(QListView):
                     return
 
             # 如果没有找到对应的图片文件，根据参数决定是否显示提示信息
-            QMessageBox.information(self, "智能跳转", f"未找到与最后一条标注记录关联的图片文件: {target_image_name}")
+            QMessageBox.information(self, tr("context_menu_jump_to_last_annotated"), f"未找到与最后一条标注记录关联的图片文件: {target_image_name}")
 
         except Exception as e:
             print(f"跳转到最后标注图片时出错: {e}")
             # 根据参数决定是否显示错误提示
-            QMessageBox.warning(self, "错误", f"跳转时发生错误: {str(e)}")
+            QMessageBox.warning(self, tr("dialog_title_error"), f"跳转时发生错误: {str(e)}")
 
     def on_jump_to_clicked(self):
         """跳转至...菜单项点击事件"""
@@ -656,7 +657,7 @@ class ImageListView(QListView):
         max_index = self.model.rowCount()
         jump_to, ok = QInputDialog.getInt(
             self,
-            "跳转至...",
+            tr("context_menu_jump_to"),
             f"请输入图片序号 (1-{max_index}):",
             1, 1, max_index, 1
         )
@@ -673,7 +674,7 @@ class ImageListView(QListView):
         """处理用户选中的一个或多个文件，使用YOLO模型对这些文件进行处理"""
         # 检查模型是否已加载
         if not self.project_info.is_model_loaded:
-            QMessageBox.warning(self, "警告", "模型未加载，请先加载YOLO模型。")
+            QMessageBox.warning(self, tr("dialog_title_error"), "模型未加载，请先加载YOLO模型。")
             return
 
         # 获取当前选中的所有文件索引
@@ -694,7 +695,7 @@ class ImageListView(QListView):
 
         # 创建进度对话框显示处理状态
         progress_dialog = QDialog(self)
-        progress_dialog.setWindowTitle("Processing")
+        progress_dialog.setWindowTitle(tr("dialog_title_export_progress"))
         progress_dialog.setModal(True)
         progress_dialog.resize(400, 150)
 
@@ -714,7 +715,7 @@ class ImageListView(QListView):
         progress_label.setAlignment(Qt.AlignRight)
         layout.addWidget(progress_label)
 
-        cancel_button = QPushButton("Cancel")
+        cancel_button = QPushButton(tr("button_cancel"))
         layout.addWidget(cancel_button)
 
         progress_dialog.setLayout(layout)
@@ -815,21 +816,21 @@ class ImageListView(QListView):
                 msg += "\n\n错误详情:\n" + "\n".join(errors[:5])  # 只显示前5个错误
                 if len(errors) > 5:
                     msg += f"\n... 还有 {len(errors) - 5} 个错误"
-            QMessageBox.information(self, "处理结果", msg)
+            QMessageBox.information(self, tr("dialog_title_export_progress"), msg)
         else:
             msg = f"处理被用户取消\n\n已处理: {processed_count}\n成功: {success_count}\n错误: {error_count}"
-            QMessageBox.information(self, "处理结果", msg)
+            QMessageBox.information(self, tr("dialog_title_export_progress"), msg)
 
     def on_batch_recognition_clicked(self, index):
         """处理指定范围内的图片，使用YOLO模型进行批量处理"""
         # 检查模型是否已加载
         if not self.project_info.is_model_loaded:
-            QMessageBox.warning(self, "警告", "模型未加载，请先加载YOLO模型。")
+            QMessageBox.warning(self, tr("dialog_title_error"), "模型未加载，请先加载YOLO模型。")
             return
 
         # 检查是否存在可处理的文件
         if self.model.rowCount() == 0:
-            QMessageBox.information(self, "提示", "没有可处理的文件。")
+            QMessageBox.information(self, tr("dialog_title_info"), "没有可处理的文件。")
             return
 
         # 获取当前点击的索引（如果有效）
@@ -854,7 +855,7 @@ class BatchRecognitionDialog(QDialog):
     
     def __init__(self, total_count, current_index, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("识别多图")
+        self.setWindowTitle(tr("context_menu_batch_recognize"))
         self.setModal(True)
         self.resize(500, 400)
         
@@ -905,8 +906,8 @@ class BatchRecognitionDialog(QDialog):
         
         # 按钮区域
         button_layout = QVBoxLayout()
-        self.start_button = QPushButton("开始识别")
-        self.cancel_button = QPushButton("取消")
+        self.start_button = QPushButton(tr("button_start"))
+        self.cancel_button = QPushButton(tr("button_cancel"))
         
         self.start_button.clicked.connect(self.on_start_clicked)
         self.cancel_button.clicked.connect(self.reject)
