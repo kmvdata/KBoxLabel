@@ -123,7 +123,25 @@ class ProjectWindow(QMainWindow):
         
         # 连接语言变更信号
         LanguageManager.instance().language_changed.connect(self.on_language_changed)
-    
+        
+        # 确保项目路径有效（强制用户设置）
+        self.ensure_project_path()
+        self.image_list.sig_canvas_needs_reload.connect(
+            self.image_canvas.reload_image
+        )
+
+        # 连接选中项变化信号
+        self.image_list.sig_selection_changed.connect(self.on_image_list_selection_changed)  # type: ignore
+        # self.image_list.selectionModel().selectionChanged.connect(self.on_image_selection_changed)  # type: ignore
+        self.image_list.sig_image_clicked.connect(self.image_canvas.load_image)
+
+        # 窗口加载完成后自动选中第一个元素
+        QTimer.singleShot(0, self.select_first_image)
+        
+        # 自动加载项目图片（确保路径有效后）
+        if self.project_info and self.project_info.path.exists():
+            self.handle_import_images()
+
     @pyqtSlot(str)
     def on_language_changed(self, language: str):
         """处理语言变更事件"""
@@ -138,7 +156,6 @@ class ProjectWindow(QMainWindow):
         if hasattr(self, 'menu_bar'):
             self.menu_bar.update_menu_texts()
 
-        self.set_project_path(self.project_info.path)
         # 确保项目路径有效（强制用户设置）
         self.ensure_project_path()
         self.image_list.sig_canvas_needs_reload.connect(
@@ -152,6 +169,10 @@ class ProjectWindow(QMainWindow):
 
         # 窗口加载完成后自动选中第一个元素
         QTimer.singleShot(0, self.select_first_image)
+        
+        # 设置项目路径并加载图片（这会触发图片加载）
+        if self.project_info and self.project_info.path.exists():
+            self.set_project_path(self.project_info.path)
 
     def select_first_image(self):
         """选中图片列表中的第一个元素"""
